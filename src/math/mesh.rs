@@ -1,10 +1,10 @@
-use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
+use nalgebra_glm::{vec2, vec4, Vec2, Vec3, Vec4};
 
 pub struct Mesh {
-    positions: Vec<Vec3>,
-    colors: Vec<Vec4>,
-    texcoords: Vec<Vec2>,
-    normals: Vec<Vec3>,
+    pub positions: Vec<Vec3>,
+    pub colors: Vec<Vec4>,
+    pub texcoords: Vec<Vec2>,
+    pub normals: Vec<Vec3>,
 }
 
 impl Mesh {
@@ -47,7 +47,7 @@ impl MeshBuilder<(), (), ()> {
 }
 
 impl<TPositionsType, TColorsType, TTexcoordsType>
-MeshBuilder<TPositionsType, TColorsType, TTexcoordsType>
+    MeshBuilder<TPositionsType, TColorsType, TTexcoordsType>
 {
     pub fn with_square(self, size: Vec2) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
         MeshBuilder {
@@ -155,6 +155,9 @@ pub fn create_square_texcoords(position: Vec2, size: Vec2) -> Vec<Vec2> {
         vec2(position.x + size.x, position.y),
     ];
 }
+
+#[cfg(test)]
+use nalgebra_glm::vec3;
 
 #[test]
 fn test_manually() {
