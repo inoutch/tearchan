@@ -14,19 +14,20 @@ impl Mesh {
         texcoords: Vec<Vec2>,
         normals: Vec<Vec3>,
     ) -> Result<Mesh, &'static str> {
-        return Ok(Mesh {
+        Ok(Mesh {
             positions,
             colors,
             texcoords,
             normals,
-        });
+        })
     }
 
     pub fn size(&self) -> usize {
-        return self.positions.len();
+        self.positions.len()
     }
 }
 
+#[derive(Default)]
 pub struct MeshBuilder<TPositionsType, TColorsType, TTexcoordsType> {
     positions: TPositionsType,
     colors: TColorsType,
@@ -36,73 +37,73 @@ pub struct MeshBuilder<TPositionsType, TColorsType, TTexcoordsType> {
 
 impl MeshBuilder<(), (), ()> {
     pub fn new() -> MeshBuilder<(), (), ()> {
-        return MeshBuilder {
+        MeshBuilder {
             positions: (),
             colors: (),
             texcoords: (),
             normals: vec![],
-        };
+        }
     }
 }
 
 impl<TPositionsType, TColorsType, TTexcoordsType>
-    MeshBuilder<TPositionsType, TColorsType, TTexcoordsType>
+MeshBuilder<TPositionsType, TColorsType, TTexcoordsType>
 {
     pub fn with_square(self, size: Vec2) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
-        return MeshBuilder {
+        MeshBuilder {
             positions: create_square_positions(vec2(0.0f32, 0.0f32), size),
             colors: create_square_colors(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32)),
             texcoords: create_square_texcoords(vec2(0.0f32, 0.0f32), vec2(1.0f32, 1.0f32)),
             normals: self.normals,
-        };
+        }
     }
 
     pub fn positions(
         self,
         positions: Vec<Vec3>,
     ) -> MeshBuilder<Vec<Vec3>, TColorsType, TTexcoordsType> {
-        return MeshBuilder {
+        MeshBuilder {
             positions,
             colors: self.colors,
             texcoords: self.texcoords,
             normals: self.normals,
-        };
+        }
     }
 
     pub fn colors(
         self,
         colors: Vec<Vec4>,
     ) -> MeshBuilder<TPositionsType, Vec<Vec4>, TTexcoordsType> {
-        return MeshBuilder {
+        MeshBuilder {
             positions: self.positions,
             colors,
             texcoords: self.texcoords,
             normals: self.normals,
-        };
+        }
     }
 
     pub fn texcoords(
         self,
         texcoords: Vec<Vec2>,
     ) -> MeshBuilder<TPositionsType, TColorsType, Vec<Vec2>> {
-        return MeshBuilder {
+        MeshBuilder {
             positions: self.positions,
             colors: self.colors,
             texcoords,
             normals: self.normals,
-        };
+        }
     }
 
     pub fn normals(
         self,
         normals: Vec<Vec3>,
     ) -> MeshBuilder<TPositionsType, TColorsType, TTexcoordsType> {
-        return MeshBuilder {
+        MeshBuilder {
             positions: self.positions,
             colors: self.colors,
             texcoords: self.texcoords,
             normals,
-        };
+        }
     }
 }
 
@@ -110,7 +111,7 @@ impl MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
     pub fn build(self) -> Result<Mesh, String> {
         if self.positions.len() == self.colors.len()
             && self.positions.len() == self.texcoords.len()
-            && (self.positions.len() == self.normals.len() || self.normals.len() == 0)
+            && (self.positions.len() == self.normals.len() || self.normals.is_empty())
         {
             return Ok(Mesh {
                 positions: self.positions,
@@ -119,13 +120,13 @@ impl MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
                 normals: self.normals,
             });
         }
-        return Err(format!(
+        Err(format!(
             "Illegal vertex length: pos={}, col={}, tex={}, nom={}",
             self.positions.len(),
             self.colors.len(),
             self.texcoords.len(),
             self.normals.len()
-        ));
+        ))
     }
 }
 
