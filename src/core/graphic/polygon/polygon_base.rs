@@ -28,6 +28,7 @@ pub trait PolygonBase {
 
     fn set_visible(&mut self, visible: bool) {
         self.get_mut_polygon().visible = visible;
+        self.update_all_positions();
     }
 
     fn visible(&self) -> bool {
@@ -136,5 +137,21 @@ pub trait PolygonBase {
         polygon.children().iter().for_each(|x| {
             x.borrow_mut().update_all_normals();
         });
+    }
+
+    fn reset_all_position_change_range(&mut self) {
+        self.get_mut_polygon().position_change_range.reset();
+    }
+
+    fn reset_all_color_change_range(&mut self) {
+        self.get_mut_polygon().color_change_range.reset();
+    }
+
+    fn reset_all_texcoord_change_range(&mut self) {
+        self.get_mut_polygon().texcoord_change_range.reset();
+    }
+
+    fn reset_all_normal_change_range(&mut self) {
+        self.get_mut_polygon().normal_change_range.reset();
     }
 }
