@@ -2,13 +2,13 @@ use std::ops::Range;
 
 #[derive(Debug)]
 pub struct ChangeRange {
-    pub size: u16,
-    range_start: u16,
-    range_end: u16,
+    pub size: u32,
+    range_start: u32,
+    range_end: u32,
 }
 
 impl ChangeRange {
-    pub fn new(size: u16) -> ChangeRange {
+    pub fn new(size: u32) -> ChangeRange {
         ChangeRange {
             size,
             range_start: 0,
@@ -16,7 +16,7 @@ impl ChangeRange {
         }
     }
 
-    pub fn resize(&mut self, size: u16) {
+    pub fn resize(&mut self, size: u32) {
         self.size = size;
         self.range_end = size;
         if self.range_start > size {
@@ -24,15 +24,15 @@ impl ChangeRange {
         }
     }
 
-    pub fn resize_and_update(&mut self, start: u16, size: u16) {
+    pub fn resize_and_update(&mut self, start: u32, size: u32) {
         self.size = size;
         self.update(start, size);
     }
 
-    pub fn update(&mut self, start: u16, end: u16) {
+    pub fn update(&mut self, start: u32, end: u32) {
         debug_assert!(start < end, "start wasn't less than end");
 
-        if self.range_start == std::u16::MAX {
+        if self.range_start == std::u32::MAX {
             self.range_start = start;
             self.range_end = end;
             return;
@@ -51,12 +51,12 @@ impl ChangeRange {
     }
 
     pub fn reset(&mut self) {
-        self.range_start = std::u16::MAX;
-        self.range_end = std::u16::MAX;
+        self.range_start = std::u32::MAX;
+        self.range_end = std::u32::MAX;
     }
 
-    pub fn get_range(&self) -> Option<Range<u16>> {
-        if self.range_start == std::u16::MAX {
+    pub fn get_range(&self) -> Option<Range<u32>> {
+        if self.range_start == std::u32::MAX {
             return None;
         }
         Some(Range {
