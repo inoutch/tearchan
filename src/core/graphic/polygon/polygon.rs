@@ -55,7 +55,7 @@ mod tests {
     use crate::core::graphic::polygon::polygon::Polygon;
     use crate::core::graphic::polygon::polygon_base::PolygonBase;
     use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
-    use crate::math::mesh::{create_square_positions, MeshBuilder, create_square_colors};
+    use crate::math::mesh::{create_square_positions, MeshBuilder, create_square_colors, create_square_texcoords};
     use crate::utility::buffer_interface::tests::MockBuffer;
     use nalgebra_glm::{vec2, vec3, vec4};
     use std::ops::{Deref, Range};
@@ -158,5 +158,24 @@ mod tests {
         polygon.children()
             .iter_mut()
             .for_each(|x| {});
+    }
+
+    #[test]
+    fn test_texcoord() {
+        let mesh = MeshBuilder::new()
+            .with_square(vec2(32.0f32, 64.0f32))
+            .build()
+            .unwrap();
+
+        let mut polygon = Polygon::new(mesh.clone());
+        let mut buffer = MockBuffer::new(256);
+        let expected_texcoords = create_square_texcoords(vec2(0.0f32, 0.0f32), vec2(1.0f32, 1.0f32))
+            .iter()
+            .map(|texcoord| vec![texcoord.x, texcoord.y])
+            .flatten()
+            .collect::<Vec<_>>();
+
+        polygon.copy_texcoords_into(&mut buffer, 0);
+        assert_eq!(buffer.get_changes(), expected_texcoords.as_slice());
     }
 }
