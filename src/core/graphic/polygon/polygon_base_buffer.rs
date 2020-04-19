@@ -41,7 +41,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
             };
             let mesh_colors = &self.mesh().colors;
 
-            buffer.update_with_range(range.start, range.end);
+            buffer.update_with_range(range.start * 4, range.end * 4);
             for i in range {
                 let base_color = &mesh_colors[i as usize];
                 buffer.copy(offset + i * 4 + 0, color.x * base_color.x);
@@ -58,7 +58,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
         if let Some(range) = change_range.get_range() {
             let mesh_texcoords = &self.mesh().texcoords;
 
-            buffer.update_with_range(range.start * 3, range.end * 3);
+            buffer.update_with_range(range.start * 2, range.end * 2);
             for i in range {
                 let uv = &mesh_texcoords[i as usize];
                 buffer.copy(offset + i * 2 + 0, uv.x);

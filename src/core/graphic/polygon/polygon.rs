@@ -29,7 +29,7 @@ impl Polygon {
             children: vec![],
             visible: true,
             position: vec3(0.0f32, 0.0f32, 0.0f32),
-            color: vec4(0.0f32, 0.0f32, 0.0f32, 1.0f32),
+            color: vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32),
             scale: vec3(1.0f32, 1.0f32, 1.0f32),
             mesh,
             position_change_range,
@@ -55,7 +55,7 @@ mod tests {
     use crate::core::graphic::polygon::polygon::Polygon;
     use crate::core::graphic::polygon::polygon_base::PolygonBase;
     use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
-    use crate::math::mesh::{create_square_positions, MeshBuilder};
+    use crate::math::mesh::{create_square_positions, MeshBuilder, create_square_colors};
     use crate::utility::buffer_interface::tests::MockBuffer;
     use nalgebra_glm::{vec2, vec3, vec4};
     use std::ops::{Deref, Range};
@@ -128,5 +128,35 @@ mod tests {
             child.map(|x| x.color()),
             Some(&vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32))
         );
+    }
+
+    #[test]
+    fn test_color() {
+        let mesh = MeshBuilder::new()
+            .with_square(vec2(32.0f32, 64.0f32))
+            .build()
+            .unwrap();
+
+        let mut polygon = Polygon::new(mesh.clone());
+        assert_eq!(polygon.color(), &vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+
+        polygon.set_color(vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32));
+        assert_eq!(polygon.color(), &vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32));
+
+        let mut buffer = MockBuffer::new(256);
+        polygon.copy_colors_into(&mut buffer, 0);
+
+        let expected_colors = create_square_colors(vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32))
+            .iter()
+            .map(|color| vec![color.x, color.y, color.z, color.w])
+            .flatten()
+            .collect::<Vec<_>>();
+        assert_eq!(&buffer.data[(buffer.start as usize)..(buffer.end as usize)], expected_colors.as_slice());
+
+        let child = Polygon::new(mesh.clone());
+        polygon.add_child(Box::new(child));
+        polygon.children()
+            .iter_mut()
+            .for_each(|x| {});
     }
 }
