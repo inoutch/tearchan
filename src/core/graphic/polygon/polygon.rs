@@ -178,4 +178,19 @@ mod tests {
         polygon.copy_texcoords_into(&mut buffer, 0);
         assert_eq!(buffer.get_changes(), expected_texcoords.as_slice());
     }
+
+    #[test]
+    fn test_normal() {
+        let mesh = MeshBuilder::new()
+            .with_square(vec2(32.0f32, 64.0f32))
+            .build()
+            .unwrap();
+
+        let mut polygon = Polygon::new(mesh.clone());
+        let mut buffer = MockBuffer::new(256);
+        polygon.copy_normals_into(&mut buffer, 0);
+
+        // Allow empty for 2d
+        assert_eq!(buffer.get_changes(), []);
+    }
 }
