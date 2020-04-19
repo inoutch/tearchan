@@ -18,11 +18,11 @@ pub trait PolygonBase {
         }
     }
 
-    fn children(&self) -> &Vec<Rc<RefCell<dyn PolygonBase>>> {
-        &self.get_polygon().children
+    fn children(&mut self) -> &mut Vec<Box<dyn PolygonBase>> {
+        &mut self.get_mut_polygon().children
     }
 
-    fn add_child(&mut self, child: Rc<RefCell<dyn PolygonBase>>) {
+    fn add_child(&mut self, child: Box<dyn PolygonBase>) {
         self.get_mut_polygon().children.push(child);
     }
 
@@ -107,8 +107,8 @@ pub trait PolygonBase {
         let polygon = self.get_mut_polygon();
         polygon.position_change_range.update_all();
 
-        polygon.children().iter().for_each(|x| {
-            x.borrow_mut().update_all_positions();
+        polygon.children().iter_mut().for_each(|x| {
+            x.update_all_positions();
         });
     }
 
@@ -116,8 +116,8 @@ pub trait PolygonBase {
         let polygon = self.get_mut_polygon();
         polygon.color_change_range.update_all();
 
-        polygon.children().iter().for_each(|x| {
-            x.borrow_mut().update_all_colors();
+        polygon.children().iter_mut().for_each(|x| {
+            x.update_all_colors();
         });
     }
 
@@ -125,8 +125,8 @@ pub trait PolygonBase {
         let polygon = self.get_mut_polygon();
         polygon.texcoord_change_range.update_all();
 
-        polygon.children().iter().for_each(|x| {
-            x.borrow_mut().update_all_texcoords();
+        polygon.children().iter_mut().for_each(|x| {
+            x.update_all_texcoords();
         });
     }
 
@@ -134,8 +134,8 @@ pub trait PolygonBase {
         let polygon = self.get_mut_polygon();
         polygon.normal_change_range.update_all();
 
-        polygon.children().iter().for_each(|x| {
-            x.borrow_mut().update_all_normals();
+        polygon.children().iter_mut().for_each(|x| {
+            x.update_all_normals();
         });
     }
 

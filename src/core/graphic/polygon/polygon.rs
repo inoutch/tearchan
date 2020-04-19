@@ -2,12 +2,11 @@ use crate::core::graphic::polygon::polygon_base::PolygonBase;
 use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
 use nalgebra_glm::{vec3, vec4, Vec3, Vec4};
-use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Weak;
 
 pub struct Polygon {
     pub parent: Option<Weak<dyn PolygonBase>>,
-    pub children: Vec<Rc<RefCell<dyn PolygonBase>>>,
+    pub children: Vec<Box<dyn PolygonBase>>,
     pub visible: bool,
     pub position: Vec3,
     pub color: Vec4,
@@ -58,8 +57,8 @@ mod tests {
     use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
     use crate::math::mesh::{create_square_positions, MeshBuilder};
     use crate::utility::buffer_interface::tests::MockBuffer;
-    use nalgebra_glm::{vec2, vec3};
-    use std::ops::Range;
+    use nalgebra_glm::{vec2, vec3, vec4};
+    use std::ops::{Deref, Range};
 
     impl PolygonBaseBuffer<MockBuffer> for Polygon {}
 
@@ -103,5 +102,31 @@ mod tests {
         polygon.set_visible(false);
         range = polygon.position_change_range().get_range();
         assert_eq!(range, Some(Range { start: 0, end: 6 }));
+    }
+
+    #[test]
+    fn test_tree() {
+        let mesh = MeshBuilder::new()
+            .with_square(vec2(32.0f32, 64.0f32))
+            .build()
+            .unwrap();
+
+        // check initial position
+        let mut polygon_parent = Polygon::new(mesh.clone());
+        polygon_parent.set_color(vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32));
+
+        let mut polygon_child = Polygon::new(mesh.clone());
+        polygon_child.set_color(vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32));
+
+        polygon_parent.add_child(Box::new(polygon_child));
+        assert_eq!(polygon_parent.children().len(), 1);
+
+        let children = polygon_parent.children();
+        let child = children.first().map(|x| x.deref());
+
+        assert_eq!(
+            child.map(|x| x.color()),
+            Some(&vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32))
+        );
     }
 }
