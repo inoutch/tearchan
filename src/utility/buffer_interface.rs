@@ -24,6 +24,10 @@ pub mod tests {
                 end: 0,
             }
         }
+
+        pub fn get_changes(&self) -> &[f32] {
+            &self.data[(self.start as usize)..(self.end as usize)]
+        }
     }
 
     impl BufferInterface<f32> for MockBuffer {
