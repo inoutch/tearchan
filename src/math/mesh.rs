@@ -1,5 +1,6 @@
 use nalgebra_glm::{vec2, vec4, Vec2, Vec3, Vec4};
 
+#[derive(Clone)]
 pub struct Mesh {
     pub positions: Vec<Vec3>,
     pub colors: Vec<Vec4>,

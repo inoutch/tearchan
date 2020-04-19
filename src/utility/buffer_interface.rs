@@ -1,9 +1,9 @@
 pub trait BufferInterface<T> {
-    fn update_with_range(&mut self, start: u16, end: u16);
+    fn update_with_range(&mut self, start: u32, end: u32);
 
-    fn copy(&mut self, offset: u16, value: T);
+    fn copy(&mut self, offset: u32, value: T);
 
-    fn resize(&mut self, size: u16);
+    fn resize(&mut self, size: u32);
 }
 
 #[cfg(test)]
@@ -11,9 +11,9 @@ pub mod tests {
     use crate::utility::buffer_interface::BufferInterface;
 
     pub struct MockBuffer {
-        data: Vec<f32>,
-        start: u16,
-        end: u16,
+        pub data: Vec<f32>,
+        pub start: u32,
+        pub end: u32,
     }
 
     impl MockBuffer {
@@ -27,20 +27,20 @@ pub mod tests {
     }
 
     impl BufferInterface<f32> for MockBuffer {
-        fn update_with_range(&mut self, start: u16, end: u16) {
+        fn update_with_range(&mut self, start: u32, end: u32) {
             if self.start > start {
                 self.start = start;
             }
-            if self.end > end {
+            if self.end < end {
                 self.end = end;
             }
         }
 
-        fn copy(&mut self, offset: u16, value: f32) {
+        fn copy(&mut self, offset: u32, value: f32) {
             self.data[offset as usize] = value;
         }
 
-        fn resize(&mut self, size: u16) {
+        fn resize(&mut self, size: u32) {
             self.data.resize(size as usize, 0.0f32);
         }
     }
