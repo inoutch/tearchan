@@ -3,7 +3,7 @@ use crate::utility::buffer_interface::BufferInterface;
 use nalgebra_glm::vec3_to_vec4;
 
 pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
-    fn copy_positions_into(&mut self, buffer: &mut TBuffer, offset: u32) {
+    fn copy_positions_into(&mut self, buffer: &mut TBuffer, offset: usize) {
         let change_range = self.position_change_range();
         if let Some(range) = change_range.get_range() {
             let matrix = self.transform();
@@ -30,7 +30,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
         }
     }
 
-    fn copy_colors_into(&mut self, buffer: &mut TBuffer, offset: u32) {
+    fn copy_colors_into(&mut self, buffer: &mut TBuffer, offset: usize) {
         let change_range = self.color_change_range();
         let parent = self.parent();
         if let Some(range) = change_range.get_range() {
@@ -53,7 +53,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
         }
     }
 
-    fn copy_texcoords_into(&mut self, buffer: &mut TBuffer, offset: u32) {
+    fn copy_texcoords_into(&mut self, buffer: &mut TBuffer, offset: usize) {
         let change_range = self.texcoord_change_range();
         if let Some(range) = change_range.get_range() {
             let mesh_texcoords = &self.mesh().texcoords;
@@ -68,7 +68,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
         }
     }
 
-    fn copy_normals_into(&mut self, buffer: &mut TBuffer, offset: u32) {
+    fn copy_normals_into(&mut self, buffer: &mut TBuffer, offset: usize) {
         let change_range = self.normal_change_range();
         if let Some(range) = change_range.get_range() {
             let matrix = self.transform();

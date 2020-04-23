@@ -3,6 +3,8 @@ use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
 use nalgebra_glm::{vec3, vec4, Vec3, Vec4};
 use std::rc::Weak;
+use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
+use crate::utility::buffer_interface::BufferInterface;
 
 pub struct Polygon {
     pub parent: Option<Weak<dyn PolygonBase>>,
@@ -20,10 +22,10 @@ pub struct Polygon {
 
 impl Polygon {
     pub fn new(mesh: Mesh) -> Polygon {
-        let position_change_range = ChangeRange::new(mesh.positions.len() as u32);
-        let color_change_range = ChangeRange::new(mesh.colors.len() as u32);
-        let texcoord_change_range = ChangeRange::new(mesh.texcoords.len() as u32);
-        let normal_change_range = ChangeRange::new(mesh.normals.len() as u32);
+        let position_change_range = ChangeRange::new(mesh.positions.len());
+        let color_change_range = ChangeRange::new(mesh.colors.len());
+        let texcoord_change_range = ChangeRange::new(mesh.texcoords.len());
+        let normal_change_range = ChangeRange::new(mesh.normals.len());
         Polygon {
             parent: None,
             children: vec![],
@@ -50,6 +52,8 @@ impl PolygonBase for Polygon {
     }
 }
 
+impl <TBuffer: BufferInterface<f32>> PolygonBaseBuffer<TBuffer> for Polygon {}
+
 #[cfg(test)]
 mod tests {
     use crate::core::graphic::polygon::polygon::Polygon;
@@ -61,8 +65,6 @@ mod tests {
     use crate::utility::buffer_interface::tests::MockBuffer;
     use nalgebra_glm::{vec2, vec3, vec4};
     use std::ops::{Deref, Range};
-
-    impl PolygonBaseBuffer<MockBuffer> for Polygon {}
 
     #[test]
     fn test_position() {
