@@ -59,8 +59,6 @@ impl<'a, T> Deref for Shared<T> {
 #[cfg(test)]
 mod tests {
     use crate::extension::shared::Shared;
-    use std::rc::Rc;
-    use std::cell::RefCell;
 
     struct Struct {
         value: i32,
