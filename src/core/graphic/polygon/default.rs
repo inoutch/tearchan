@@ -1,10 +1,10 @@
 use crate::core::graphic::polygon::polygon_base::PolygonBase;
+use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
 use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
+use crate::utility::buffer_interface::BufferInterface;
 use nalgebra_glm::{vec3, vec4, Vec3, Vec4};
 use std::rc::Weak;
-use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
-use crate::utility::buffer_interface::BufferInterface;
 
 pub struct Polygon {
     pub parent: Option<Weak<dyn PolygonBase>>,
@@ -52,7 +52,7 @@ impl PolygonBase for Polygon {
     }
 }
 
-impl <TBuffer: BufferInterface<f32>> PolygonBaseBuffer<TBuffer> for Polygon {}
+impl<TBuffer: BufferInterface<f32>> PolygonBaseBuffer<TBuffer> for Polygon {}
 
 #[cfg(test)]
 mod tests {
