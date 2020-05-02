@@ -13,15 +13,16 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
             buffer.update_with_range(range.start * 3, range.end * 3);
             if self.computed_visible() {
                 for i in range {
-                    let p = position + &mesh_positions[i as usize];
-                    let v = &matrix * vec3_to_vec4(&p);
-                    buffer.copy(offset + i * 3 + 0, v.x);
+                    let mesh_position = &mesh_positions[i as usize];
+                    let m = &matrix;
+                    let v = m * vec3_to_vec4(&(position + mesh_position));
+                    buffer.copy(offset + i * 3, v.x);
                     buffer.copy(offset + i * 3 + 1, v.y);
                     buffer.copy(offset + i * 3 + 2, v.z);
                 }
             } else {
                 for i in range {
-                    buffer.copy(offset + i * 3 + 0, 0.0f32);
+                    buffer.copy(offset + i * 3, 0.0f32);
                     buffer.copy(offset + i * 3 + 1, 0.0f32);
                     buffer.copy(offset + i * 3 + 2, 0.0f32);
                 }
@@ -44,7 +45,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
             buffer.update_with_range(range.start * 4, range.end * 4);
             for i in range {
                 let base_color = &mesh_colors[i as usize];
-                buffer.copy(offset + i * 4 + 0, color.x * base_color.x);
+                buffer.copy(offset + i * 4, color.x * base_color.x);
                 buffer.copy(offset + i * 4 + 1, color.y * base_color.y);
                 buffer.copy(offset + i * 4 + 2, color.z * base_color.z);
                 buffer.copy(offset + i * 4 + 3, color.w * base_color.w);
@@ -61,7 +62,7 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
             buffer.update_with_range(range.start * 2, range.end * 2);
             for i in range {
                 let uv = &mesh_texcoords[i as usize];
-                buffer.copy(offset + i * 2 + 0, uv.x);
+                buffer.copy(offset + i * 2, uv.x);
                 buffer.copy(offset + i * 2 + 1, uv.y);
             }
             self.reset_all_texcoord_change_range();
@@ -76,8 +77,9 @@ pub trait PolygonBaseBuffer<TBuffer: BufferInterface<f32>>: PolygonBase {
 
             buffer.update_with_range(range.start * 3, range.end * 3);
             for i in range {
-                let v = &matrix * vec3_to_vec4(&mesh_normals[i as usize]);
-                buffer.copy(offset + i * 3 + 0, v.x);
+                let m = &matrix;
+                let v = m * vec3_to_vec4(&mesh_normals[i as usize]);
+                buffer.copy(offset + i * 3, v.x);
                 buffer.copy(offset + i * 3 + 1, v.y);
                 buffer.copy(offset + i * 3 + 2, v.z);
             }

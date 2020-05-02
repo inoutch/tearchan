@@ -1,4 +1,4 @@
-use crate::core::graphic::polygon::polygon::Polygon;
+use crate::core::graphic::polygon::default::Polygon;
 use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
 use nalgebra_glm::{scale, translate, Mat4, Vec3, Vec4};

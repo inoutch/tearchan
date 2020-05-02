@@ -56,7 +56,7 @@ impl <TBuffer: BufferInterface<f32>> PolygonBaseBuffer<TBuffer> for Polygon {}
 
 #[cfg(test)]
 mod tests {
-    use crate::core::graphic::polygon::polygon::Polygon;
+    use crate::core::graphic::polygon::default::Polygon;
     use crate::core::graphic::polygon::polygon_base::PolygonBase;
     use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
     use crate::math::mesh::{
