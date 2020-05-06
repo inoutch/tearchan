@@ -40,6 +40,11 @@ impl Polygon {
             normal_change_range,
         }
     }
+
+    pub fn set_position(&mut self, position: Vec3) {
+        self.position = position;
+        self.position_change_range.update_all();
+    }
 }
 
 impl PolygonBase for Polygon {

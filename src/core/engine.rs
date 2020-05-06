@@ -3,6 +3,7 @@ use crate::core::graphic::hal::backend::create_backend;
 use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
 use crate::core::screen::ScreenMode;
+use std::time::Instant;
 
 pub struct Engine {
     startup_config: StartupConfig,
@@ -36,14 +37,15 @@ impl Engine {
             )))
             .with_title(self.startup_config.application_name.to_string());
 
-        let (_window, instance, mut adapters, surface) =
-            create_backend(window_builder, &event_loop);
+        let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
         let adapter = adapters.remove(0);
         let mut renderer = Renderer::new(instance, adapter, surface);
         let mut scene_manager = self.scene_manager;
 
+        let timer_length = std::time::Duration::from_millis(1000 / 60);
         event_loop.run(move |event, _, control_flow| {
-            *control_flow = winit::event_loop::ControlFlow::Wait;
+            *control_flow =
+                winit::event_loop::ControlFlow::WaitUntil(Instant::now() + timer_length);
             match event {
                 winit::event::Event::WindowEvent { event, .. } => match event {
                     winit::event::WindowEvent::CloseRequested => {
@@ -59,10 +61,13 @@ impl Engine {
                     } => *control_flow = winit::event_loop::ControlFlow::Exit,
                     _ => {}
                 },
-                winit::event::Event::MainEventsCleared => {
+                winit::event::Event::RedrawRequested(_) => {
                     renderer.render(|api| {
                         scene_manager.render(1.0f32 / 6.0f32, api);
                     });
+                },
+                winit::event::Event::RedrawEventsCleared => {
+                    window.request_redraw();
                 }
                 _ => {}
             }

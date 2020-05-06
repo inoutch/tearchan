@@ -236,4 +236,12 @@ impl<B: Backend> Texture<B> {
             sampler,
         }
     }
+
+    pub fn borrow_sampler(&self) -> &B::Sampler {
+        &self.sampler
+    }
+
+    pub fn borrow_image_view(&self) -> &B::ImageView {
+        &self.image_view
+    }
 }

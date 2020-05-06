@@ -1,6 +1,7 @@
 use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_buffer_pointer::BatchBufferPointer;
 use crate::core::graphic::hal::backend::{FixedApi, FixedVertexBuffer};
+use crate::core::graphic::hal::vertex_buffer::VertexBuffer;
 use crate::extension::collection::VecExt;
 use crate::extension::shared::Shared;
 use crate::math::change_range::ChangeRange;
@@ -32,6 +33,10 @@ impl BatchBufferF32 {
             change_range: ChangeRange::new(0),
         }
     }
+
+    pub fn borrow_vertex_buffer(&self) -> &FixedVertexBuffer {
+        &self.vertex_buffer
+    }
 }
 
 impl BatchBufferF32 {
@@ -60,6 +65,7 @@ impl BatchBuffer for BatchBufferF32 {
     fn allocate(&mut self, size: usize) -> Shared<BatchBufferPointer> {
         let last = self.last();
         self.size += size;
+        self.change_range.resize_and_update(last, last + size);
 
         if last + size > self.vertices.len() {
             self.reallocate_vertex_buffer(last + size);

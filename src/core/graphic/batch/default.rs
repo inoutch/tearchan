@@ -1,6 +1,8 @@
 use crate::core::graphic::batch::batch_base::BatchBase;
 use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_object_bundle::BatchObjectBundle;
+use crate::core::graphic::hal::backend::{FixedApi, FixedGraphicPipeline};
+use crate::core::graphic::hal::graphic_pipeline::GraphicPipeline;
 use crate::extension::collection::VecExt;
 use crate::extension::shared::Shared;
 use std::borrow::Borrow;
@@ -61,14 +63,11 @@ impl<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBu
         }
     }
 
-    pub fn render(&mut self) {
-        // material.bind()
-
+    pub fn flush(&mut self) {
         for x in self.object_bundles.iter_mut() {
             self.base.update(x);
         }
         self.flush_all();
-        // Call graphic API to draw
     }
 
     pub fn sort_by_render_order(&mut self) {}
@@ -78,6 +77,14 @@ impl<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBu
             Some(x) => x.batch_buffer.size() / x.stride as usize,
             None => 0,
         }
+    }
+
+    pub fn batch_buffers(&self) -> Vec<&TBatchBuffer> {
+        self.base
+            .bundles()
+            .iter()
+            .map(|x| &x.batch_buffer)
+            .collect()
     }
 
     fn allocate(
@@ -104,9 +111,9 @@ impl<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBu
 
 #[cfg(test)]
 mod tests {
-    use crate::core::graphic::batch::default::Batch;
     use crate::core::graphic::batch::batch_base::tests::MockBatchBase;
     use crate::core::graphic::batch::batch_buffer::tests::MockBatchBuffer;
+    use crate::core::graphic::batch::default::Batch;
     use crate::extension::shared::Shared;
     use crate::utility::test::func::MockFunc;
 

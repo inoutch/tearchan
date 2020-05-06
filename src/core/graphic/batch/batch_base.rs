@@ -9,6 +9,7 @@ pub trait BatchBase<TObject, TBatchBuffer: BatchBuffer> {
     fn size(&self, object: &Shared<TObject>) -> usize;
     fn bundles_mut(&mut self) -> &mut Vec<BatchBundle<TBatchBuffer>>;
     fn bundles(&self) -> &Vec<BatchBundle<TBatchBuffer>>;
+    fn triangle_count(&self) -> usize;
 }
 
 #[cfg(test)]
@@ -56,6 +57,10 @@ pub mod tests {
 
         fn bundles(&self) -> &Vec<BatchBundle<MockBatchBuffer>> {
             &self.bundles
+        }
+
+        fn triangle_count(&self) -> usize {
+            0
         }
     }
 }

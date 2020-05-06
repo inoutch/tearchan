@@ -1,29 +1,29 @@
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::device::Device;
 use gfx_hal::memory::Segment;
-use gfx_hal::{buffer, Backend};
+use gfx_hal::{Backend, MemoryTypeId};
 use std::borrow::Borrow;
-use std::mem::ManuallyDrop;
+use std::mem::{size_of, ManuallyDrop};
 use std::rc::{Rc, Weak};
-use std::{iter, mem, ptr};
 
-pub struct VertexBuffer<B: Backend> {
+pub struct UniformBuffer<B: Backend, T> {
     device: Weak<B::Device>,
     buffer: ManuallyDrop<B::Buffer>,
     buffer_memory: ManuallyDrop<B::Memory>,
+    size: usize,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<B: Backend> VertexBuffer<B> {
-    pub fn new(
-        device: &Rc<B::Device>,
-        memory_types: &[MemoryType],
-        vertices: &[f32],
-    ) -> VertexBuffer<B> {
-        // TODO: Consider alignment
-        let size = vertices.len() as u64 * mem::size_of::<f32>() as u64;
-        let mut buffer = unsafe { device.create_buffer(size, buffer::Usage::VERTEX).unwrap() };
+impl<B: Backend, T> UniformBuffer<B, T> {
+    pub fn new(device: &Rc<B::Device>, memory_types: &[MemoryType], data_source: &[T]) -> Self {
+        let upload_size = data_source.len() * size_of::<T>();
+        let mut buffer = unsafe {
+            device
+                .create_buffer(upload_size as u64, gfx_hal::buffer::Usage::UNIFORM)
+                .unwrap()
+        };
         let buffer_req = unsafe { device.get_buffer_requirements(&buffer) };
-        let upload_type = memory_types
+        let upload_type: MemoryTypeId = memory_types
             .iter()
             .enumerate()
             .position(|(id, mem_type)| {
@@ -37,6 +37,7 @@ impl<B: Backend> VertexBuffer<B> {
 
         let buffer_memory =
             unsafe { device.allocate_memory(upload_type, buffer_req.size) }.unwrap();
+
         unsafe {
             let result = device
                 .bind_buffer_memory(&buffer_memory, 0, &mut buffer)
@@ -44,39 +45,39 @@ impl<B: Backend> VertexBuffer<B> {
             debug_assert!(result);
 
             let mapping = device.map_memory(&buffer_memory, Segment::ALL).unwrap();
-            ptr::copy_nonoverlapping(vertices.as_ptr() as *const u8, mapping, size as usize);
+            std::ptr::copy_nonoverlapping(data_source.as_ptr() as *const u8, mapping, upload_size);
             device
-                .flush_mapped_memory_ranges(iter::once((&buffer_memory, Segment::ALL)))
+                .flush_mapped_memory_ranges(std::iter::once((&buffer_memory, Segment::ALL)))
                 .unwrap();
             device.unmap_memory(&buffer_memory);
         }
-
-        VertexBuffer {
+        UniformBuffer {
             device: Rc::downgrade(device),
             buffer: ManuallyDrop::new(buffer),
             buffer_memory: ManuallyDrop::new(buffer_memory),
+            size: upload_size,
+            _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn copy_to_buffer(&self, vertices: &[f32], offset: usize, size: usize) {
+    pub fn copy_to_buffer(&self, data_source: &[T]) {
         if let Some(device) = self.device.upgrade() {
-            let binary_offset = offset * std::mem::size_of::<f32>();
-            let binary_size = size * std::mem::size_of::<f32>();
+            let size = data_source.len() * size_of::<T>();
             unsafe {
                 let memory = self.buffer_memory.borrow();
-                let mapping = device
-                    .map_memory(
-                        memory,
-                        Segment {
-                            offset: binary_offset as u64,
-                            size: Some(binary_size as u64),
-                        },
-                    )
-                    .unwrap();
-                ptr::copy_nonoverlapping(vertices.as_ptr() as *const u8, mapping, binary_size);
+                let mapping = device.map_memory(memory, Segment::ALL).unwrap();
+                std::ptr::copy_nonoverlapping(
+                    data_source.as_ptr() as *const u8,
+                    mapping,
+                    size as usize,
+                );
                 device.unmap_memory(memory);
             }
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
     }
 
     pub fn borrow_buffer(&self) -> &B::Buffer {
@@ -84,12 +85,14 @@ impl<B: Backend> VertexBuffer<B> {
     }
 }
 
-impl<B: Backend> Drop for VertexBuffer<B> {
+impl<B: Backend, T> Drop for UniformBuffer<B, T> {
     fn drop(&mut self) {
         if let Some(device) = self.device.upgrade() {
             unsafe {
-                device.destroy_buffer(ManuallyDrop::into_inner(ptr::read(&self.buffer)));
-                device.free_memory(ManuallyDrop::into_inner(ptr::read(&self.buffer_memory)));
+                device.free_memory(ManuallyDrop::into_inner(std::ptr::read(
+                    &self.buffer_memory,
+                )));
+                device.destroy_buffer(ManuallyDrop::into_inner(std::ptr::read(&self.buffer)));
             }
         }
     }

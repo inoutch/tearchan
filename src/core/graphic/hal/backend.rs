@@ -24,12 +24,18 @@ pub type FixedSurface = back::Surface;
 
 pub type FixedApi<'a> = Api<'a, back::Backend>;
 pub type FixedVertexBuffer = VertexBuffer<back::Backend>;
+pub type FixedUniformBuffer<T> = UniformBuffer<back::Backend, T>;
+pub type FixedTexture = Texture<back::Backend>;
+pub type FixedGraphicPipeline = GraphicPipeline<back::Backend>;
 
 use gfx_hal::adapter::Adapter;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::{Window, WindowBuilder};
 
+use crate::core::graphic::hal::graphic_pipeline::GraphicPipeline;
 use crate::core::graphic::hal::renderer_api::Api;
+use crate::core::graphic::hal::texture::Texture;
+use crate::core::graphic::hal::uniform_buffer::UniformBuffer;
 use crate::core::graphic::hal::vertex_buffer::VertexBuffer;
 use gfx_hal::Instance;
 #[cfg(target_arch = "wasm32")]

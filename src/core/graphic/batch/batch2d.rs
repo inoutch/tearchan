@@ -5,7 +5,6 @@ use crate::core::graphic::batch::batch_bundle::BatchBundle;
 use crate::core::graphic::batch::batch_object_bundle::BatchObjectBundle;
 use crate::core::graphic::batch::default::Batch;
 use crate::core::graphic::hal::backend::FixedApi;
-use crate::core::graphic::hal::vertex_buffer::VertexBuffer;
 use crate::core::graphic::polygon::default::Polygon;
 use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
 use crate::extension::shared::Shared;
@@ -55,6 +54,11 @@ where
     fn bundles(&self) -> &Vec<BatchBundle<TBatchBuffer>> {
         &self.bundles
     }
+
+    fn triangle_count(&self) -> usize {
+        let bundle = &self.bundles[0];
+        bundle.batch_buffer.size() / bundle.stride as usize
+    }
 }
 
 impl<TObject: PolygonBaseBuffer<TBatchBuffer>, TBatchBuffer>
@@ -74,11 +78,11 @@ where
                     batch_buffer: position_buffer,
                 },
                 BatchBundle {
-                    stride: 3,
+                    stride: 4,
                     batch_buffer: color_buffer,
                 },
                 BatchBundle {
-                    stride: 3,
+                    stride: 2,
                     batch_buffer: texcoord_buffer,
                 },
             ],

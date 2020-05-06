@@ -5,11 +5,14 @@ use gfx_hal::Backend;
 use std::mem::ManuallyDrop;
 use std::rc::{Rc, Weak};
 
+const ENTRY_NAME: &str = "main";
+
 pub struct Shader<B: Backend> {
     device: Weak<B::Device>,
     vs_module: ManuallyDrop<B::ShaderModule>,
     fs_module: ManuallyDrop<B::ShaderModule>,
     attributes: Vec<Attribute>,
+    descriptor_set_layout_bindings: Vec<gfx_hal::pso::DescriptorSetLayoutBinding>,
 }
 
 impl<B: Backend> Shader<B> {
@@ -17,16 +20,47 @@ impl<B: Backend> Shader<B> {
         device: &Rc<B::Device>,
         shader_source: ShaderSource,
         attributes: Vec<Attribute>,
+        descriptor_sets: Vec<gfx_hal::pso::DescriptorSetLayoutBinding>,
     ) -> Shader<B> {
         let vs_module =
             unsafe { device.create_shader_module(&shader_source.spirv_vert_source) }.unwrap();
         let fs_module =
             unsafe { device.create_shader_module(&shader_source.spirv_frag_source) }.unwrap();
+
         Shader {
             device: Rc::downgrade(device),
             vs_module: ManuallyDrop::new(vs_module),
             fs_module: ManuallyDrop::new(fs_module),
             attributes,
+            descriptor_set_layout_bindings: descriptor_sets,
+        }
+    }
+
+    pub fn borrow_attributes(&self) -> &Vec<Attribute> {
+        &self.attributes
+    }
+
+    pub fn borrow_descriptor_set_layout_bindings(
+        &self,
+    ) -> &Vec<gfx_hal::pso::DescriptorSetLayoutBinding> {
+        &self.descriptor_set_layout_bindings
+    }
+
+    pub fn create_entries(&self) -> gfx_hal::pso::GraphicsShaderSet<B> {
+        gfx_hal::pso::GraphicsShaderSet {
+            vertex: gfx_hal::pso::EntryPoint::<B> {
+                entry: ENTRY_NAME,
+                module: &self.vs_module,
+                specialization: gfx_hal::pso::Specialization::default(),
+            },
+            hull: None,
+            domain: None,
+            geometry: None,
+            fragment: Some(gfx_hal::pso::EntryPoint::<B> {
+                entry: ENTRY_NAME,
+                module: &self.fs_module,
+                specialization: gfx_hal::pso::Specialization::default(),
+            }),
         }
     }
 }
