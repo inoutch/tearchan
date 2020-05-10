@@ -1,4 +1,5 @@
 pub mod batch2d;
+pub mod batch3d;
 pub mod batch_base;
 pub mod batch_buffer;
 pub mod batch_buffer_f32;

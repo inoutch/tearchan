@@ -1,3 +1,4 @@
+use crate::core::graphic::camera::CameraBase;
 use crate::core::graphic::hal::backend::{
     FixedApi, FixedBackend, FixedTexture, FixedUniformBuffer,
 };
@@ -8,8 +9,7 @@ use crate::core::graphic::shader::shader_source::ShaderSource;
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::pso::Descriptor;
 use gfx_hal::Backend;
-use nalgebra_glm::{vec3, Mat4};
-use crate::core::graphic::camera_2d::Camera2D;
+use nalgebra_glm::Mat4;
 
 pub struct Standard2DShaderProgram {
     shader_program: ShaderProgram,
@@ -17,7 +17,7 @@ pub struct Standard2DShaderProgram {
 }
 
 impl Standard2DShaderProgram {
-    pub fn new(api: &FixedApi, camera: &Camera2D) -> Self {
+    pub fn new(api: &FixedApi, camera: &CameraBase) -> Self {
         let shader_source = ShaderSource::new(
             include_bytes!("../../../../target/data/shaders/standard.vert"),
             include_bytes!("../../../../target/data/shaders/standard.frag"),
@@ -41,7 +41,8 @@ impl Standard2DShaderProgram {
     }
 
     pub fn prepare(&mut self, mvp_matrix: &Mat4, texture: &FixedTexture) {
-        self.mvp_matrix_uniform.copy_to_buffer(&[mvp_matrix.clone_owned()]);
+        self.mvp_matrix_uniform
+            .copy_to_buffer(&[mvp_matrix.clone_owned()]);
     }
 
     pub fn borrow_mvp_matrix_uniform(&self) -> &FixedUniformBuffer<Mat4> {
@@ -89,7 +90,7 @@ pub fn write_descriptor_sets<'a, B: Backend>(
         },
         gfx_hal::pso::DescriptorSetWrite {
             set: descriptor_set,
-            binding: 0,
+            binding: 1,
             array_offset: 0,
             descriptors: Some(gfx_hal::pso::Descriptor::CombinedImageSampler(
                 &*image_view,

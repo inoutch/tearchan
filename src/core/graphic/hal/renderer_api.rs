@@ -120,7 +120,7 @@ impl<'a, B: gfx_hal::Backend> Api<'a, B> {
                 self.viewport.rect,
                 &[gfx_hal::command::ClearValue {
                     color: gfx_hal::command::ClearColor {
-                        float32: [1.0, 0.0, 0.0, 1.0],
+                        float32: [0.3, 0.3, 0.3, 1.0],
                     },
                 }],
                 gfx_hal::command::SubpassContents::Inline,

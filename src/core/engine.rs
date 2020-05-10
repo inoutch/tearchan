@@ -4,6 +4,9 @@ use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
 use crate::core::screen::ScreenMode;
 use std::time::Instant;
+use winit::event_loop::EventLoop;
+use winit::monitor::MonitorHandle;
+use winit::window::Fullscreen;
 
 pub struct Engine {
     startup_config: StartupConfig,
@@ -31,10 +34,9 @@ impl Engine {
             .with_min_inner_size(winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
                 64.0, 64.0,
             )))
-            .with_inner_size(winit::dpi::Size::Physical(winit::dpi::PhysicalSize::new(
-                window_size.width,
-                window_size.height,
-            )))
+            .with_fullscreen(Some(Fullscreen::Borderless(prompt_for_monitor(
+                &event_loop,
+            ))))
             .with_title(self.startup_config.application_name.to_string());
 
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
@@ -43,10 +45,17 @@ impl Engine {
         let mut scene_manager = self.scene_manager;
 
         let timer_length = std::time::Duration::from_millis(1000 / 60);
+        println!("inner_size: {:?}", window.inner_size());
+
         event_loop.run(move |event, _, control_flow| {
             *control_flow =
                 winit::event_loop::ControlFlow::WaitUntil(Instant::now() + timer_length);
             match event {
+                winit::event::Event::NewEvents(winit::event::StartCause::ResumeTimeReached {
+                    ..
+                }) => {
+                    window.request_redraw();
+                }
                 winit::event::Event::WindowEvent { event, .. } => match event {
                     winit::event::WindowEvent::CloseRequested => {
                         *control_flow = winit::event_loop::ControlFlow::Exit
@@ -65,12 +74,20 @@ impl Engine {
                     renderer.render(|api| {
                         scene_manager.render(1.0f32 / 6.0f32, api);
                     });
-                },
-                winit::event::Event::RedrawEventsCleared => {
-                    window.request_redraw();
                 }
                 _ => {}
             }
         });
     }
+}
+
+fn prompt_for_monitor(event_loop: &EventLoop<()>) -> MonitorHandle {
+    let num = 0;
+    let monitor = event_loop
+        .available_monitors()
+        .nth(num)
+        .expect("Please enter a valid ID");
+
+    println!("Using {:?}", monitor.name());
+    monitor
 }

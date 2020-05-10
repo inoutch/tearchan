@@ -1,14 +1,14 @@
 use crate::app::hello_world_scene::HelloWorldScene;
 use gfx_hal::window::Extent2D;
+use std::env;
 use tearchan::core::engine::Engine;
 use tearchan::core::engine_config::StartupConfigBuilder;
 use tearchan::core::screen::ScreenMode;
-use std::env;
 
 pub mod app;
 
 fn main() {
-    env::set_var("RUST_LOG", "error");
+    env::set_var("RUST_LOG", "info");
     env_logger::init();
 
     let startup_config = StartupConfigBuilder::default()

@@ -23,6 +23,10 @@ impl Camera2D {
         self.base.update();
     }
 
+    pub fn borrow_base(&self) -> &CameraBase {
+        &self.base
+    }
+
     pub fn borrow_combine(&self) -> &Mat4 {
         self.base.borrow_combine()
     }
