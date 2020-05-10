@@ -181,6 +181,7 @@ where
             },
             depth: 0.0..1.0,
         };
+        println!("viewport {:?}", viewport);
 
         Renderer {
             instance,
@@ -266,8 +267,8 @@ where
         unsafe {
             cmd_buffer.begin_primary(gfx_hal::command::CommandBufferFlags::ONE_TIME_SUBMIT);
 
-            cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
-            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
+            // cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
+            // cmd_buffer.set_scissors(0, &[self.viewport.rect]);
 
             // TODO: Group arguments the ungenerated items in each loop
             let screen_size = vec2(self.viewport.rect.w as f32, self.viewport.rect.h as f32);

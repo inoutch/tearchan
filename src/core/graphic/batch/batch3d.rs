@@ -21,12 +21,12 @@ where
     TBatchBuffer: BatchBuffer + BufferInterface<f32>,
 {
     fn update(&mut self, object_bundle: &mut Rc<BatchObjectBundle<TObject>>) {
-        /*debug_assert_eq!(self.bundles.len(), 4, "Invalid bundles length");
+        debug_assert_eq!(self.bundles.len(), 4, "Invalid bundles length");
         debug_assert_eq!(
             object_bundle.pointers.len(),
             4,
             "Invalid object pointers length"
-        );*/
+        );
 
         let mut object = object_bundle.object.borrow_mut();
         object.copy_positions_into(
@@ -74,7 +74,7 @@ where
         position_buffer: TBatchBuffer,
         color_buffer: TBatchBuffer,
         texcoord_buffer: TBatchBuffer,
-        //normal_buffer: TBatchBuffer,
+        normal_buffer: TBatchBuffer,
     ) -> Batch<TObject, TBatchBuffer, Batch3D<TBatchBuffer>> {
         Batch::new(Batch3D {
             bundles: vec![
@@ -90,10 +90,10 @@ where
                     stride: 2,
                     batch_buffer: texcoord_buffer,
                 },
-                /*BatchBundle {
+                BatchBundle {
                     stride: 3,
                     batch_buffer: normal_buffer,
-                },*/
+                },
             ],
         })
     }
@@ -105,7 +105,7 @@ impl Batch3D<BatchBufferF32> {
             BatchBufferF32::new(api),
             BatchBufferF32::new(api),
             BatchBufferF32::new(api),
-            //BatchBufferF32::new(api),
+            BatchBufferF32::new(api),
         )
     }
 }

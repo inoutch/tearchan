@@ -3,7 +3,7 @@
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec4 color;
 layout(location = 2) in vec2 texcoord;
-//layout(location = 3) in vec3 normal;
+layout(location = 3) in vec3 normal;
 
 layout(binding = 0) uniform Matrix {
     mat4 viewProjectionMatrix;
@@ -15,7 +15,6 @@ layout(location = 1) out vec2 outTexcoord;
 void main(void) {
     outColor = color;
     outTexcoord = texcoord;
-//    gl_Position = viewProjectionMatrix * vec4(normal, 1.0);
+    gl_Position = viewProjectionMatrix * vec4(normal, 1.0);
     gl_Position = viewProjectionMatrix * vec4(position, 1.0);
-//    gl_Position = vec4(position, 1.0);
 }

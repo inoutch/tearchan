@@ -110,7 +110,7 @@ fn create_3d_attributes() -> Vec<Attribute> {
             },
             stride: 2 * std::mem::size_of::<f32>() as u32,
         },
-        /*Attribute {
+        Attribute {
             attribute_desc: gfx_hal::pso::AttributeDesc {
                 // normal
                 location: 3,
@@ -121,7 +121,7 @@ fn create_3d_attributes() -> Vec<Attribute> {
                 },
             },
             stride: 3 * std::mem::size_of::<f32>() as u32,
-        },*/
+        },
     ]
 }
 

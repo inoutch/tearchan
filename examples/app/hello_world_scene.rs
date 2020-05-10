@@ -54,7 +54,7 @@ impl HelloWorldScene {
                 .create_graphic_pipeline(shader_program.borrow_shader_program().borrow_shader());
 
             let standard_3d_shader_program =
-                Standard3DShaderProgram::new(scene_context.renderer_api, camera.borrow_base());
+                Standard3DShaderProgram::new(scene_context.renderer_api, camera_3d.borrow_base());
             let graphic_pipeline_3d = scene_context.renderer_api.create_graphic_pipeline(
                 standard_3d_shader_program
                     .borrow_shader_program()
@@ -69,7 +69,7 @@ impl HelloWorldScene {
             let polygon = Shared::new(Polygon::new(mesh));
             // batch.add(&polygon, 0);
 
-            let mesh3 = MeshBuilder::new().with_cube(300.0f32).build().unwrap();
+            let mesh3 = MeshBuilder::new().with_cube(2.0f32).build().unwrap();
             let mut batch_3d = Batch3D::new(scene_context.renderer_api);
             let polygon_2d = Shared::new(Polygon::new(mesh3));
             batch_3d.add(&polygon_2d, 0);
@@ -119,11 +119,11 @@ impl SceneBase for HelloWorldScene {
                 .collect(),
             self.batch.triangle_count(),
         );*/
-        self.camera.update();
+        self.camera_3d.update();
         self.batch_3d.flush();
 
         self.shader_program_3d.prepare(
-            self.camera.borrow_combine(),
+            self.camera_3d.borrow_combine(),
             &vec3(0.0f32, 0.0f32, -1.0f32),
             &vec3(1.0f32, 1.0f32, 1.0f32),
             1.0f32,

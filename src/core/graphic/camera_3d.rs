@@ -1,5 +1,6 @@
 use crate::core::graphic::camera::CameraBase;
-use nalgebra_glm::{vec3, Mat4, Vec3};
+use nalgebra_glm::{mat4, vec3, Mat4, Vec3};
+use std::f32::consts::PI;
 
 pub struct Camera3D {
     base: CameraBase,
@@ -10,7 +11,27 @@ pub struct Camera3D {
 
 impl Camera3D {
     pub fn new(aspect: f32) -> Self {
-        let proj_matrix = nalgebra_glm::perspective(aspect, 45.0f32, 0.1f32, 1.0f32);
+        /*let proj_matrix = mat4(
+            1.7808219f32,
+            0.0f32,
+            0.0f32,
+            0.0f32,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -1.0101011,
+            -0.10101011,
+            0.0,
+            0.0,
+            -1.0,
+            0.0,
+        );*/
+        let proj_matrix =
+            nalgebra_glm::perspective(aspect, 45.0f32 / 180.0f32 * PI, 0.1f32, 10.0f32);
+        println!("proj={:?}", proj_matrix);
         let view_matrix: Mat4 = nalgebra_glm::look_at(
             &vec3(0.0f32, 0.0f32, 0.0f32),
             &vec3(0.0f32, 0.0f32, 0.0f32),
