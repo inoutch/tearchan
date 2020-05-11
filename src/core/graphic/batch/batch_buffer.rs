@@ -63,7 +63,7 @@ pub mod tests {
             ]);
         }
 
-        fn sort(&mut self, sorter: fn(fn(BatchBufferPointer)) -> usize) {
+        fn sort(&mut self, _sorter: fn(fn(BatchBufferPointer)) -> usize) {
             unimplemented!()
         }
 

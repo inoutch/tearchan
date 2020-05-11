@@ -1,20 +1,30 @@
-struct A {}
+use nalgebra_glm::vec3;
 
-struct B<'a> {
-    a: &'a A,
+trait A {
+    fn a(&self) -> u32;
 }
 
-struct C<'a> {
-    a: &'a A,
+struct AA {}
+
+impl A for AA {
+    fn a(&self) -> u32 {
+        0
+    }
 }
 
-struct D<'a> {
-    a: Option<A>,
-    b: B<'a>,
-    c: C<'a>,
+struct Parent {
+    parent: Box<dyn A>,
+}
+
+impl Parent {
+    fn new() -> Parent {
+        Parent {
+            parent: Box::new(AA {}),
+        }
+    }
 }
 
 #[test]
 fn sandbox() {
-
+    assert!(vec3(2.0f32, 1.0f32, 1.0f32) == vec3(1.0f32, 1.0f32, 1.0f32));
 }

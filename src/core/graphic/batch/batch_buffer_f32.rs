@@ -1,7 +1,6 @@
 use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_buffer_pointer::BatchBufferPointer;
-use crate::core::graphic::hal::backend::{FixedApi, FixedVertexBuffer};
-use crate::core::graphic::hal::vertex_buffer::VertexBuffer;
+use crate::core::graphic::hal::backend::{RendererApi, VertexBuffer};
 use crate::extension::collection::VecExt;
 use crate::extension::shared::Shared;
 use crate::math::change_range::ChangeRange;
@@ -9,7 +8,7 @@ use crate::utility::buffer_interface::BufferInterface;
 use std::ops::Deref;
 
 pub struct BatchBufferF32 {
-    vertex_buffer: FixedVertexBuffer,
+    vertex_buffer: VertexBuffer,
     vertices: Vec<f32>,
     size: usize,
     pointers: Vec<Shared<BatchBufferPointer>>,
@@ -17,11 +16,11 @@ pub struct BatchBufferF32 {
 }
 
 impl BatchBufferF32 {
-    pub fn new(api: &FixedApi) -> BatchBufferF32 {
-        BatchBufferF32::new_with_size(api, 100_000_usize)
+    pub fn new(api: &RendererApi) -> BatchBufferF32 {
+        BatchBufferF32::new_with_size(api, 1_usize)
     }
 
-    pub fn new_with_size(api: &FixedApi, size: usize) -> BatchBufferF32 {
+    pub fn new_with_size(api: &RendererApi, size: usize) -> BatchBufferF32 {
         let vertices = vec![0.0f32; size];
         let vertex_buffer = api.create_vertex_buffer(&vertices);
 
@@ -34,7 +33,7 @@ impl BatchBufferF32 {
         }
     }
 
-    pub fn borrow_vertex_buffer(&self) -> &FixedVertexBuffer {
+    pub fn borrow_vertex_buffer(&self) -> &VertexBuffer {
         &self.vertex_buffer
     }
 }
@@ -46,14 +45,17 @@ impl BatchBufferF32 {
 
     fn reallocate_vertex_buffer(&mut self, size: usize) {
         self.change_range.resize(size);
-        self.change_range.update_all();
+        self.change_range.reset();
 
         let new_size = size * 2;
         self.vertices.resize(new_size, 0.0f32);
 
-        // TODO: reallocate vertex buffer
         self.size = size;
-        unimplemented!("reallocate vertex buffer");
+        let new_vertex_buffer = self
+            .vertex_buffer
+            .create_vertex_buffer(&self.vertices)
+            .expect("device is already dropped");
+        self.vertex_buffer = new_vertex_buffer;
     }
 }
 
@@ -96,9 +98,8 @@ impl BatchBuffer for BatchBufferF32 {
             Some(v)
         };
         if let Some(x) = old_vertices {
-            for i in 0..(old_size - last) {
-                self.vertices[i + new_last] = x[i + last];
-            }
+            let l = old_size - last;
+            self.vertices[new_last..(l + new_last)].clone_from_slice(&x[last..(l + last)]);
         }
         pointer.borrow_mut().size = size;
         let pointer_ptr = pointer.deref() as *const BatchBufferPointer;
@@ -130,7 +131,7 @@ impl BatchBuffer for BatchBufferF32 {
         });
     }
 
-    fn sort(&mut self, sorter: fn(fn(BatchBufferPointer)) -> usize) {
+    fn sort(&mut self, _sorter: fn(fn(BatchBufferPointer)) -> usize) {
         unimplemented!()
     }
 
@@ -155,7 +156,7 @@ impl BufferInterface<f32> for BatchBufferF32 {
         self.vertices[offset] = value;
     }
 
-    fn resize(&mut self, size: usize) {
+    fn resize(&mut self, _size: usize) {
         unimplemented!();
     }
 }

@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 pub struct Shared<T> {
     v: Rc<RefCell<T>>,
@@ -20,6 +20,10 @@ impl<T> Shared<T> {
             v: Rc::clone(&shared.v),
         }
     }
+
+    pub fn downgrade(shared: &Shared<T>) -> SharedWeak<T> {
+        Rc::downgrade(&shared.v)
+    }
 }
 
 impl<T> Shared<T> {
@@ -35,6 +39,8 @@ impl<T> Shared<T> {
         self.v.as_ptr()
     }
 }
+
+pub type SharedWeak<T> = Weak<RefCell<T>>;
 
 impl<T: fmt::Display> fmt::Display for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

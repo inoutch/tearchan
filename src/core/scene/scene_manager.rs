@@ -1,4 +1,4 @@
-use crate::core::graphic::hal::backend::FixedApi;
+use crate::core::graphic::hal::backend::RendererApi;
 use crate::core::scene::scene_base::SceneBase;
 use crate::core::scene::scene_context::SceneContext;
 use crate::core::scene::scene_creator::SceneCreator;
@@ -16,7 +16,7 @@ impl SceneManager {
         }
     }
 
-    pub fn render(&mut self, delta: f32, api: &mut FixedApi) {
+    pub fn render(&mut self, delta: f32, api: &mut RendererApi) {
         let mut scene_context = SceneContext::new(api);
         let scene_creator = std::mem::replace(&mut self.scene_creator, None);
         if let Some(x) = scene_creator {

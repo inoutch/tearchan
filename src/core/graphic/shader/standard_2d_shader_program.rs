@@ -1,23 +1,21 @@
 use crate::core::graphic::camera::CameraBase;
 use crate::core::graphic::hal::backend::{
-    FixedApi, FixedBackend, FixedTexture, FixedUniformBuffer,
+    RendererApi, Texture, UniformBuffer, ShaderProgram,
 };
-use crate::core::graphic::hal::uniform_buffer::UniformBuffer;
+use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::shader::attribute::Attribute;
-use crate::core::graphic::shader::shader_program::ShaderProgram;
 use crate::core::graphic::shader::shader_source::ShaderSource;
-use gfx_hal::adapter::MemoryType;
 use gfx_hal::pso::Descriptor;
-use gfx_hal::Backend;
 use nalgebra_glm::Mat4;
+use gfx_hal::Backend;
 
 pub struct Standard2DShaderProgram {
     shader_program: ShaderProgram,
-    mvp_matrix_uniform: FixedUniformBuffer<Mat4>,
+    mvp_matrix_uniform: UniformBuffer<Mat4>,
 }
 
 impl Standard2DShaderProgram {
-    pub fn new(api: &FixedApi, camera: &CameraBase) -> Self {
+    pub fn new(api: &RendererApi, camera: &CameraBase) -> Self {
         let shader_source = ShaderSource::new(
             include_bytes!("../../../../target/data/shaders/standard.vert"),
             include_bytes!("../../../../target/data/shaders/standard.frag"),
@@ -40,12 +38,12 @@ impl Standard2DShaderProgram {
         &self.shader_program
     }
 
-    pub fn prepare(&mut self, mvp_matrix: &Mat4, texture: &FixedTexture) {
+    pub fn prepare(&mut self, mvp_matrix: &Mat4, texture: &Texture) {
         self.mvp_matrix_uniform
             .copy_to_buffer(&[mvp_matrix.clone_owned()]);
     }
 
-    pub fn borrow_mvp_matrix_uniform(&self) -> &FixedUniformBuffer<Mat4> {
+    pub fn borrow_mvp_matrix_uniform(&self) -> &UniformBuffer<Mat4> {
         &self.mvp_matrix_uniform
     }
     /*pub fn write_descriptor_sets<'a>(
@@ -74,7 +72,7 @@ impl Standard2DShaderProgram {
 
 pub fn write_descriptor_sets<'a, B: Backend>(
     descriptor_set: &'a B::DescriptorSet,
-    uniform: &'a UniformBuffer<B, Mat4>,
+    uniform: &'a UniformBufferCommon<B, Mat4>,
     image_view: &'a B::ImageView,
     sampler: &'a B::Sampler,
 ) -> Vec<gfx_hal::pso::DescriptorSetWrite<'a, B, Option<Descriptor<'a, B>>>> {

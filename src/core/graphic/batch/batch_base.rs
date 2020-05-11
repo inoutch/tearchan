@@ -47,7 +47,7 @@ pub mod tests {
             ]);
         }
 
-        fn size(&self, object: &Shared<TObject>) -> usize {
+        fn size(&self, _object: &Shared<TObject>) -> usize {
             0
         }
 

@@ -16,7 +16,7 @@ const COLOR_RANGE: gfx_hal::image::SubresourceRange = gfx_hal::image::Subresourc
     layers: 0..1,
 };
 
-pub struct Texture<B: Backend> {
+pub struct TextureCommon<B: Backend> {
     device: Weak<B::Device>,
     image: ManuallyDrop<B::Image>,
     image_memory: ManuallyDrop<B::Memory>,
@@ -24,7 +24,7 @@ pub struct Texture<B: Backend> {
     sampler: ManuallyDrop<B::Sampler>,
 }
 
-impl<B: Backend> Texture<B> {
+impl<B: Backend> TextureCommon<B> {
     pub fn new(
         device: &Rc<B::Device>,
         command_pool: &mut B::CommandPool,
@@ -32,7 +32,7 @@ impl<B: Backend> Texture<B> {
         memory_types: &[MemoryType],
         limits: &Limits,
         image_raw: &Image,
-    ) -> Texture<B> {
+    ) -> TextureCommon<B> {
         let image_stride = image_raw.stride;
         let width = image_raw.size().x;
         let height = image_raw.size().y;
@@ -149,7 +149,7 @@ impl<B: Backend> Texture<B> {
         );
 
         // copy buffer to texture
-        let mut copy_fence = device.create_fence(false).expect("Could not create fence");
+        let copy_fence = device.create_fence(false).expect("Could not create fence");
         unsafe {
             let mut cmd_buffer = command_pool.allocate_one(gfx_hal::command::Level::Primary);
             cmd_buffer.begin_primary(gfx_hal::command::CommandBufferFlags::ONE_TIME_SUBMIT);
@@ -217,18 +217,18 @@ impl<B: Backend> Texture<B> {
 
             cmd_buffer.finish();
 
-            queue_group.queues[0]
-                .submit_without_semaphores(Some(&cmd_buffer), Some(&mut copy_fence));
+            queue_group.queues[0].submit_without_semaphores(Some(&cmd_buffer), Some(&copy_fence));
 
             device
                 .wait_for_fence(&copy_fence, !0)
                 .expect("Can't wait for fence");
 
+            device.destroy_fence(copy_fence);
             device.free_memory(image_upload_memory);
             device.destroy_buffer(image_upload_buffer);
         }
 
-        Texture {
+        TextureCommon {
             device: Rc::downgrade(device),
             image,
             image_memory,
@@ -243,5 +243,19 @@ impl<B: Backend> Texture<B> {
 
     pub fn borrow_image_view(&self) -> &B::ImageView {
         &self.image_view
+    }
+}
+
+impl<B: Backend> Drop for TextureCommon<B> {
+    fn drop(&mut self) {
+        if let Some(device) = self.device.upgrade() {
+            unsafe {
+                device.destroy_sampler(ManuallyDrop::into_inner(std::ptr::read(&self.sampler)));
+                device
+                    .destroy_image_view(ManuallyDrop::into_inner(std::ptr::read(&self.image_view)));
+                device.free_memory(ManuallyDrop::into_inner(std::ptr::read(&self.image_memory)));
+                device.destroy_image(ManuallyDrop::into_inner(std::ptr::read(&self.image)));
+            }
+        }
     }
 }

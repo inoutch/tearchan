@@ -3,10 +3,9 @@ use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
 use crate::core::graphic::batch::batch_bundle::BatchBundle;
 use crate::core::graphic::batch::batch_object_bundle::BatchObjectBundle;
-use crate::core::graphic::batch::default::Batch;
-use crate::core::graphic::hal::backend::FixedApi;
-use crate::core::graphic::polygon::default::Polygon;
-use crate::core::graphic::polygon::polygon_base_buffer::PolygonBaseBuffer;
+use crate::core::graphic::batch::Batch;
+use crate::core::graphic::hal::backend::RendererApi;
+use crate::core::graphic::polygon::Polygon;
 use crate::extension::shared::Shared;
 use crate::utility::buffer_interface::BufferInterface;
 use std::rc::Rc;
@@ -15,12 +14,11 @@ pub struct Batch3D<TBatchBuffer: BatchBuffer> {
     bundles: Vec<BatchBundle<TBatchBuffer>>,
 }
 
-impl<TObject: PolygonBaseBuffer<TBatchBuffer>, TBatchBuffer> BatchBase<TObject, TBatchBuffer>
-    for Batch3D<TBatchBuffer>
+impl<TBatchBuffer> BatchBase<Polygon, TBatchBuffer> for Batch3D<TBatchBuffer>
 where
     TBatchBuffer: BatchBuffer + BufferInterface<f32>,
 {
-    fn update(&mut self, object_bundle: &mut Rc<BatchObjectBundle<TObject>>) {
+    fn update(&mut self, object_bundle: &mut Rc<BatchObjectBundle<Polygon>>) {
         debug_assert_eq!(self.bundles.len(), 4, "Invalid bundles length");
         debug_assert_eq!(
             object_bundle.pointers.len(),
@@ -41,14 +39,14 @@ where
             &mut self.bundles[2].batch_buffer,
             object_bundle.pointers[2].start,
         );
-        /*object.copy_normals_into(
+        object.copy_normals_into(
             &mut self.bundles[3].batch_buffer,
             object_bundle.pointers[3].start,
-        );*/
+        );
     }
 
-    fn size(&self, object: &Shared<TObject>) -> usize {
-        object.borrow_mut().mesh().size()
+    fn size(&self, object: &Shared<Polygon>) -> usize {
+        object.mesh_size()
     }
 
     fn bundles_mut(&mut self) -> &mut Vec<BatchBundle<TBatchBuffer>> {
@@ -65,8 +63,7 @@ where
     }
 }
 
-impl<TObject: PolygonBaseBuffer<TBatchBuffer>, TBatchBuffer>
-    Batch<TObject, TBatchBuffer, Batch3D<TBatchBuffer>>
+impl<TBatchBuffer> Batch<Polygon, TBatchBuffer, Batch3D<TBatchBuffer>>
 where
     TBatchBuffer: BatchBuffer + BufferInterface<f32>,
 {
@@ -75,7 +72,7 @@ where
         color_buffer: TBatchBuffer,
         texcoord_buffer: TBatchBuffer,
         normal_buffer: TBatchBuffer,
-    ) -> Batch<TObject, TBatchBuffer, Batch3D<TBatchBuffer>> {
+    ) -> Batch<Polygon, TBatchBuffer, Batch3D<TBatchBuffer>> {
         Batch::new(Batch3D {
             bundles: vec![
                 BatchBundle {
@@ -100,7 +97,7 @@ where
 }
 
 impl Batch3D<BatchBufferF32> {
-    pub fn new(api: &FixedApi) -> Batch<Polygon, BatchBufferF32, Batch3D<BatchBufferF32>> {
+    pub fn new(api: &RendererApi) -> Batch<Polygon, BatchBufferF32, Batch3D<BatchBufferF32>> {
         Batch::new_batch3d(
             BatchBufferF32::new(api),
             BatchBufferF32::new(api),

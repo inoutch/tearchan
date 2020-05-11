@@ -1,17 +1,13 @@
 use crate::core::graphic::hal::shader::Shader;
 use crate::core::graphic::shader::attribute::Attribute;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{CreationError, DescriptorPool, DescriptorType, DepthTest, Comparison};
+use gfx_hal::pso::{Comparison, CreationError, DepthTest, DescriptorPool, DescriptorType};
 use gfx_hal::Backend;
 use std::borrow::Borrow;
 use std::mem::ManuallyDrop;
 use std::rc::{Rc, Weak};
 
-pub struct GraphicPipeline<B: Backend> {
-    descriptor_set_uniform_providers: Vec<i32>,
-    descriptor_set_texture_providers: Vec<i32>,
-
-    // native
+pub struct GraphicPipelineCommon<B: Backend> {
     device: Weak<B::Device>,
     descriptor_pool: ManuallyDrop<B::DescriptorPool>,
     descriptor_set: B::DescriptorSet,
@@ -20,7 +16,7 @@ pub struct GraphicPipeline<B: Backend> {
     pipeline: ManuallyDrop<B::GraphicsPipeline>,
 }
 
-impl<B: Backend> GraphicPipeline<B> {
+impl<B: Backend> GraphicPipelineCommon<B> {
     pub fn new(device: &Rc<B::Device>, render_pass: &B::RenderPass, shader: &Shader<B>) -> Self {
         let descriptor_ranges = create_default_descriptor_range_descriptors();
         let mut descriptor_pool = unsafe {
@@ -87,9 +83,7 @@ impl<B: Backend> GraphicPipeline<B> {
                 .create_graphics_pipeline(&pipeline_desc, None)
                 .unwrap()
         };
-        GraphicPipeline {
-            descriptor_set_uniform_providers: vec![],
-            descriptor_set_texture_providers: vec![],
+        GraphicPipelineCommon {
             device: Rc::downgrade(device),
             descriptor_pool: ManuallyDrop::new(descriptor_pool),
             descriptor_set,
@@ -112,7 +106,7 @@ impl<B: Backend> GraphicPipeline<B> {
     }
 }
 
-impl<B: Backend> Drop for GraphicPipeline<B> {
+impl<B: Backend> Drop for GraphicPipelineCommon<B> {
     fn drop(&mut self) {
         if let Some(device) = self.device.upgrade() {
             unsafe {

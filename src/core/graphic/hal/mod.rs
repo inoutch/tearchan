@@ -2,7 +2,7 @@ pub mod backend;
 pub mod graphic_pipeline;
 pub mod graphic_pipeline_config;
 pub mod image;
-pub mod material;
+pub mod instance;
 pub mod renderer;
 pub mod renderer_api;
 pub mod shader;

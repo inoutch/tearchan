@@ -6,7 +6,7 @@ use std::borrow::Borrow;
 use std::mem::{size_of, ManuallyDrop};
 use std::rc::{Rc, Weak};
 
-pub struct UniformBuffer<B: Backend, T> {
+pub struct UniformBufferCommon<B: Backend, T> {
     device: Weak<B::Device>,
     buffer: ManuallyDrop<B::Buffer>,
     buffer_memory: ManuallyDrop<B::Memory>,
@@ -14,7 +14,7 @@ pub struct UniformBuffer<B: Backend, T> {
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<B: Backend, T> UniformBuffer<B, T> {
+impl<B: Backend, T> UniformBufferCommon<B, T> {
     pub fn new(device: &Rc<B::Device>, memory_types: &[MemoryType], data_source: &[T]) -> Self {
         let upload_size = data_source.len() * size_of::<T>();
         let mut buffer = unsafe {
@@ -51,7 +51,7 @@ impl<B: Backend, T> UniformBuffer<B, T> {
                 .unwrap();
             device.unmap_memory(&buffer_memory);
         }
-        UniformBuffer {
+        UniformBufferCommon {
             device: Rc::downgrade(device),
             buffer: ManuallyDrop::new(buffer),
             buffer_memory: ManuallyDrop::new(buffer_memory),
@@ -85,7 +85,7 @@ impl<B: Backend, T> UniformBuffer<B, T> {
     }
 }
 
-impl<B: Backend, T> Drop for UniformBuffer<B, T> {
+impl<B: Backend, T> Drop for UniformBufferCommon<B, T> {
     fn drop(&mut self) {
         if let Some(device) = self.device.upgrade() {
             unsafe {
