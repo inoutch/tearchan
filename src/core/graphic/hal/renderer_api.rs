@@ -8,7 +8,7 @@ use crate::core::graphic::shader::attribute::Attribute;
 use crate::core::graphic::shader::shader_program::{ShaderProgram, ShaderProgramCommon};
 use crate::core::graphic::shader::shader_source::ShaderSource;
 use gfx_hal::adapter::MemoryType;
-use gfx_hal::command::CommandBuffer;
+use gfx_hal::command::{ClearDepthStencil, CommandBuffer};
 use gfx_hal::device::Device;
 use gfx_hal::pso::Descriptor;
 use gfx_hal::queue::QueueGroup;
@@ -118,11 +118,19 @@ impl<'a, B: gfx_hal::Backend> Api<'a, B> {
                 self.render_pass,
                 self.frame_buffer,
                 self.viewport.rect,
-                &[gfx_hal::command::ClearValue {
-                    color: gfx_hal::command::ClearColor {
-                        float32: [0.3, 0.3, 0.3, 1.0],
+                &[
+                    gfx_hal::command::ClearValue {
+                        color: gfx_hal::command::ClearColor {
+                            float32: [0.3, 0.3, 0.3, 1.0],
+                        },
                     },
-                }],
+                    gfx_hal::command::ClearValue {
+                        depth_stencil: ClearDepthStencil {
+                            depth: 1.0f32,
+                            stencil: 0,
+                        },
+                    },
+                ],
                 gfx_hal::command::SubpassContents::Inline,
             );
             self.command_buffer.draw(0..triangle_count as u32, 0..1);

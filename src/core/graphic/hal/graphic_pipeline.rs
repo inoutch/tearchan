@@ -1,7 +1,7 @@
 use crate::core::graphic::hal::shader::Shader;
 use crate::core::graphic::shader::attribute::Attribute;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{CreationError, DescriptorPool, DescriptorType};
+use gfx_hal::pso::{CreationError, DescriptorPool, DescriptorType, DepthTest, Comparison};
 use gfx_hal::Backend;
 use std::borrow::Borrow;
 use std::mem::ManuallyDrop;
@@ -71,6 +71,12 @@ impl<B: Backend> GraphicPipeline<B> {
                 mask: gfx_hal::pso::ColorMask::ALL,
                 blend: Some(gfx_hal::pso::BlendState::ALPHA),
             });
+
+        pipeline_desc.depth_stencil.depth = Some(DepthTest {
+            fun: Comparison::LessEqual,
+            write: true,
+        });
+        pipeline_desc.depth_stencil.depth_bounds = true;
 
         shader.borrow_attributes().iter().for_each(|x| {
             pipeline_desc.attributes.push(x.attribute_desc);
