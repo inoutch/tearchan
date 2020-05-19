@@ -1,5 +1,5 @@
 use crate::core::graphic::camera::CameraBase;
-use nalgebra_glm::{mat4, vec3, Mat4, Vec3};
+use nalgebra_glm::{vec3, Mat4, Vec3};
 use std::f32::consts::PI;
 
 pub struct Camera3D {
