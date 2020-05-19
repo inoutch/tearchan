@@ -1,4 +1,4 @@
-use nalgebra_glm::{vec2, vec4, Vec2, Vec3, Vec4};
+use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 
 #[derive(Clone)]
 pub struct Mesh {
@@ -56,6 +56,15 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
             colors: create_square_colors(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32)),
             texcoords: create_square_texcoords(vec2(0.0f32, 0.0f32), vec2(1.0f32, 1.0f32)),
             normals: self.normals,
+        }
+    }
+
+    pub fn with_cube(self, size: f32) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        MeshBuilder {
+            positions: create_cube_positions(size),
+            colors: create_cube_colors(),
+            texcoords: create_cute_texcoords(vec2(0.0f32, 0.0f32), vec2(1.0f32, 1.0f32)),
+            normals: create_cube_normals(),
         }
     }
 
@@ -157,8 +166,181 @@ pub fn create_square_texcoords(position: Vec2, size: Vec2) -> Vec<Vec2> {
     ];
 }
 
-#[cfg(test)]
-use nalgebra_glm::vec3;
+pub fn create_square_normals() -> Vec<Vec3> {
+    return vec![
+        Vec3::new(0.0f32, 0.0f32, 1.0f32),
+        Vec3::new(0.0f32, 0.0f32, 1.0f32),
+        Vec3::new(0.0f32, 0.0f32, 1.0f32),
+        Vec3::new(0.0f32, 0.0f32, 1.0f32),
+        Vec3::new(0.0f32, 0.0f32, 1.0f32),
+        Vec3::new(0.0f32, 0.0f32, 1.0f32),
+    ];
+}
+
+pub fn create_cube_positions(size: f32) -> Vec<Vec3> {
+    let h = size / 2.0f32;
+    vec![
+        vec3(-h, -h, -h),
+        vec3(-h, -h, h),
+        vec3(-h, h, h),
+        vec3(-h, -h, -h),
+        vec3(-h, h, h),
+        vec3(-h, h, -h),
+        vec3(h, h, -h), //
+        vec3(-h, -h, -h),
+        vec3(-h, h, -h),
+        vec3(h, h, -h), //
+        vec3(h, -h, -h),
+        vec3(-h, -h, -h),
+        vec3(h, -h, h), //
+        vec3(-h, -h, -h),
+        vec3(h, -h, -h),
+        vec3(h, -h, h), //
+        vec3(-h, -h, h),
+        vec3(-h, -h, -h),
+        vec3(h, h, h), //
+        vec3(h, -h, -h),
+        vec3(h, h, -h),
+        vec3(h, -h, -h), //
+        vec3(h, h, h),
+        vec3(h, -h, h),
+        vec3(h, h, h), //
+        vec3(h, h, -h),
+        vec3(-h, h, -h),
+        vec3(h, h, h), //
+        vec3(-h, h, -h),
+        vec3(-h, h, h),
+        vec3(-h, h, h), //
+        vec3(-h, -h, h),
+        vec3(h, -h, h),
+        vec3(h, h, h), //
+        vec3(-h, h, h),
+        vec3(h, -h, h),
+    ]
+}
+
+pub fn create_cute_texcoords(position: Vec2, size: Vec2) -> Vec<Vec2> {
+    vec![
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+        vec2(position.x, position.y),
+        vec2(position.x, position.y + size.y),
+        vec2(position.x + size.x, position.y + size.y),
+        vec2(position.x + size.x, position.y),
+    ]
+}
+
+pub fn create_cube_colors() -> Vec<Vec4> {
+    vec![
+        vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(1.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 1.0f32, 0.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(1.0f32, 0.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 1.0f32, 1.0f32),
+        vec4(0.0f32, 1.0f32, 1.0f32, 1.0f32),
+    ]
+}
+
+pub fn create_cube_normals() -> Vec<Vec3> {
+    vec![
+        vec3(-1.0f32, 0.0f32, 0.0f32),
+        vec3(-1.0f32, 0.0f32, 0.0f32),
+        vec3(-1.0f32, 0.0f32, 0.0f32),
+        vec3(-1.0f32, 0.0f32, 0.0f32),
+        vec3(-1.0f32, 0.0f32, 0.0f32),
+        vec3(-1.0f32, 0.0f32, 0.0f32),
+        vec3(0.0f32, 0.0f32, -1.0f32),
+        vec3(0.0f32, 0.0f32, -1.0f32),
+        vec3(0.0f32, 0.0f32, -1.0f32),
+        vec3(0.0f32, 0.0f32, -1.0f32),
+        vec3(0.0f32, 0.0f32, -1.0f32),
+        vec3(0.0f32, 0.0f32, -1.0f32),
+        vec3(0.0f32, -1.0f32, 0.0f32),
+        vec3(0.0f32, -1.0f32, 0.0f32),
+        vec3(0.0f32, -1.0f32, 0.0f32),
+        vec3(0.0f32, -1.0f32, 0.0f32),
+        vec3(0.0f32, -1.0f32, 0.0f32),
+        vec3(0.0f32, -1.0f32, 0.0f32),
+        vec3(1.0f32, 0.0f32, 0.0f32),
+        vec3(1.0f32, 0.0f32, 0.0f32),
+        vec3(1.0f32, 0.0f32, 0.0f32),
+        vec3(1.0f32, 0.0f32, 0.0f32),
+        vec3(1.0f32, 0.0f32, 0.0f32),
+        vec3(1.0f32, 0.0f32, 0.0f32),
+        vec3(0.0f32, 1.0f32, 0.0f32),
+        vec3(0.0f32, 1.0f32, 0.0f32),
+        vec3(0.0f32, 1.0f32, 0.0f32),
+        vec3(0.0f32, 1.0f32, 0.0f32),
+        vec3(0.0f32, 1.0f32, 0.0f32),
+        vec3(0.0f32, 1.0f32, 0.0f32),
+        vec3(0.0f32, 0.0f32, 1.0f32),
+        vec3(0.0f32, 0.0f32, 1.0f32),
+        vec3(0.0f32, 0.0f32, 1.0f32),
+        vec3(0.0f32, 0.0f32, 1.0f32),
+        vec3(0.0f32, 0.0f32, 1.0f32),
+        vec3(0.0f32, 0.0f32, 1.0f32),
+    ]
+}
 
 #[test]
 fn test_manually() {
