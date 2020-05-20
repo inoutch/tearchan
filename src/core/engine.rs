@@ -67,7 +67,7 @@ impl Engine {
                 renderer.render(|api| {
                     scene_manager.render(1.0f32 / 6.0f32, api);
                 });
-            },
+            }
             _ => {
                 *control_flow =
                     winit::event_loop::ControlFlow::WaitUntil(Instant::now() + timer_length);
@@ -77,7 +77,7 @@ impl Engine {
     }
 }
 
-fn prompt_for_monitor(event_loop: &EventLoop<()>) -> MonitorHandle {
+pub fn prompt_for_monitor(event_loop: &EventLoop<()>) -> MonitorHandle {
     let num = 0;
     let monitor = event_loop
         .available_monitors()

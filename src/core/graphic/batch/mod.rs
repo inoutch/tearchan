@@ -20,8 +20,6 @@ pub mod batch_object_bundle;
 
 pub struct Batch<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBuffer>> {
     base: TBatchBase,
-    material: i32,
-    // TODO: Change to actual material
     object_bundles: Vec<Rc<BatchObjectBundle<TObject>>>,
     object_bundles_cache: HashMap<*const TObject, Rc<BatchObjectBundle<TObject>>>,
     _marker: PhantomData<fn() -> TBatchBuffer>,
@@ -33,7 +31,6 @@ impl<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBu
     pub fn new(batch_base: TBatchBase) -> Batch<TObject, TBatchBuffer, TBatchBase> {
         Batch {
             base: batch_base,
-            material: 0,
             object_bundles: vec![],
             object_bundles_cache: HashMap::new(),
             _marker: PhantomData,
