@@ -80,7 +80,7 @@ impl<B: Backend, T> UniformBufferCommon<B, T> {
         self.size
     }
 
-    pub fn borrow_buffer(&self) -> &B::Buffer {
+    pub fn buffer(&self) -> &B::Buffer {
         &self.buffer
     }
 }

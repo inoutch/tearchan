@@ -6,10 +6,10 @@ use crate::core::graphic::hal::shader::ShaderCommon;
 use crate::core::graphic::hal::texture::TextureCommon;
 use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
+use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
 use crate::core::graphic::image::Image;
 use gfx_hal::command::{ClearDepthStencil, CommandBuffer};
 use gfx_hal::device::Device;
-use gfx_hal::pso::Descriptor;
 use nalgebra_glm::Vec2;
 use std::ops::Deref;
 
@@ -86,7 +86,10 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         )
     }
 
-    pub fn create_graphic_pipeline(&mut self, shader: &ShaderCommon<B>) -> GraphicPipelineCommon<B> {
+    pub fn create_graphic_pipeline(
+        &mut self,
+        shader: &ShaderCommon<B>,
+    ) -> GraphicPipelineCommon<B> {
         GraphicPipelineCommon::new(
             &self.context.device,
             self.context.render_pass.deref(),
@@ -102,11 +105,11 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     ) {
         unsafe {
             self.command_buffer
-                .bind_graphics_pipeline(graphic_pipeline.borrow_pipeline());
+                .bind_graphics_pipeline(graphic_pipeline.pipeline());
             self.command_buffer.bind_graphics_descriptor_sets(
-                graphic_pipeline.borrow_pipeline_layout(),
+                graphic_pipeline.pipeline_layout(),
                 0,
-                std::iter::once(graphic_pipeline.borrow_descriptor_set()),
+                std::iter::once(graphic_pipeline.descriptor_set().raw()),
                 &[],
             );
 
@@ -143,16 +146,11 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         self.screen_size
     }
 
-    pub fn write_descriptor_sets(
-        &self,
-        write_descriptor_sets: Vec<
-            gfx_hal::pso::DescriptorSetWrite<'a, B, Option<Descriptor<'a, B>>>,
-        >,
-    ) {
+    pub fn write_descriptor_sets(&self, write_descriptor_sets: WriteDescriptorSetsCommon<B>) {
         unsafe {
             self.context
                 .device
-                .write_descriptor_sets(write_descriptor_sets)
+                .write_descriptor_sets(write_descriptor_sets.get())
         }
     }
 }

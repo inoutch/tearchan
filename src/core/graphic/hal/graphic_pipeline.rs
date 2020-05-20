@@ -1,3 +1,4 @@
+use crate::core::graphic::hal::descriptor_set::DescriptorSetCommon;
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::ShaderCommon;
 use gfx_hal::device::Device;
@@ -10,7 +11,7 @@ use std::rc::{Rc, Weak};
 pub struct GraphicPipelineCommon<B: Backend> {
     device: Weak<B::Device>,
     descriptor_pool: ManuallyDrop<B::DescriptorPool>,
-    descriptor_set: B::DescriptorSet,
+    descriptor_set: DescriptorSetCommon<B>,
     descriptor_set_layout: ManuallyDrop<B::DescriptorSetLayout>,
     pipeline_layout: ManuallyDrop<B::PipelineLayout>,
     pipeline: ManuallyDrop<B::GraphicsPipeline>,
@@ -90,22 +91,22 @@ impl<B: Backend> GraphicPipelineCommon<B> {
         GraphicPipelineCommon {
             device: Rc::downgrade(device),
             descriptor_pool: ManuallyDrop::new(descriptor_pool),
-            descriptor_set,
+            descriptor_set: DescriptorSetCommon::new(descriptor_set),
             descriptor_set_layout: ManuallyDrop::new(descriptor_set_layouts.remove(0)),
             pipeline_layout: ManuallyDrop::new(pipeline_layout),
             pipeline: ManuallyDrop::new(pipeline),
         }
     }
 
-    pub fn borrow_pipeline(&self) -> &B::GraphicsPipeline {
+    pub fn pipeline(&self) -> &B::GraphicsPipeline {
         self.pipeline.borrow()
     }
 
-    pub fn borrow_pipeline_layout(&self) -> &B::PipelineLayout {
+    pub fn pipeline_layout(&self) -> &B::PipelineLayout {
         self.pipeline_layout.borrow()
     }
 
-    pub fn borrow_descriptor_set(&self) -> &B::DescriptorSet {
+    pub fn descriptor_set(&self) -> &DescriptorSetCommon<B> {
         &self.descriptor_set
     }
 }

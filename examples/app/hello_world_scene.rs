@@ -79,18 +79,10 @@ impl SceneBase for HelloWorldScene {
             &self.texture,
         );
 
-        let descriptor_set = self.graphic_pipeline.borrow_descriptor_set();
-        let write_descriptor_sets =
-            tearchan::core::graphic::shader::standard_3d_shader_program::write_descriptor_sets(
-                descriptor_set,
-                &self.shader_program.vp_matrix_uniform,
-                &self.shader_program.inv_vp_matrix_uniform,
-                &self.shader_program.light_position_uniform,
-                &self.shader_program.light_color_uniform,
-                &self.shader_program.ambient_strength_uniform,
-                self.texture.borrow_image_view(),
-                self.texture.borrow_sampler(),
-            );
+        let descriptor_set = self.graphic_pipeline.descriptor_set();
+        let write_descriptor_sets = self
+            .shader_program
+            .create_write_descriptor_sets(descriptor_set, &self.texture);
 
         scene_context
             .renderer_api

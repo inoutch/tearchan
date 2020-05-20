@@ -1,20 +1,19 @@
 use crate::core::graphic::camera::CameraBase;
-use crate::core::graphic::hal::backend::{RendererApi, Shader, Texture, UniformBuffer};
+use crate::core::graphic::hal::backend::{
+    DescriptorSet, RendererApi, Shader, Texture, UniformBuffer, WriteDescriptorSets,
+};
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
-use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::math::mat::inverse_transpose;
-use gfx_hal::pso::Descriptor;
-use gfx_hal::Backend;
 use nalgebra_glm::{vec3, Mat4, Vec3};
 
 pub struct Standard3DShaderProgram {
     shader: Shader,
-    pub vp_matrix_uniform: UniformBuffer<Mat4>,
-    pub inv_vp_matrix_uniform: UniformBuffer<Mat4>,
-    pub light_position_uniform: UniformBuffer<Vec3>,
-    pub light_color_uniform: UniformBuffer<Vec3>,
-    pub ambient_strength_uniform: UniformBuffer<f32>,
+    vp_matrix_uniform: UniformBuffer<Mat4>,
+    inv_vp_matrix_uniform: UniformBuffer<Mat4>,
+    light_position_uniform: UniformBuffer<Vec3>,
+    light_color_uniform: UniformBuffer<Vec3>,
+    ambient_strength_uniform: UniformBuffer<f32>,
 }
 
 impl Standard3DShaderProgram {
@@ -23,7 +22,7 @@ impl Standard3DShaderProgram {
             include_bytes!("../../../../target/data/shaders/standard_3d.vert"),
             include_bytes!("../../../../target/data/shaders/standard_3d.frag"),
         )
-        .unwrap();
+            .unwrap();
         let mvp_matrix: Mat4 = camera.combine().clone_owned();
         let attributes = create_3d_attributes();
         let descriptor_sets = create_3d_descriptor_set_layout_bindings();
@@ -66,6 +65,70 @@ impl Standard3DShaderProgram {
             .copy_to_buffer(&[light_color.clone_owned()]);
         self.ambient_strength_uniform
             .copy_to_buffer(&[ambient_strength]);
+    }
+
+    pub fn create_write_descriptor_sets<'a>(
+        &'a self,
+        descriptor_set: &'a DescriptorSet,
+        texture: &'a Texture,
+    ) -> WriteDescriptorSets<'a> {
+        WriteDescriptorSets::new(vec![
+            gfx_hal::pso::DescriptorSetWrite {
+                set: descriptor_set.raw(),
+                binding: 0,
+                array_offset: 0,
+                descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
+                    self.vp_matrix_uniform.buffer(),
+                    gfx_hal::buffer::SubRange::WHOLE,
+                )),
+            },
+            gfx_hal::pso::DescriptorSetWrite {
+                set: descriptor_set.raw(),
+                binding: 1,
+                array_offset: 0,
+                descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
+                    self.inv_vp_matrix_uniform.buffer(),
+                    gfx_hal::buffer::SubRange::WHOLE,
+                )),
+            },
+            gfx_hal::pso::DescriptorSetWrite {
+                set: descriptor_set.raw(),
+                binding: 2,
+                array_offset: 0,
+                descriptors: Some(gfx_hal::pso::Descriptor::CombinedImageSampler(
+                    texture.image_view(),
+                    gfx_hal::image::Layout::ShaderReadOnlyOptimal,
+                    texture.sampler(),
+                )),
+            },
+            gfx_hal::pso::DescriptorSetWrite {
+                set: descriptor_set.raw(),
+                binding: 3,
+                array_offset: 0,
+                descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
+                    self.light_position_uniform.buffer(),
+                    gfx_hal::buffer::SubRange::WHOLE,
+                )),
+            },
+            gfx_hal::pso::DescriptorSetWrite {
+                set: descriptor_set.raw(),
+                binding: 4,
+                array_offset: 0,
+                descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
+                    self.light_color_uniform.buffer(),
+                    gfx_hal::buffer::SubRange::WHOLE,
+                )),
+            },
+            gfx_hal::pso::DescriptorSetWrite {
+                set: descriptor_set.raw(),
+                binding: 5,
+                array_offset: 0,
+                descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
+                    self.ambient_strength_uniform.buffer(),
+                    gfx_hal::buffer::SubRange::WHOLE,
+                )),
+            },
+        ])
     }
 }
 
@@ -118,75 +181,6 @@ fn create_3d_attributes() -> Vec<Attribute> {
                 },
             },
             stride: 3 * std::mem::size_of::<f32>() as u32,
-        },
-    ]
-}
-
-pub fn write_descriptor_sets<'a, B: Backend>(
-    descriptor_set: &'a B::DescriptorSet,
-    vp_matrix_uniform: &'a UniformBufferCommon<B, Mat4>,
-    inv_vp_matrix_uniform: &'a UniformBufferCommon<B, Mat4>,
-    light_position_uniform: &'a UniformBufferCommon<B, Vec3>,
-    light_color_uniform: &'a UniformBufferCommon<B, Vec3>,
-    ambient_strength_uniform: &'a UniformBufferCommon<B, f32>,
-    image_view: &'a B::ImageView,
-    sampler: &'a B::Sampler,
-) -> Vec<gfx_hal::pso::DescriptorSetWrite<'a, B, Option<Descriptor<'a, B>>>> {
-    vec![
-        gfx_hal::pso::DescriptorSetWrite {
-            set: &descriptor_set,
-            binding: 0,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
-                vp_matrix_uniform.borrow_buffer(),
-                gfx_hal::buffer::SubRange::WHOLE,
-            )),
-        },
-        gfx_hal::pso::DescriptorSetWrite {
-            set: &descriptor_set,
-            binding: 1,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
-                inv_vp_matrix_uniform.borrow_buffer(),
-                gfx_hal::buffer::SubRange::WHOLE,
-            )),
-        },
-        gfx_hal::pso::DescriptorSetWrite {
-            set: descriptor_set,
-            binding: 2,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::CombinedImageSampler(
-                &*image_view,
-                gfx_hal::image::Layout::ShaderReadOnlyOptimal,
-                sampler,
-            )),
-        },
-        gfx_hal::pso::DescriptorSetWrite {
-            set: &descriptor_set,
-            binding: 3,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
-                light_position_uniform.borrow_buffer(),
-                gfx_hal::buffer::SubRange::WHOLE,
-            )),
-        },
-        gfx_hal::pso::DescriptorSetWrite {
-            set: &descriptor_set,
-            binding: 4,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
-                light_color_uniform.borrow_buffer(),
-                gfx_hal::buffer::SubRange::WHOLE,
-            )),
-        },
-        gfx_hal::pso::DescriptorSetWrite {
-            set: &descriptor_set,
-            binding: 5,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
-                ambient_strength_uniform.borrow_buffer(),
-                gfx_hal::buffer::SubRange::WHOLE,
-            )),
         },
     ]
 }

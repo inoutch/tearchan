@@ -1,10 +1,9 @@
 use crate::core::graphic::camera::CameraBase;
-use crate::core::graphic::hal::backend::{RendererApi, Shader, Texture, UniformBuffer};
+use crate::core::graphic::hal::backend::{
+    DescriptorSet, RendererApi, Shader, Texture, UniformBuffer, WriteDescriptorSets,
+};
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
-use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
-use gfx_hal::pso::Descriptor;
-use gfx_hal::Backend;
 use nalgebra_glm::Mat4;
 
 pub struct Standard2DShaderProgram {
@@ -40,60 +39,33 @@ impl Standard2DShaderProgram {
             .copy_to_buffer(&[mvp_matrix.clone_owned()]);
     }
 
-    pub fn borrow_mvp_matrix_uniform(&self) -> &UniformBuffer<Mat4> {
-        &self.mvp_matrix_uniform
-    }
-    /*pub fn write_descriptor_sets<'a>(
-        &self,
-        descriptor_set: &FixedBackend::DescriptorSet,
-    ) -> Vec<gfx_hal::pso::DescriptorSetWrite<B, Option<Descriptor<B>>>> {
-        vec![
+    pub fn create_write_descriptor_sets<'a>(
+        &'a self,
+        descriptor_set: &'a DescriptorSet,
+        texture: &'a Texture,
+    ) -> WriteDescriptorSets<'a> {
+        WriteDescriptorSets::new(vec![
             gfx_hal::pso::DescriptorSetWrite {
-                set: descriptor_set,
+                set: descriptor_set.raw(),
                 binding: 0,
                 array_offset: 0,
-                descriptors: Some(gfx_hal::pso::Descriptor::Image(
-                    &*image_srv,
-                    i::Layout::ShaderReadOnlyOptimal,
+                descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
+                    self.mvp_matrix_uniform.buffer(),
+                    gfx_hal::buffer::SubRange::WHOLE,
                 )),
             },
             gfx_hal::pso::DescriptorSetWrite {
-                set: &descriptor_set,
+                set: descriptor_set.raw(),
                 binding: 1,
                 array_offset: 0,
-                descriptors: Some(gfx_hal::pso::Descriptor::Sampler(&*sampler)),
+                descriptors: Some(gfx_hal::pso::Descriptor::CombinedImageSampler(
+                    texture.image_view(),
+                    gfx_hal::image::Layout::ShaderReadOnlyOptimal,
+                    texture.sampler(),
+                )),
             },
-        ]
-    }*/
-}
-
-pub fn write_descriptor_sets<'a, B: Backend>(
-    descriptor_set: &'a B::DescriptorSet,
-    uniform: &'a UniformBufferCommon<B, Mat4>,
-    image_view: &'a B::ImageView,
-    sampler: &'a B::Sampler,
-) -> Vec<gfx_hal::pso::DescriptorSetWrite<'a, B, Option<Descriptor<'a, B>>>> {
-    vec![
-        gfx_hal::pso::DescriptorSetWrite {
-            set: &descriptor_set,
-            binding: 0,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::Buffer(
-                uniform.borrow_buffer(),
-                gfx_hal::buffer::SubRange::WHOLE,
-            )),
-        },
-        gfx_hal::pso::DescriptorSetWrite {
-            set: descriptor_set,
-            binding: 1,
-            array_offset: 0,
-            descriptors: Some(gfx_hal::pso::Descriptor::CombinedImageSampler(
-                &*image_view,
-                gfx_hal::image::Layout::ShaderReadOnlyOptimal,
-                sampler,
-            )),
-        },
-    ]
+        ])
+    }
 }
 
 fn create_2d_attributes() -> Vec<Attribute> {

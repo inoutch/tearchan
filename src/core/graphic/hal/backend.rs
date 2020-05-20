@@ -18,20 +18,24 @@ extern crate gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 extern crate gfx_backend_vulkan as back;
 
+use crate::core::graphic::hal::descriptor_set::DescriptorSetCommon;
 use crate::core::graphic::hal::graphic_pipeline::GraphicPipelineCommon;
 use crate::core::graphic::hal::renderer_api::RendererApiCommon;
 use crate::core::graphic::hal::shader::ShaderCommon;
 use crate::core::graphic::hal::texture::TextureCommon;
 use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
+use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
 
 pub type Backend = back::Backend;
 pub type Instance = back::Instance;
 pub type Surface = back::Surface;
 
+pub type DescriptorSet = DescriptorSetCommon<back::Backend>;
 pub type GraphicPipeline = GraphicPipelineCommon<back::Backend>;
 pub type RendererApi<'a> = RendererApiCommon<'a, back::Backend>;
 pub type Shader = ShaderCommon<back::Backend>;
 pub type Texture = TextureCommon<back::Backend>;
 pub type UniformBuffer<T> = UniformBufferCommon<back::Backend, T>;
 pub type VertexBuffer = VertexBufferCommon<back::Backend>;
+pub type WriteDescriptorSets<'a> = WriteDescriptorSetsCommon<'a, back::Backend>;
