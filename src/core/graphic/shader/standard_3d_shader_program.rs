@@ -22,7 +22,7 @@ impl Standard3DShaderProgram {
             include_bytes!("../../../../target/data/shaders/standard_3d.vert"),
             include_bytes!("../../../../target/data/shaders/standard_3d.frag"),
         )
-            .unwrap();
+        .unwrap();
         let mvp_matrix: Mat4 = camera.combine().clone_owned();
         let attributes = create_3d_attributes();
         let descriptor_sets = create_3d_descriptor_set_layout_bindings();
