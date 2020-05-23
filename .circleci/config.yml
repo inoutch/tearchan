@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: uta8a/circleci-rust-cmake:0.0.1
+      - image: circleci/rust
     steps:
       - checkout
       - run:
