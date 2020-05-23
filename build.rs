@@ -1,7 +1,5 @@
-#[cfg(not(feature = "ci"))]
 extern crate shaderc;
 
-#[cfg(not(feature = "ci"))]
 use shaderc::ShaderKind;
 use std::error::Error;
 
@@ -11,7 +9,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let shader_gen_path = "target/data/shaders/";
     std::fs::create_dir_all(shader_gen_path)?;
 
-    #[cfg(not(feature = "ci"))]
     for entry in std::fs::read_dir("data/shaders")? {
         let entry = entry?;
         if entry.file_type()?.is_file() {
