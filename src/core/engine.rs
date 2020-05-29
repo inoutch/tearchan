@@ -1,4 +1,4 @@
-use crate::core::engine_config::StartupConfig;
+use crate::core::engine_config::{EngineConfig, StartupConfig};
 use crate::core::graphic::hal::instance::create_backend;
 use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
@@ -8,22 +8,24 @@ use winit::event_loop::EventLoop;
 use winit::monitor::MonitorHandle;
 
 pub struct Engine {
-    startup_config: StartupConfig,
+    config: EngineConfig,
     scene_manager: SceneManager,
 }
 
 impl Engine {
-    pub fn new(mut config: StartupConfig) -> Engine {
-        let scene_creator =
-            std::mem::replace(&mut config.scene_creator, None).expect("specify a scene creator");
+    pub fn new(config: StartupConfig) -> Engine {
         Engine {
-            startup_config: config,
-            scene_manager: SceneManager::new(scene_creator),
+            config: EngineConfig {
+                application_name: config.application_name,
+                screen_mode: config.screen_mode,
+                screen_size: config.screen_size,
+            },
+            scene_manager: SceneManager::new(config.scene_creator),
         }
     }
 
     pub fn run(self) {
-        let window_size = match &self.startup_config.screen_mode {
+        let window_size = match &self.config.screen_mode {
             ScreenMode::FullScreenWindow => unimplemented!("FullScreenWindow"),
             ScreenMode::Windowed { resolutions } => &resolutions[0],
         };
@@ -40,7 +42,7 @@ impl Engine {
             /*.with_fullscreen(Some(Fullscreen::Borderless(prompt_for_monitor(
                 &event_loop,
             ))))*/
-            .with_title(self.startup_config.application_name.to_string());
+            .with_title(self.config.application_name.to_string());
 
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
         let adapter = adapters.remove(0);

@@ -1,4 +1,5 @@
 use crate::core::scene::scene_creator::SceneCreator;
+use crate::core::scene::scene_manager::DummyScene;
 use crate::core::screen::ScreenMode;
 use nalgebra_glm::Vec2;
 
@@ -8,7 +9,7 @@ pub struct StartupConfig {
     pub application_name: String,
     pub screen_mode: ScreenMode,
     pub screen_size: Option<Vec2>,
-    pub scene_creator: Option<SceneCreator>,
+    pub scene_creator: SceneCreator,
 }
 
 impl Default for StartupConfig {
@@ -17,9 +18,15 @@ impl Default for StartupConfig {
             application_name: "default".to_string(),
             screen_mode: ScreenMode::FullScreenWindow,
             screen_size: None,
-            scene_creator: None,
+            scene_creator: |_| Box::new(DummyScene {}),
         }
     }
+}
+
+pub struct EngineConfig {
+    pub application_name: String,
+    pub screen_mode: ScreenMode,
+    pub screen_size: Option<Vec2>,
 }
 
 #[cfg(test)]

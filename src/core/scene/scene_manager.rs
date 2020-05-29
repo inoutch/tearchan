@@ -1,11 +1,12 @@
 use crate::core::graphic::hal::backend::RendererApi;
 use crate::core::scene::scene_base::SceneBase;
-use crate::core::scene::scene_context::SceneContext;
+use crate::core::scene::scene_context::{SceneContext, SceneContextCommand};
 use crate::core::scene::scene_creator::SceneCreator;
 
 pub struct SceneManager {
     current_scene: Box<dyn SceneBase>,
     scene_creator: Option<SceneCreator>,
+    commands: Vec<SceneContextCommand>,
 }
 
 impl SceneManager {
@@ -13,11 +14,22 @@ impl SceneManager {
         SceneManager {
             current_scene: Box::new(DummyScene {}),
             scene_creator: Some(scene_creator),
+            commands: vec![],
         }
     }
 
     pub fn render(&mut self, delta: f32, api: &mut RendererApi) {
-        let mut scene_context = SceneContext::new(api);
+        while !self.commands.is_empty() {
+            if let Some(command) = self.commands.pop() {
+                match command {
+                    SceneContextCommand::TransitScene { scene_creator } => {
+                        self.scene_creator = Some(scene_creator);
+                    }
+                }
+            }
+        }
+
+        let mut scene_context = SceneContext::new(api, &mut self.commands);
         let scene_creator = std::mem::replace(&mut self.scene_creator, None);
         if let Some(x) = scene_creator {
             self.current_scene = x(&mut scene_context);
@@ -28,7 +40,7 @@ impl SceneManager {
     }
 }
 
-struct DummyScene;
+pub struct DummyScene;
 impl SceneBase for DummyScene {
     fn update(&mut self, _scene_context: &mut SceneContext, _delta: f32) {}
 }

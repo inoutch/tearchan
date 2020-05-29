@@ -23,8 +23,8 @@ pub struct HelloWorldScene {
 }
 
 impl HelloWorldScene {
-    pub fn creator() -> Option<SceneCreator> {
-        Some(|scene_context| {
+    pub fn creator() -> SceneCreator {
+        |scene_context| {
             let screen_size = scene_context.renderer_api.screen_size();
             let image = Image::new_empty();
 
@@ -59,7 +59,7 @@ impl HelloWorldScene {
                 graphic_pipeline: graphic_pipeline_3d,
                 texture,
             })
-        })
+        }
     }
 }
 
