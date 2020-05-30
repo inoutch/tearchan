@@ -10,6 +10,8 @@ pub struct StartupConfig {
     pub screen_mode: ScreenMode,
     pub screen_size: Option<Vec2>,
     pub scene_creator: SceneCreator,
+    pub resource_path: Option<String>,
+    pub writable_path: Option<String>,
 }
 
 impl Default for StartupConfig {
@@ -19,6 +21,8 @@ impl Default for StartupConfig {
             screen_mode: ScreenMode::FullScreenWindow,
             screen_size: None,
             scene_creator: |_| Box::new(DummyScene {}),
+            resource_path: None,
+            writable_path: None,
         }
     }
 }
@@ -27,6 +31,8 @@ pub struct EngineConfig {
     pub application_name: String,
     pub screen_mode: ScreenMode,
     pub screen_size: Option<Vec2>,
+    pub resource_path: Option<String>,
+    pub writable_path: Option<String>,
 }
 
 #[cfg(test)]

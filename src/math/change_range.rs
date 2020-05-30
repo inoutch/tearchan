@@ -30,7 +30,7 @@ impl ChangeRange {
     }
 
     pub fn update(&mut self, start: usize, end: usize) {
-        debug_assert!(start < end, "start wasn't less than end");
+        debug_assert!(start <= end, "start wasn't less than end");
 
         if self.range_start == std::usize::MAX {
             self.range_start = start;

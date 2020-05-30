@@ -43,6 +43,10 @@ optional = true
 version = "0.5"
 optional = true
 
+[target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies]
+objc = "0.2.7"
+objc-foundation = "0.1.1"
+
 [dev-dependencies]
 float-cmp = "0.7.0"
 

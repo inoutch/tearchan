@@ -1,4 +1,5 @@
 use crate::core::engine_config::{EngineConfig, StartupConfig};
+use crate::core::file::file_api::FileApi;
 use crate::core::graphic::hal::instance::create_backend;
 use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
@@ -19,6 +20,8 @@ impl Engine {
                 application_name: config.application_name,
                 screen_mode: config.screen_mode,
                 screen_size: config.screen_size,
+                resource_path: config.resource_path,
+                writable_path: config.writable_path,
             },
             scene_manager: SceneManager::new(config.scene_creator),
         }
@@ -48,6 +51,7 @@ impl Engine {
         let adapter = adapters.remove(0);
         let mut renderer = Renderer::new(instance, adapter, surface, *window_size);
         let mut scene_manager = self.scene_manager;
+        let mut file_api = FileApi::new(self.config.resource_path, self.config.writable_path);
 
         let timer_length = std::time::Duration::from_millis(1000 / 60);
         event_loop.run(move |event, _, control_flow| match event {
@@ -66,8 +70,8 @@ impl Engine {
                 _ => {}
             },
             winit::event::Event::RedrawRequested(_) => {
-                renderer.render(|api| {
-                    scene_manager.render(1.0f32 / 6.0f32, api);
+                renderer.render(|renderer_api| {
+                    scene_manager.render(1.0f32 / 6.0f32, renderer_api, &mut file_api);
                 });
             }
             _ => {
