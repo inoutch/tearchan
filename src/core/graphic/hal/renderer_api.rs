@@ -3,7 +3,7 @@ use crate::core::graphic::hal::renderer::{RendererApiContext, RendererApiStaticC
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
 use crate::core::graphic::hal::shader::ShaderCommon;
-use crate::core::graphic::hal::texture::TextureCommon;
+use crate::core::graphic::hal::texture::{TextureCommon, TextureConfig};
 use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
 use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
@@ -75,7 +75,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         )
     }
 
-    pub fn create_texture(&mut self, image: &Image) -> TextureCommon<B> {
+    pub fn create_texture(&mut self, image: &Image, config: TextureConfig) -> TextureCommon<B> {
         TextureCommon::new(
             &self.context.device,
             self.command_pool,
@@ -83,6 +83,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
             &self.static_context.memory_types,
             &self.static_context.limits,
             image,
+            config,
         )
     }
 

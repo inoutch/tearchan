@@ -3,6 +3,7 @@ use gfx_hal::adapter::MemoryType;
 use gfx_hal::command::CommandBuffer;
 use gfx_hal::device::Device;
 use gfx_hal::format::Swizzle;
+use gfx_hal::image::{Filter, WrapMode};
 use gfx_hal::memory::Segment;
 use gfx_hal::pool::CommandPool;
 use gfx_hal::queue::{CommandQueue, QueueGroup};
@@ -15,6 +16,20 @@ const COLOR_RANGE: gfx_hal::image::SubresourceRange = gfx_hal::image::Subresourc
     levels: 0..1,
     layers: 0..1,
 };
+
+pub struct TextureConfig {
+    filter: Filter,
+    wrap: WrapMode,
+}
+
+impl Default for TextureConfig {
+    fn default() -> Self {
+        TextureConfig {
+            filter: Filter::Linear,
+            wrap: WrapMode::Clamp,
+        }
+    }
+}
 
 pub struct TextureCommon<B: Backend> {
     device: Weak<B::Device>,
@@ -32,6 +47,7 @@ impl<B: Backend> TextureCommon<B> {
         memory_types: &[MemoryType],
         limits: &Limits,
         image_raw: &Image,
+        config: TextureConfig,
     ) -> TextureCommon<B> {
         let image_stride = image_raw.stride;
         let width = image_raw.size().x;
@@ -141,8 +157,8 @@ impl<B: Backend> TextureCommon<B> {
         let sampler = ManuallyDrop::new(
             unsafe {
                 device.create_sampler(&gfx_hal::image::SamplerDesc::new(
-                    gfx_hal::image::Filter::Linear,
-                    gfx_hal::image::WrapMode::Clamp,
+                    config.filter,
+                    config.wrap,
                 ))
             }
             .expect("Can't create sampler"),

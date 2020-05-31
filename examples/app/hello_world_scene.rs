@@ -4,6 +4,7 @@ use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
 use tearchan::core::graphic::batch::Batch;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
+use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::image::Image;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
 use tearchan::core::graphic::shader::standard_3d_shader_program::Standard3DShaderProgram;
@@ -35,7 +36,9 @@ impl HelloWorldScene {
             camera_3d.update();
 
             //
-            let texture = scene_context.renderer_api.create_texture(&image);
+            let texture = scene_context
+                .renderer_api
+                .create_texture(&image, TextureConfig::default());
 
             let standard_3d_shader_program =
                 Standard3DShaderProgram::new(scene_context.renderer_api, camera_3d.base());
