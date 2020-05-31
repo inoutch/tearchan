@@ -10,7 +10,7 @@ use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
 use crate::core::graphic::image::Image;
 use gfx_hal::command::{ClearDepthStencil, CommandBuffer};
 use gfx_hal::device::Device;
-use nalgebra_glm::Vec2;
+use nalgebra_glm::{vec2, Vec2};
 use std::ops::Deref;
 
 pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
@@ -20,7 +20,7 @@ pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
     command_buffer: &'a mut B::CommandBuffer,
     frame_buffer: &'a B::Framebuffer,
     viewport: &'a gfx_hal::pso::Viewport,
-    screen_size: &'a Vec2,
+    screen_size: Vec2,
 }
 
 impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
@@ -31,8 +31,8 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         command_buffer: &'a mut B::CommandBuffer,
         frame_buffer: &'a B::Framebuffer,
         viewport: &'a gfx_hal::pso::Viewport,
-        screen_size: &'a Vec2,
     ) -> RendererApiCommon<'a, B> {
+        let screen_size = vec2(viewport.rect.w as f32, viewport.rect.h as f32);
         RendererApiCommon {
             context,
             static_context,
@@ -143,7 +143,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     }
 
     pub fn screen_size(&self) -> &Vec2 {
-        self.screen_size
+        &self.screen_size
     }
 
     pub fn write_descriptor_sets(&self, write_descriptor_sets: WriteDescriptorSetsCommon<B>) {

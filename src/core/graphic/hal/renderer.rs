@@ -4,10 +4,10 @@ use gfx_hal::command::CommandBuffer;
 use gfx_hal::device::Device;
 use gfx_hal::format::{ChannelType, Swizzle};
 use gfx_hal::pool::CommandPool;
+use gfx_hal::pso::{Rect, Viewport};
 use gfx_hal::queue::{CommandQueue, QueueFamily, QueueGroup, Submission};
 use gfx_hal::window::{PresentationSurface, Surface};
 use gfx_hal::{window, Backend, Instance, Limits};
-use nalgebra_glm::vec2;
 use std::borrow::Borrow;
 use std::iter;
 use std::mem::ManuallyDrop;
@@ -182,7 +182,6 @@ where
             },
             depth: 0.0..1.0,
         };
-        println!("viewport {:?}", viewport);
 
         Renderer {
             instance,
@@ -275,11 +274,21 @@ where
         unsafe {
             cmd_buffer.begin_primary(gfx_hal::command::CommandBufferFlags::ONE_TIME_SUBMIT);
 
-            // cmd_buffer.set_viewports(0, &[self.viewport.clone()]);
+            cmd_buffer.set_viewports(
+                0,
+                &[Viewport {
+                    rect: Rect {
+                        x: self.viewport.rect.x,
+                        y: self.viewport.rect.y + self.viewport.rect.h,
+                        w: self.viewport.rect.w,
+                        h: -self.viewport.rect.h,
+                    },
+                    depth: self.viewport.depth.clone(),
+                }],
+            );
+            // TODO: Fix me!
             // cmd_buffer.set_scissors(0, &[self.viewport.rect]);
 
-            // TODO: Group arguments the ungenerated items in each loop
-            let screen_size = vec2(self.viewport.rect.w as f32, self.viewport.rect.h as f32);
             let mut api = RendererApiCommon::new(
                 &mut self.context,
                 &self.static_context,
@@ -287,7 +296,6 @@ where
                 cmd_buffer,
                 &framebuffer,
                 &self.viewport,
-                &screen_size,
             );
             callback(&mut api);
 
