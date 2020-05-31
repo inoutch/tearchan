@@ -1,7 +1,7 @@
 use crate::core::graphic::polygon::{Polygon, PolygonCore, PolygonProvider};
 use crate::extension::shared::Shared;
 use crate::math::mesh::Mesh;
-use nalgebra_glm::{make_mat4, translate, vec2, vec3, Mat4, Vec2};
+use nalgebra_glm::{translate, vec2, vec3, Mat4, Vec2};
 
 pub struct Polygon2DProvider {
     anchor_point: Vec2,
