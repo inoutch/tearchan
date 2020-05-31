@@ -6,3 +6,4 @@ pub mod hal;
 pub mod image;
 pub mod polygon;
 pub mod shader;
+pub mod texture;
