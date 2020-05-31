@@ -18,8 +18,8 @@ const COLOR_RANGE: gfx_hal::image::SubresourceRange = gfx_hal::image::Subresourc
 };
 
 pub struct TextureConfig {
-    filter: Filter,
-    wrap: WrapMode,
+    pub filter: Filter,
+    pub wrap: WrapMode,
 }
 
 impl Default for TextureConfig {
