@@ -47,7 +47,46 @@ impl Image {
     }
 
     pub fn row(&self, y: usize) -> &[u8] {
-        let width = self.size.y;
+        let width = self.size.x;
         &self.image[y * (width as usize) * self.stride..(y + 1) * (width as usize) * self.stride]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::core::graphic::image::Image;
+    use nalgebra_glm::{vec2, vec4};
+
+    #[test]
+    fn test_row() {
+        let colors = [
+            vec4(0u8, 255u8, 255u8, 255u8),
+            vec4(255u8, 0u8, 255u8, 255u8),
+            vec4(255u8, 255u8, 0u8, 255u8),
+            vec4(255u8, 255u8, 255u8, 0u8),
+            vec4(0u8, 0u8, 255u8, 255u8),
+            vec4(255u8, 0u8, 0u8, 255u8),
+        ];
+        let bytes = colors
+            .iter()
+            .map(|x| x.data.to_vec())
+            .flatten()
+            .collect::<Vec<u8>>();
+
+        assert_eq!(bytes.len(), 24);
+
+        let image = Image::new(bytes, vec2(2, 3));
+        assert_eq!(
+            image.row(0),
+            &[0u8, 255u8, 255u8, 255u8, 255u8, 0u8, 255u8, 255u8]
+        );
+        assert_eq!(
+            image.row(1),
+            &[255u8, 255u8, 0u8, 255u8, 255u8, 255u8, 255u8, 0u8]
+        );
+        assert_eq!(
+            image.row(2),
+            &[0u8, 0u8, 255u8, 255u8, 255u8, 0u8, 0u8, 255u8]
+        );
     }
 }
