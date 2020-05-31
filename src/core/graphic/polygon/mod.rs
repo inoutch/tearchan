@@ -3,28 +3,78 @@ use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
 use crate::math::vec::{make_vec3_fill, make_vec3_zero, make_vec4_white};
 use crate::utility::buffer_interface::BufferInterface;
-use nalgebra_glm::{rotate, scale, translate, vec3, vec3_to_vec4, vec4, Mat4, Vec3, Vec4};
+use nalgebra_glm::{rotate, scale, translate, vec3, vec3_to_vec4, vec4, Mat4, Vec2, Vec3, Vec4};
+use std::any::Any;
 use std::cell::RefCell;
 use std::option::Option::Some;
 use std::rc::Rc;
 
+pub mod polygon_2d;
+pub mod sprite_atlas;
+
 pub trait PolygonProvider {
-    fn position<'a>(&self, core: &'a PolygonCore) -> &'a Vec3;
-    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3);
-    fn color<'a>(&self, core: &'a PolygonCore) -> &'a Vec4;
-    fn set_color(&mut self, core: &mut PolygonCore, color: Vec4);
-    fn computed_color(&self, core: &PolygonCore) -> Vec4;
-    fn scale<'a>(&self, core: &'a PolygonCore) -> &'a Vec3;
-    fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3);
-    fn rotation_axis<'a>(&self, core: &'a PolygonCore) -> &'a Vec3;
-    fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3);
-    fn rotation_radian(&self, core: &PolygonCore) -> f32;
-    fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32);
-    fn visible(&self, core: &PolygonCore) -> bool;
-    fn set_visible(&mut self, core: &mut PolygonCore, visible: bool);
-    fn computed_visible(&self, core: &PolygonCore) -> bool;
-    fn add_child(&mut self, core: &mut PolygonCore, polygon: &Shared<Polygon>);
+    fn position<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
+        core.position()
+    }
+
+    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) {
+        core.set_position(position);
+    }
+
+    fn color<'a>(&self, core: &'a PolygonCore) -> &'a Vec4 {
+        core.color()
+    }
+
+    fn set_color(&mut self, core: &mut PolygonCore, color: Vec4) {
+        core.set_color(color);
+    }
+
+    fn computed_color(&self, core: &PolygonCore) -> Vec4 {
+        core.computed_color()
+    }
+
+    fn scale<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
+        core.scale()
+    }
+
+    fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3) {
+        core.set_scale(scale);
+    }
+
+    fn rotation_axis<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
+        core.rotation_axis()
+    }
+
+    fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3) {
+        core.set_rotation_axis(rotation_axis);
+    }
+
+    fn rotation_radian(&self, core: &PolygonCore) -> f32 {
+        core.rotation_radian()
+    }
+
+    fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32) {
+        core.set_rotation_radian(rotation_radian);
+    }
+
+    fn visible(&self, core: &PolygonCore) -> bool {
+        core.visible()
+    }
+
+    fn set_visible(&mut self, core: &mut PolygonCore, visible: bool) {
+        core.set_visible(visible);
+    }
+
+    fn computed_visible(&self, core: &PolygonCore) -> bool {
+        core.computed_visible()
+    }
+
+    fn add_child(&mut self, core: &mut PolygonCore, polygon: &Shared<Polygon>) {
+        core.add_child(polygon);
+    }
+
     fn transform(&self, core: &PolygonCore) -> Mat4;
+
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4;
 }
 
@@ -103,7 +153,12 @@ impl Polygon {
                 for i in range {
                     let mesh_position = &mesh_positions[i as usize];
                     let m = &matrix;
-                    let v = m * vec3_to_vec4(&(position + mesh_position));
+                    let v = m * vec4(
+                        position.x + mesh_position.x,
+                        position.y + mesh_position.y,
+                        position.z + mesh_position.z,
+                        1.0f32,
+                    );
                     buffer.copy(offset + i * 3, v.x);
                     buffer.copy(offset + i * 3 + 1, v.y);
                     buffer.copy(offset + i * 3 + 2, v.z);
@@ -188,6 +243,14 @@ impl Polygon {
 
     pub fn mesh_size(&self) -> usize {
         self.mesh().size()
+    }
+
+    pub fn provider_as_any(&self) -> &dyn Any {
+        &self.provider
+    }
+
+    pub fn provider_as_any_mut(&mut self) -> &mut dyn Any {
+        &mut self.provider
     }
 }
 
@@ -365,6 +428,26 @@ impl PolygonCore {
         }
         None
     }
+
+    pub fn update_positions_of_mesh(&mut self, positions: Vec<Vec3>) {
+        self.mesh.positions = positions;
+        self.update_all_positions();
+    }
+
+    pub fn update_colors_of_mesh(&mut self, colors: Vec<Vec4>) {
+        self.mesh.colors = colors;
+        self.update_all_colors();
+    }
+
+    pub fn update_texcoords_of_mesh(&mut self, texcoords: Vec<Vec2>) {
+        self.mesh.texcoords = texcoords;
+        self.update_all_texcoords();
+    }
+
+    pub fn update_normals_of_mesh(&mut self, normals: Vec<Vec3>) {
+        self.mesh.normals = normals;
+        self.update_all_normals();
+    }
 }
 
 impl PolygonCommon for PolygonCore {
@@ -476,66 +559,6 @@ impl PolygonCommon for PolygonCore {
 pub struct PolygonDefaultProvider {}
 
 impl PolygonProvider for PolygonDefaultProvider {
-    fn position<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
-        core.position()
-    }
-
-    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) {
-        core.set_position(position);
-    }
-
-    fn color<'a>(&self, core: &'a PolygonCore) -> &'a Vec4 {
-        core.color()
-    }
-
-    fn set_color(&mut self, core: &mut PolygonCore, color: Vec4) {
-        core.set_color(color);
-    }
-
-    fn computed_color(&self, core: &PolygonCore) -> Vec4 {
-        core.computed_color()
-    }
-
-    fn scale<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
-        core.scale()
-    }
-
-    fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3) {
-        core.set_scale(scale);
-    }
-
-    fn rotation_axis<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
-        core.rotation_axis()
-    }
-
-    fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3) {
-        core.set_rotation_axis(rotation_axis);
-    }
-
-    fn rotation_radian(&self, core: &PolygonCore) -> f32 {
-        core.rotation_radian()
-    }
-
-    fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32) {
-        core.set_rotation_radian(rotation_radian);
-    }
-
-    fn visible(&self, core: &PolygonCore) -> bool {
-        core.visible()
-    }
-
-    fn set_visible(&mut self, core: &mut PolygonCore, visible: bool) {
-        core.set_visible(visible);
-    }
-
-    fn computed_visible(&self, core: &PolygonCore) -> bool {
-        core.computed_visible()
-    }
-
-    fn add_child(&mut self, core: &mut PolygonCore, polygon: &Shared<Polygon>) {
-        core.add_child(polygon);
-    }
-
     fn transform(&self, core: &PolygonCore) -> Mat4 {
         core.transform(self)
     }
@@ -799,12 +822,12 @@ mod test {
             .build()
             .unwrap();
 
-        let mut polygon = Polygon::new(mesh.clone());
+        let mut polygon = Polygon::new(mesh);
         let mut buffer = MockBuffer::new(256);
         polygon.copy_normals_into(&mut buffer, 0);
 
         // Allow empty for 2d
-        assert_eq!(buffer.get_changes(), []);
+        assert_eq!(buffer.get_changes().len(), 0);
     }
 
     #[test]

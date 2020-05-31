@@ -1,3 +1,5 @@
+use crate::core::graphic::texture::TextureFrame;
+use crate::math::vec::{make_vec2_zero, make_vec4_white};
 use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 
 #[derive(Clone)]
@@ -65,6 +67,19 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
             colors: create_cube_colors(),
             texcoords: create_cute_texcoords(vec2(0.0f32, 0.0f32), vec2(1.0f32, 1.0f32)),
             normals: create_cube_normals(),
+        }
+    }
+
+    pub fn with_frame(
+        self,
+        texture_size: Vec2,
+        frame: &TextureFrame,
+    ) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        MeshBuilder {
+            positions: create_square_positions_from_frame(frame),
+            texcoords: create_square_texcoords_from_frame(texture_size, frame),
+            colors: create_square_colors(make_vec4_white()),
+            normals: create_square_normals(),
         }
     }
 
@@ -340,6 +355,22 @@ pub fn create_cube_normals() -> Vec<Vec3> {
         vec3(0.0f32, 0.0f32, 1.0f32),
         vec3(0.0f32, 0.0f32, 1.0f32),
     ]
+}
+
+pub fn create_square_positions_from_frame(frame: &TextureFrame) -> Vec<Vec3> {
+    let sx = frame.source.x as f32;
+    let sy = frame.source.y as f32;
+    let sw = frame.rect.w as f32;
+    let sh = frame.rect.h as f32;
+    create_square_positions(vec2(sx, sy), vec2(sw, sh))
+}
+
+pub fn create_square_texcoords_from_frame(texture_size: Vec2, frame: &TextureFrame) -> Vec<Vec2> {
+    let fx = frame.rect.x as f32 / texture_size.x;
+    let fy = frame.rect.y as f32 / texture_size.y;
+    let fw = frame.rect.w as f32 / texture_size.x;
+    let fh = frame.rect.h as f32 / texture_size.y;
+    create_square_texcoords(vec2(fx, fy), vec2(fw, fh))
 }
 
 #[test]

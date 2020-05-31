@@ -1,3 +1,4 @@
+use nalgebra_glm::{vec2, Vec2};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::read_to_string;
@@ -6,10 +7,10 @@ use texture_packer::Frame;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Rect {
-    x: u32,
-    y: u32,
-    w: u32,
-    h: u32,
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -30,6 +31,10 @@ pub struct Size {
 impl Size {
     pub fn new(w: u32, h: u32) -> Self {
         Size { w, h }
+    }
+
+    pub fn to_vec2(&self) -> Vec2 {
+        vec2(self.w as f32, self.h as f32)
     }
 }
 
