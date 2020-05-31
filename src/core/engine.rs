@@ -4,9 +4,11 @@ use crate::core::graphic::hal::instance::create_backend;
 use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
 use crate::core::screen::ScreenMode;
+use gfx_hal::window::Extent2D;
 use std::time::Instant;
 use winit::event_loop::EventLoop;
 use winit::monitor::MonitorHandle;
+use winit::window::Fullscreen;
 
 pub struct Engine {
     config: EngineConfig,
@@ -29,27 +31,34 @@ impl Engine {
 
     pub fn run(self) {
         let window_size = match &self.config.screen_mode {
-            ScreenMode::FullScreenWindow => unimplemented!("FullScreenWindow"),
-            ScreenMode::Windowed { resolutions } => &resolutions[0],
+            ScreenMode::FullScreenWindow => Extent2D {
+                width: 1,
+                height: 1,
+            },
+            ScreenMode::Windowed { resolutions } => resolutions[0],
         };
 
         let event_loop = winit::event_loop::EventLoop::new();
-        let window_builder = winit::window::WindowBuilder::new()
+        let mut window_builder = winit::window::WindowBuilder::new()
             .with_min_inner_size(winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
                 64.0, 64.0,
             )))
-            .with_inner_size(winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
-                window_size.width as f64,
-                window_size.height as f64,
-            )))
-            /*.with_fullscreen(Some(Fullscreen::Borderless(prompt_for_monitor(
-                &event_loop,
-            ))))*/
             .with_title(self.config.application_name.to_string());
+        window_builder = match &self.config.screen_mode {
+            ScreenMode::FullScreenWindow => window_builder.with_fullscreen(Some(
+                Fullscreen::Borderless(prompt_for_monitor(&event_loop)),
+            )),
+            ScreenMode::Windowed { resolutions } => window_builder.with_inner_size(
+                winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
+                    resolutions[0].width as f64,
+                    resolutions[0].height as f64,
+                )),
+            ),
+        };
 
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
         let adapter = adapters.remove(0);
-        let mut renderer = Renderer::new(instance, adapter, surface, *window_size);
+        let mut renderer = Renderer::new(instance, adapter, surface, window_size);
         let mut scene_manager = self.scene_manager;
         let mut file_api = FileApi::new(self.config.resource_path, self.config.writable_path);
 
@@ -85,11 +94,8 @@ impl Engine {
 
 pub fn prompt_for_monitor(event_loop: &EventLoop<()>) -> MonitorHandle {
     let num = 0;
-    let monitor = event_loop
+    event_loop
         .available_monitors()
         .nth(num)
-        .expect("Please enter a valid ID");
-
-    println!("Using {:?}", monitor.name());
-    monitor
+        .expect("Please enter a valid ID")
 }
