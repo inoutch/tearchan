@@ -83,6 +83,45 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
+    pub fn with_model(self, model: &tobj::Model) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mesh = &model.mesh;
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
+        let mut next_face = 0;
+        for f in 0..mesh.num_face_indices.len() {
+            let end = next_face + mesh.num_face_indices[f] as usize;
+            let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
+            for v in face_indices {
+                positions.push(vec3(
+                    model.mesh.positions[(*v * 3) as usize],
+                    model.mesh.positions[(*v * 3 + 1) as usize],
+                    model.mesh.positions[(*v * 3 + 2) as usize],
+                ));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                texcoords.push(vec2(
+                    model.mesh.texcoords[(*v * 2) as usize],
+                    1.0f32 - model.mesh.texcoords[(*v * 2 + 1) as usize],
+                ));
+                normals.push(vec3(
+                    model.mesh.normals[(*v * 3) as usize],
+                    model.mesh.normals[(*v * 3 + 1) as usize],
+                    model.mesh.normals[(*v * 3 + 2) as usize],
+                ));
+            }
+            next_face = end;
+        }
+
+        MeshBuilder {
+            positions,
+            colors,
+            texcoords,
+            normals,
+        }
+    }
+
     pub fn positions(
         self,
         positions: Vec<Vec3>,

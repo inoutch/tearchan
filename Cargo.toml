@@ -23,6 +23,7 @@ gfx-backend-empty = "0.5"
 nalgebra-glm = "0.7.0"
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
+tobj = "2.0.1"
 texture_packer = "0.21.1"
 
 [dependencies.gfx-backend-gl]

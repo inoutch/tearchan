@@ -1826,6 +1826,7 @@ dependencies = [
  "serde_json",
  "shaderc",
  "texture_packer",
+ "tobj",
  "winit 0.22.2",
 ]
 
@@ -1866,6 +1867,12 @@ dependencies = [
  "lzw",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "tobj"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c09266614653bb7668cff99f1631ca162844a1cd97afc601dc22fc9ba218bfd"
 
 [[package]]
 name = "toml"
