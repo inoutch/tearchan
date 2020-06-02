@@ -18,15 +18,12 @@ layout(binding = 3) uniform Position {
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec2 outTexcoord;
 layout(location = 2) out vec3 outNormal;
-layout(location = 3) out vec3 outLightPosition;
-layout(location = 4) out vec3 outFragPosition;
+layout(location = 3) out vec3 outLightDir;
 
 void main(void) {
     outColor = color;
     outTexcoord = texcoord;
-    outNormal = normal;
-    outLightPosition = (invViewProjectionMatrix * vec4(outLightPosition, 1.0)).xyz;
-    outLightPosition = (transpose(inverse(viewProjectionMatrix)) * vec4(outLightPosition, 1.0)).xyz;
+    outNormal = normalize(normal);
+    outLightDir = normalize(lightPosition - position);
     gl_Position = viewProjectionMatrix * vec4(position, 1.0);
-    outFragPosition = gl_Position.xyz;
 }
