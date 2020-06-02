@@ -2,7 +2,7 @@ use crate::core::graphic::hal::descriptor_set::DescriptorSetCommon;
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::ShaderCommon;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool, Rect};
+use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool};
 use gfx_hal::Backend;
 use std::borrow::Borrow;
 use std::mem::ManuallyDrop;

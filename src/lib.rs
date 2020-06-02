@@ -2,8 +2,6 @@
 extern crate derive_builder;
 
 #[macro_use]
-
-#[macro_use]
 extern crate objc;
 
 pub mod core;
