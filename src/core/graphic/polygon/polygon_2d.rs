@@ -1,5 +1,5 @@
 use crate::core::graphic::polygon::{Polygon, PolygonCore, PolygonProvider};
-use crate::extension::shared::Shared;
+use crate::extension::shared::{Shared, make_shared};
 use crate::math::mesh::Mesh;
 use nalgebra_glm::{translate, vec2, vec3, Mat4, Vec2};
 
@@ -35,7 +35,7 @@ impl Polygon2D {
             size,
         });
         Polygon2D {
-            polygon: Shared::new(Polygon::new_with_provider(provider, mesh)),
+            polygon: make_shared(Polygon::new_with_provider(provider, mesh)),
         }
     }
 

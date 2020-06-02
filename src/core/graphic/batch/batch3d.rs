@@ -29,24 +29,24 @@ where
         let mut object = object_bundle.object.borrow_mut();
         object.copy_positions_into(
             &mut self.bundles[0].batch_buffer,
-            object_bundle.pointers[0].start,
+            object_bundle.pointers[0].borrow().start,
         );
         object.copy_colors_into(
             &mut self.bundles[1].batch_buffer,
-            object_bundle.pointers[1].start,
+            object_bundle.pointers[1].borrow().start,
         );
         object.copy_texcoords_into(
             &mut self.bundles[2].batch_buffer,
-            object_bundle.pointers[2].start,
+            object_bundle.pointers[2].borrow().start,
         );
         object.copy_normals_into(
             &mut self.bundles[3].batch_buffer,
-            object_bundle.pointers[3].start,
+            object_bundle.pointers[3].borrow().start,
         );
     }
 
     fn size(&self, object: &Shared<Polygon>) -> usize {
-        object.mesh_size()
+        object.borrow().mesh_size()
     }
 
     fn bundles_mut(&mut self) -> &mut Vec<BatchBundle<TBatchBuffer>> {

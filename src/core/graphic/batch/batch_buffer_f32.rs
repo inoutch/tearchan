@@ -2,7 +2,7 @@ use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_buffer_pointer::BatchBufferPointer;
 use crate::core::graphic::hal::backend::{RendererApi, VertexBuffer};
 use crate::extension::collection::VecExt;
-use crate::extension::shared::Shared;
+use crate::extension::shared::{make_shared, Shared};
 use crate::math::change_range::ChangeRange;
 use crate::utility::buffer_interface::BufferInterface;
 use std::ops::Deref;
@@ -40,7 +40,7 @@ impl BatchBufferF32 {
 
 impl BatchBufferF32 {
     fn last(&self) -> usize {
-        self.pointers.last().map_or(0, |x| x.last())
+        self.pointers.last().map_or(0, |x| x.borrow().last())
     }
 
     fn reallocate_vertex_buffer(&mut self, size: usize) {
@@ -72,23 +72,24 @@ impl BatchBuffer for BatchBufferF32 {
         if last + size > self.vertices.len() {
             self.reallocate_vertex_buffer(last + size);
         }
-        let pointer = Shared::new(BatchBufferPointer::new(last, size));
+        let pointer = make_shared(BatchBufferPointer::new(last, size));
         self.pointers.push(Shared::clone(&pointer));
         pointer
     }
 
     fn reallocate(&mut self, pointer: &Shared<BatchBufferPointer>, size: usize) {
-        let diff = size - pointer.size;
+        let diff = size - pointer.borrow().size;
         let old_size = self.size;
         let new_size = self.last() + diff;
 
-        self.change_range.resize_and_update(new_size, pointer.start);
+        self.change_range
+            .resize_and_update(new_size, pointer.borrow().start);
 
         if self.vertices.len() < new_size {
             self.reallocate_vertex_buffer(new_size);
         }
 
-        let last = pointer.last();
+        let last = pointer.borrow().last();
         let new_last = last + diff;
         let old_vertices = if old_size > last {
             None
@@ -102,12 +103,12 @@ impl BatchBuffer for BatchBufferF32 {
             self.vertices[new_last..(l + new_last)].clone_from_slice(&x[last..(l + last)]);
         }
         pointer.borrow_mut().size = size;
-        let pointer_ptr = pointer.deref() as *const BatchBufferPointer;
+        let pointer_ptr = pointer.borrow().deref() as *const BatchBufferPointer;
         let mut after_index = self
             .pointers
             .iter()
             .position(move |x| {
-                let x_ptr = x.deref() as *const BatchBufferPointer;
+                let x_ptr = x.borrow().deref() as *const BatchBufferPointer;
                 std::ptr::eq(x_ptr, pointer_ptr)
             })
             .unwrap()
@@ -123,10 +124,10 @@ impl BatchBuffer for BatchBufferF32 {
     }
 
     fn free(&mut self, pointer: &Shared<BatchBufferPointer>) {
-        let pointer_ptr = pointer.deref() as *const BatchBufferPointer;
+        let pointer_ptr = pointer.borrow().deref() as *const BatchBufferPointer;
         self.reallocate(pointer, 0);
         self.pointers.remove_item_is(move |x| {
-            let x_ptr = x.deref() as *const BatchBufferPointer;
+            let x_ptr = x.borrow().deref() as *const BatchBufferPointer;
             std::ptr::eq(x_ptr, pointer_ptr)
         });
     }

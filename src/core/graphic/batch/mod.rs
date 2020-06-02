@@ -3,7 +3,6 @@ use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_object_bundle::BatchObjectBundle;
 use crate::extension::collection::VecExt;
 use crate::extension::shared::Shared;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -55,7 +54,7 @@ impl<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBu
         if let Some(x) = self.object_bundles_cache.get(&key) {
             {
                 self.object_bundles.remove_item_is(move |y| {
-                    std::ptr::eq(x.borrow(), y.borrow() as *const BatchObjectBundle<TObject>)
+                    std::ptr::eq(x.deref(), y.deref() as *const BatchObjectBundle<TObject>)
                 });
             }
             let pointers = &x.pointers;
@@ -118,17 +117,17 @@ mod tests {
     use crate::core::graphic::batch::batch_base::tests::MockBatchBase;
     use crate::core::graphic::batch::batch_buffer::tests::MockBatchBuffer;
     use crate::core::graphic::batch::Batch;
-    use crate::extension::shared::Shared;
+    use crate::extension::shared::make_shared;
     use crate::utility::test::func::MockFunc;
 
     #[test]
     fn test_add_and_remove() {
-        let mock_func = Shared::new(MockFunc::new());
+        let mock_func = make_shared(MockFunc::new());
         let mut batch: Batch<i32, MockBatchBuffer, MockBatchBase> =
             Batch::new(MockBatchBase::new(&mock_func));
 
-        let object1 = Shared::new(1234);
-        let object2 = Shared::new(2345);
+        let object1 = make_shared(1234);
+        let object2 = make_shared(2345);
 
         batch.add(&object1, 0);
         assert_eq!(batch.object_bundles.len(), 1);
@@ -146,11 +145,11 @@ mod tests {
     #[test]
     #[should_panic(expected = "This object already has been added")]
     fn test_duplicated_add() {
-        let mock_func = Shared::new(MockFunc::new());
+        let mock_func = make_shared(MockFunc::new());
         let mut batch: Batch<i32, MockBatchBuffer, MockBatchBase> =
             Batch::new(MockBatchBase::new(&mock_func));
 
-        let object1 = Shared::new(1234);
+        let object1 = make_shared(1234);
         batch.add(&object1, 0);
         batch.add(&object1, 1);
     }

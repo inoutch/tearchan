@@ -1,4 +1,4 @@
-use crate::extension::shared::{Shared, SharedWeak};
+use crate::extension::shared::{Shared, WeakShared};
 use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
 use crate::math::vec::{make_vec3_fill, make_vec3_zero, make_vec4_white};
@@ -346,7 +346,7 @@ pub struct PolygonCore {
     rotation_axis: Vec3,
     rotation_radian: f32,
     visible: bool,
-    parent: Option<SharedWeak<Polygon>>,
+    parent: Option<WeakShared<Polygon>>,
     children: Vec<Shared<Polygon>>,
     position_change_range: ChangeRange,
     color_change_range: ChangeRange,
@@ -571,7 +571,7 @@ impl PolygonProvider for PolygonDefaultProvider {
 #[cfg(test)]
 mod test {
     use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, PolygonProvider};
-    use crate::extension::shared::Shared;
+    use crate::extension::shared::{make_shared, Shared};
     use crate::math::mesh::{
         create_square_colors, create_square_positions, create_square_texcoords, MeshBuilder,
     };
@@ -687,7 +687,7 @@ mod test {
 
     #[test]
     fn test_init() {
-        let mock = Shared::new(MockFunc::new());
+        let mock = make_shared(MockFunc::new());
         let provider = MockPolygonProvider {
             mock: Shared::clone(&mock),
         };
@@ -712,7 +712,7 @@ mod test {
 
     #[test]
     fn test_transform() {
-        let mock = Shared::new(MockFunc::new());
+        let mock = make_shared(MockFunc::new());
         let mesh = MeshBuilder::new()
             .with_square(vec2(32.0f32, 64.0f32))
             .build()
@@ -844,7 +844,7 @@ mod test {
             mesh.clone(),
         );
 
-        let child_polygon = Shared::new(Polygon::new_with_provider(
+        let child_polygon = make_shared(Polygon::new_with_provider(
             Box::new(MockPolygonProvider {
                 mock: Shared::clone(&mock),
             }),

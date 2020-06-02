@@ -11,7 +11,7 @@ use tearchan::core::graphic::shader::standard_3d_shader_program::Standard3DShade
 use tearchan::core::scene::scene_base::SceneBase;
 use tearchan::core::scene::scene_context::SceneContext;
 use tearchan::core::scene::scene_creator::SceneCreator;
-use tearchan::extension::shared::Shared;
+use tearchan::extension::shared::{make_shared, Shared};
 use tearchan::math::mesh::MeshBuilder;
 
 pub struct HelloWorldScene {
@@ -48,7 +48,7 @@ impl HelloWorldScene {
 
             let mesh3 = MeshBuilder::new().with_cube(1.0f32).build().unwrap();
             let mut batch_3d = Batch3D::new(scene_context.renderer_api);
-            let polygon_2d = Shared::new(Polygon::new(mesh3));
+            let polygon_2d = make_shared(Polygon::new(mesh3));
             polygon_2d
                 .borrow_mut()
                 .set_rotation_axis(vec3(0.0f32, 1.0f32, 1.0f32));
@@ -68,9 +68,8 @@ impl HelloWorldScene {
 
 impl SceneBase for HelloWorldScene {
     fn update(&mut self, scene_context: &mut SceneContext, _delta: f32) {
-        self.polygon
-            .borrow_mut()
-            .set_rotation_radian(self.polygon.rotation_radian() + 0.01f32);
+        let rotation = self.polygon.borrow().rotation_radian() + 0.01f32;
+        self.polygon.borrow_mut().set_rotation_radian(rotation);
         self.camera.update();
         self.batch.flush();
 
