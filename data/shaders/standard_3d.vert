@@ -8,10 +8,7 @@ layout(location = 3) in vec3 normal;
 layout(binding = 0) uniform Matrix {
     mat4 viewProjectionMatrix;
 };
-layout(binding = 1) uniform Matrix2 {
-    mat4 invViewProjectionMatrix;
-};
-layout(binding = 3) uniform Position {
+layout(binding = 2) uniform Position {
     vec3 lightPosition;
 };
 

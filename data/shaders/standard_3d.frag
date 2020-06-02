@@ -1,10 +1,10 @@
 #version 450
 
-layout(binding = 2) uniform sampler2D texSampler;
-layout(binding = 4) uniform Color {
+layout(binding = 1) uniform sampler2D texSampler;
+layout(binding = 3) uniform Color {
     vec3 lightColor;
 };
-layout(binding = 5) uniform Ambient {
+layout(binding = 4) uniform Ambient {
     float ambientStrength;
 };
 
