@@ -84,35 +84,29 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
     }
 
     pub fn with_model(self, model: &tobj::Model) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
-        let mesh = &model.mesh;
-        let mut positions: Vec<Vec3> = vec![];
-        let mut colors: Vec<Vec4> = vec![];
-        let mut texcoords: Vec<Vec2> = vec![];
-        let mut normals: Vec<Vec3> = vec![];
+        let (positions, colors, texcoords, normals) =
+            create_bundles_from_mesh(&model.mesh, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
 
-        let mut next_face = 0;
-        for f in 0..mesh.num_face_indices.len() {
-            let end = next_face + mesh.num_face_indices[f] as usize;
-            let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
-            for v in face_indices {
-                positions.push(vec3(
-                    model.mesh.positions[(*v * 3) as usize],
-                    model.mesh.positions[(*v * 3 + 1) as usize],
-                    model.mesh.positions[(*v * 3 + 2) as usize],
-                ));
-                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
-                texcoords.push(vec2(
-                    model.mesh.texcoords[(*v * 2) as usize],
-                    1.0f32 - model.mesh.texcoords[(*v * 2 + 1) as usize],
-                ));
-                normals.push(vec3(
-                    model.mesh.normals[(*v * 3) as usize],
-                    model.mesh.normals[(*v * 3 + 1) as usize],
-                    model.mesh.normals[(*v * 3 + 2) as usize],
-                ));
-            }
-            next_face = end;
+        MeshBuilder {
+            positions,
+            colors,
+            texcoords,
+            normals,
         }
+    }
+
+    pub fn with_model_and_frame(
+        self,
+        texture_size: Vec2,
+        frame: &TextureFrame,
+        model: &tobj::Model,
+    ) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let fx = frame.rect.x as f32 / texture_size.x;
+        let fy = frame.rect.y as f32 / texture_size.y;
+        let fw = frame.rect.w as f32 / texture_size.x;
+        let fh = frame.rect.h as f32 / texture_size.y;
+        let (positions, colors, texcoords, normals) =
+            create_bundles_from_mesh(&model.mesh, fx, fy, fw, fh);
 
         MeshBuilder {
             positions,
@@ -410,6 +404,52 @@ pub fn create_square_texcoords_from_frame(texture_size: Vec2, frame: &TextureFra
     let fw = frame.rect.w as f32 / texture_size.x;
     let fh = frame.rect.h as f32 / texture_size.y;
     create_square_texcoords(vec2(fx, fy), vec2(fw, fh))
+}
+
+pub fn create_bundles_from_mesh(
+    mesh: &tobj::Mesh,
+    texture_rx: f32,
+    texture_ry: f32,
+    texture_rw: f32,
+    texture_rh: f32,
+) -> (Vec<Vec3>, Vec<Vec4>, Vec<Vec2>, Vec<Vec3>) {
+    let mut positions: Vec<Vec3> = vec![];
+    let mut colors: Vec<Vec4> = vec![];
+    let mut texcoords: Vec<Vec2> = vec![];
+    let mut normals: Vec<Vec3> = vec![];
+
+    let mut next_face = 0;
+    for f in 0..mesh.num_face_indices.len() {
+        let end = next_face + mesh.num_face_indices[f] as usize;
+        let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
+        for v in face_indices {
+            positions.push(vec3(
+                mesh.positions[(*v * 3) as usize],
+                mesh.positions[(*v * 3 + 1) as usize],
+                mesh.positions[(*v * 3 + 2) as usize],
+            ));
+            colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+            texcoords.push(convert_texcoord_into_rect(
+                mesh.texcoords[(*v * 2) as usize],
+                1.0f32 - mesh.texcoords[(*v * 2 + 1) as usize],
+                texture_rx,
+                texture_ry,
+                texture_rw,
+                texture_rh,
+            ));
+            normals.push(vec3(
+                mesh.normals[(*v * 3) as usize],
+                mesh.normals[(*v * 3 + 1) as usize],
+                mesh.normals[(*v * 3 + 2) as usize],
+            ));
+        }
+        next_face = end;
+    }
+    (positions, colors, texcoords, normals)
+}
+
+pub fn convert_texcoord_into_rect(u: f32, v: f32, rx: f32, ry: f32, rw: f32, rh: f32) -> Vec2 {
+    vec2(rx + u * rw, ry + v * rh)
 }
 
 #[test]
