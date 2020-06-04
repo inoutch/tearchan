@@ -1,6 +1,11 @@
 use crate::core::file::file_api::FileApi;
 use crate::core::graphic::hal::backend::RendererApi;
 use crate::core::scene::scene_creator::SceneCreator;
+use std::any::Any;
+
+pub trait SceneOption {
+    fn as_any(&self) -> &dyn Any;
+}
 
 pub struct SceneContext<'a, 'b> {
     pub renderer_api: &'a mut RendererApi<'b>,
@@ -9,7 +14,10 @@ pub struct SceneContext<'a, 'b> {
 }
 
 pub enum SceneContextCommand {
-    TransitScene { scene_creator: SceneCreator },
+    TransitScene {
+        scene_creator: SceneCreator,
+        option: Option<Box<dyn SceneOption>>,
+    },
 }
 
 impl<'a, 'b> SceneContext<'a, 'b> {
@@ -25,8 +33,14 @@ impl<'a, 'b> SceneContext<'a, 'b> {
         }
     }
 
-    pub fn transit_scene(&mut self, scene_creator: SceneCreator) {
-        self.commands
-            .push(SceneContextCommand::TransitScene { scene_creator })
+    pub fn transit_scene(
+        &mut self,
+        scene_creator: SceneCreator,
+        option: Option<Box<dyn SceneOption>>,
+    ) {
+        self.commands.push(SceneContextCommand::TransitScene {
+            scene_creator,
+            option,
+        })
     }
 }

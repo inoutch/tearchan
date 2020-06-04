@@ -20,7 +20,7 @@ impl Default for StartupConfig {
             application_name: "default".to_string(),
             screen_mode: ScreenMode::FullScreenWindow,
             screen_size: None,
-            scene_creator: |_| Box::new(DummyScene {}),
+            scene_creator: |_, _| Box::new(DummyScene {}),
             resource_path: None,
             writable_path: None,
         }
