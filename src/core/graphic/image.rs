@@ -1,3 +1,4 @@
+use image::{DynamicImage, ImageResult};
 use nalgebra_glm::{vec2, TVec2};
 use std::io::Cursor;
 
@@ -8,11 +9,11 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new_with_format(binaries: &[u8], format: image::ImageFormat) -> Result<Image, ()> {
+    pub fn new_with_format(binaries: &[u8], format: image::ImageFormat) -> ImageResult<Image> {
         let image = match image::load(Cursor::new(binaries), format) {
             Ok(x) => x,
-            Err(_) => {
-                return Err(());
+            Err(e) => {
+                return Err(e);
             }
         }
         .to_rgba();
