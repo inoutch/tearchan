@@ -1,4 +1,4 @@
-use image::{DynamicImage, ImageResult};
+use image::ImageResult;
 use nalgebra_glm::{vec2, TVec2};
 use std::io::Cursor;
 
