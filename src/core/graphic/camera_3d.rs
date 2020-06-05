@@ -10,9 +10,12 @@ pub struct Camera3D {
 }
 
 impl Camera3D {
-    pub fn new(aspect: f32) -> Self {
-        let proj_matrix =
-            nalgebra_glm::perspective(aspect, 45.0f32 / 180.0f32 * PI, 0.1f32, 10.0f32);
+    pub fn default_with_aspect(aspect: f32) -> Self {
+        Camera3D::new(aspect, 0.1f32, 10.0f32)
+    }
+
+    pub fn new(aspect: f32, near: f32, far: f32) -> Self {
+        let proj_matrix = nalgebra_glm::perspective(aspect, 45.0f32 / 180.0f32 * PI, near, far);
         let view_matrix: Mat4 = nalgebra_glm::look_at(
             &vec3(0.0f32, 0.0f32, 0.0f32),
             &vec3(0.0f32, 0.0f32, 0.0f32),
