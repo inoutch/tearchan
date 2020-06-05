@@ -1,5 +1,6 @@
 use nalgebra_glm::{vec2, Vec2};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::read_to_string;
 use std::path::Path;
@@ -89,5 +90,13 @@ impl TextureAtlas {
             size,
             frames,
         }
+    }
+
+    pub fn to_frame_map(&self) -> HashMap<String, usize> {
+        self.frames
+            .iter()
+            .enumerate()
+            .map(|(i, x)| (x.key.to_string(), i))
+            .collect()
     }
 }
