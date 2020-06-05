@@ -8,6 +8,7 @@ use gfx_hal::memory::Segment;
 use gfx_hal::pool::CommandPool;
 use gfx_hal::queue::{CommandQueue, QueueGroup};
 use gfx_hal::{Backend, Limits};
+use nalgebra_glm::{vec2, TVec2};
 use std::mem::ManuallyDrop;
 use std::rc::{Rc, Weak};
 
@@ -38,6 +39,7 @@ pub struct TextureCommon<B: Backend> {
     image_memory: ManuallyDrop<B::Memory>,
     image_view: ManuallyDrop<B::ImageView>,
     sampler: ManuallyDrop<B::Sampler>,
+    size: TVec2<u32>,
 }
 
 impl<B: Backend> TextureCommon<B> {
@@ -251,6 +253,7 @@ impl<B: Backend> TextureCommon<B> {
             image_memory,
             image_view,
             sampler,
+            size: vec2(image_raw.size().x, image_raw.size().y),
         }
     }
 
@@ -260,6 +263,10 @@ impl<B: Backend> TextureCommon<B> {
 
     pub fn image_view(&self) -> &B::ImageView {
         &self.image_view
+    }
+
+    pub fn size(&self) -> &TVec2<u32> {
+        &self.size
     }
 }
 
