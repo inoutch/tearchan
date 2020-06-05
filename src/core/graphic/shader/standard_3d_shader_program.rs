@@ -48,7 +48,6 @@ impl Standard3DShaderProgram {
         light_position: &Vec3,
         light_color: &Vec3,
         ambient_strength: f32,
-        _texture: &Texture,
     ) {
         self.vp_matrix_uniform
             .copy_to_buffer(&[vp_matrix.clone_owned()]);
