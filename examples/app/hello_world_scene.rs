@@ -25,11 +25,11 @@ pub struct HelloWorldScene {
 
 impl HelloWorldScene {
     pub fn creator() -> SceneCreator {
-        |scene_context| {
+        |scene_context, _| {
             let screen_size = scene_context.renderer_api.screen_size();
             let image = Image::new_empty();
 
-            let mut camera_3d = Camera3D::new(screen_size.x / screen_size.y);
+            let mut camera_3d = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
             camera_3d.position = vec3(0.0f32, -2.0f32, 4.0f32);
             camera_3d.target_position = vec3(0.0f32, 0.0f32, 0.0f32);
             camera_3d.up = vec3(0.0f32, 1.0f32, 0.0f32);
@@ -78,7 +78,6 @@ impl SceneBase for HelloWorldScene {
             &vec3(0.0f32, -2.0f32, 4.0f32),
             &vec3(1.0f32, 1.0f32, 1.0f32),
             0.2f32,
-            &self.texture,
         );
 
         let descriptor_set = self.graphic_pipeline.descriptor_set();
