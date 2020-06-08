@@ -83,11 +83,12 @@ impl BatchBuffer for BatchBufferF32 {
             if p {
                 val + size - pointer.borrow().size
             } else {
-                val - size + pointer.borrow().size
+                pointer.borrow().size - val - size
             }
         };
         let old_size = self.size;
         let new_size = diff(self.last());
+        self.size = new_size;
 
         self.change_range
             .resize_and_update(new_size, pointer.borrow().start);
@@ -107,7 +108,10 @@ impl BatchBuffer for BatchBufferF32 {
         };
         if let Some(x) = old_vertices {
             let l = old_size - last;
-            self.vertices[new_last..(l + new_last)].clone_from_slice(&x[last..(l + last)]);
+            let n = l + new_last;
+            if n > 0 {
+                self.vertices[new_last..n].clone_from_slice(&x[last..(l + last)]);
+            }
         }
         pointer.borrow_mut().size = size;
         let pointer_ptr = pointer.borrow().deref() as *const BatchBufferPointer;

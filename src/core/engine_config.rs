@@ -43,7 +43,7 @@ mod test {
 
     struct MockScene;
     impl SceneBase for MockScene {
-        fn update(&mut self, context: &mut SceneContext, delta: f32) {
+        fn update(&mut self, _context: &mut SceneContext, _delta: f32) {
             unimplemented!()
         }
     }

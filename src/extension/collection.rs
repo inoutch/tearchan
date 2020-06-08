@@ -39,7 +39,7 @@ mod tests {
     use std::rc::Rc;
 
     struct Struct {
-        value: i32,
+        pub value: i32,
     }
 
     #[test]
