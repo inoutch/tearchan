@@ -14,7 +14,7 @@ pub trait BatchBuffer {
 pub mod tests {
     use crate::core::graphic::batch::batch_buffer::BatchBuffer;
     use crate::core::graphic::batch::batch_buffer_pointer::BatchBufferPointer;
-    use crate::extension::shared::Shared;
+    use crate::extension::shared::{Shared, make_shared};
     use crate::utility::buffer_interface::BufferInterface;
     use crate::utility::test::func::MockFunc;
 
@@ -38,7 +38,7 @@ pub mod tests {
         fn allocate(&mut self, size: usize) -> Shared<BatchBufferPointer> {
             let mut x = self.mock_func.borrow_mut();
             x.call(vec!["allocate".to_string(), size.to_string()]);
-            Shared::new(BatchBufferPointer { start: 0, size: 0 })
+            make_shared(BatchBufferPointer { start: 0, size: 0 })
         }
 
         fn reallocate(&mut self, pointer: &Shared<BatchBufferPointer>, size: usize) {
@@ -47,7 +47,7 @@ pub mod tests {
                 "reallocate".to_string(),
                 format!(
                     "size={}, pointer_start={}, pointer_size={}",
-                    size, pointer.start, pointer.start
+                    size, pointer.borrow().start, pointer.borrow().size
                 ),
             ]);
         }
@@ -58,7 +58,7 @@ pub mod tests {
                 "reallocate".to_string(),
                 format!(
                     "pointer_start={}, pointer_size={}",
-                    pointer.start, pointer.start
+                    pointer.borrow().start, pointer.borrow().size
                 ),
             ]);
         }

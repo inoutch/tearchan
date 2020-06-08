@@ -146,19 +146,13 @@ impl Polygon {
         if let Some(range) = change_range.get_range() {
             let matrix = self.provider.transform(&self.core);
             let mesh_positions = &self.mesh().positions;
-            let position = self.position();
 
             buffer.update_with_range(range.start * 3, range.end * 3);
             if self.computed_visible() {
                 for i in range {
                     let mesh_position = &mesh_positions[i as usize];
                     let m = &matrix;
-                    let v = m * vec4(
-                        position.x + mesh_position.x,
-                        position.y + mesh_position.y,
-                        position.z + mesh_position.z,
-                        1.0f32,
-                    );
+                    let v = m * vec4(mesh_position.x, mesh_position.y, mesh_position.z, 1.0f32);
                     buffer.copy(offset + i * 3, v.x);
                     buffer.copy(offset + i * 3 + 1, v.y);
                     buffer.copy(offset + i * 3 + 2, v.z);
@@ -832,7 +826,7 @@ mod test {
 
     #[test]
     fn test_tree() {
-        let mock = Shared::new(MockFunc::new());
+        let mock = make_shared(MockFunc::new());
         let mesh = MeshBuilder::new()
             .with_square(vec2(32.0f32, 64.0f32))
             .build()

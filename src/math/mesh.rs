@@ -2,7 +2,7 @@ use crate::core::graphic::texture::TextureFrame;
 use crate::math::vec::make_vec4_white;
 use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Mesh {
     pub positions: Vec<Vec3>,
     pub colors: Vec<Vec4>,

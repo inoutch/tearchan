@@ -78,9 +78,16 @@ impl BatchBuffer for BatchBufferF32 {
     }
 
     fn reallocate(&mut self, pointer: &Shared<BatchBufferPointer>, size: usize) {
-        let diff = size - pointer.borrow().size;
+        let diff = |val: usize| -> usize {
+            let p = size > pointer.borrow().size;
+            if p {
+                val + size - pointer.borrow().size
+            } else {
+                val - size + pointer.borrow().size
+            }
+        };
         let old_size = self.size;
-        let new_size = self.last() + diff;
+        let new_size = diff(self.last());
 
         self.change_range
             .resize_and_update(new_size, pointer.borrow().start);
@@ -90,7 +97,7 @@ impl BatchBuffer for BatchBufferF32 {
         }
 
         let last = pointer.borrow().last();
-        let new_last = last + diff;
+        let new_last = diff(last);
         let old_vertices = if old_size > last {
             None
         } else {
