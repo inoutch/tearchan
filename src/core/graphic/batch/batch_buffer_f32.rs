@@ -34,7 +34,7 @@ impl<T: VertexBufferInterface> BatchBufferF32Common<T> {
         }
     }
 
-    pub fn borrow_vertex_buffer(&self) -> &T {
+    pub fn vertex_buffer(&self) -> &T {
         &self.vertex_buffer
     }
 }
@@ -81,41 +81,41 @@ impl<T: VertexBufferInterface> BatchBuffer for BatchBufferF32Common<T> {
         self.size = new_size;
 
         // Set to update new size
-        self.change_range
-            .resize_and_update(pointer.borrow().start, new_size);
+        if pointer.borrow().start < new_size {
+            self.change_range
+                .resize_and_update(pointer.borrow().start, new_size);
+        } else {
+            self.change_range.resize(new_size);
+        }
 
         if self.vertices.len() < new_size {
             self.reallocate_vertex_buffer(new_size);
         }
 
-        let last = pointer.borrow().last();
-        let new_last = last + size - pointer.borrow().size;
-        let old_vertices = if old_size == last {
-            None
-        } else {
-            let v = vec![0.0f32; old_size - last];
-            self.vertices[last..old_size].clone_from_slice(&v);
-            Some(v)
+        let old_last = pointer.borrow().last();
+        let new_last = old_last + size - pointer.borrow().size;
+        if old_size != old_last {
+            // If the pointer to be erased is not the last one, it need to re-copy the rest
+            let mut copies = vec![0.0f32; old_size - old_last];
+            copies.clone_from_slice(&self.vertices[old_last..old_size]);
+            self.vertices[new_last..new_size].clone_from_slice(&copies);
         };
 
-        if let Some(x) = old_vertices {
-            let l = x.len();
-            let n = l + new_last;
-            if n > 0 {
-                self.vertices[new_last..n].clone_from_slice(&x[last..(l + last)]);
-            }
-        }
-        pointer.borrow_mut().size = size;
-        let pointer_ptr = pointer.borrow().deref() as *const BatchBufferPointer;
-        let mut after_index = self
-            .pointers
-            .iter()
-            .position(move |x| {
-                let x_ptr = x.borrow().deref() as *const BatchBufferPointer;
-                std::ptr::eq(x_ptr, pointer_ptr)
-            })
-            .unwrap()
-            + 1;
+        // Find index of target pointer
+        let mut after_index = {
+            pointer.borrow_mut().size = size;
+            let pointer_ptr = &*pointer.borrow() as *const BatchBufferPointer;
+            let after_index = self
+                .pointers
+                .iter()
+                .position(move |x| {
+                    let x_ptr = &*x.borrow() as *const BatchBufferPointer;
+                    std::ptr::eq(x_ptr, pointer_ptr)
+                })
+                .unwrap();
+            self.pointers.remove(after_index);
+            after_index
+        };
 
         let mut prev_pointer = pointer.borrow_mut();
         while after_index < self.pointers.len() {
@@ -156,6 +156,7 @@ impl<T: VertexBufferInterface> BufferInterface<f32> for BatchBufferF32Common<T> 
         self.change_range.update(start, end);
     }
 
+    // Call update_with_range when all the copies are done
     fn copy(&mut self, offset: usize, value: f32) {
         self.vertices[offset] = value;
     }
@@ -180,5 +181,179 @@ impl BatchBufferF32Common<VertexBuffer> {
             },
             1_usize,
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::core::graphic::batch::batch_buffer::BatchBuffer;
+    use crate::core::graphic::batch::batch_buffer_f32::BatchBufferF32Common;
+    use crate::core::graphic::hal::vertex_buffer::test::MockVertexBuffer;
+    use crate::extension::shared::make_shared;
+    use crate::utility::buffer_interface::BufferInterface;
+    use crate::utility::test::func::MockFunc;
+    use std::ops::{Deref, Range};
+
+    type MockBatchBufferF32 = BatchBufferF32Common<MockVertexBuffer>;
+
+    #[test]
+    fn test_copy() {
+        let size = 20usize;
+        let mock = make_shared(MockFunc::new());
+        let vertex_buffer = MockVertexBuffer::new(&mock, &vec![0.0f32; size]);
+        let mut batch_buffer = MockBatchBufferF32::new_with_size(
+            vertex_buffer,
+            |b, v| MockVertexBuffer::new(&b.mock, v),
+            size,
+        );
+        assert_eq!(batch_buffer.vertex_buffer().vertices.borrow().len(), size);
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().deref(),
+            &vec![0.0f32; size]
+        );
+
+        let al_0_5 = batch_buffer.allocate(5);
+        assert_eq!(al_0_5.borrow().start, 0);
+        assert_eq!(al_0_5.borrow().size, 5);
+
+        batch_buffer.copy(0, 1.0f32);
+        batch_buffer.update_with_range(0, 1);
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().deref(),
+            &vec![0.0f32; size]
+        );
+
+        batch_buffer.flush();
+        assert!(
+            float_cmp::approx_eq!(
+                f32,
+                batch_buffer.vertex_buffer().vertices.borrow()[0],
+                1.0_f32
+            ),
+            "v[0] = {}",
+            batch_buffer.vertex_buffer().vertices.borrow()[0]
+        );
+        assert!(
+            float_cmp::approx_eq!(
+                f32,
+                batch_buffer.vertex_buffer().vertices.borrow()[1],
+                0.0_f32
+            ),
+            "v[1] = {}",
+            batch_buffer.vertex_buffer().vertices.borrow()[1]
+        );
+    }
+
+    #[test]
+    fn test_allocate() {
+        let size = 10usize;
+        let mock = make_shared(MockFunc::new());
+        let vertex_buffer = MockVertexBuffer::new(&mock, &vec![0.0f32; size]);
+        let mut batch_buffer = MockBatchBufferF32::new_with_size(
+            vertex_buffer,
+            |b, v| MockVertexBuffer::new(&b.mock, v),
+            size,
+        );
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().deref(),
+            &vec![0.0f32; size]
+        );
+
+        let al_0_5 = batch_buffer.allocate(5);
+        assert_eq!(al_0_5.borrow().start, 0);
+        assert_eq!(al_0_5.borrow().size, 5);
+        assert_eq!(batch_buffer.vertex_buffer().vertices.borrow().len(), 10);
+
+        batch_buffer.copy(0, 1.0f32);
+        batch_buffer.copy(1, 2.0f32);
+        batch_buffer.copy(2, 3.0f32);
+        batch_buffer.copy(3, 4.0f32);
+        batch_buffer.copy(4, 5.0f32);
+        batch_buffer.update_with_range(0, 5);
+        batch_buffer.flush();
+
+        let al_5_15 = batch_buffer.allocate(10);
+        assert_eq!(al_5_15.borrow().start, 5);
+        assert_eq!(al_5_15.borrow().size, 10);
+        assert!(batch_buffer.vertex_buffer().vertices.borrow().len() > 10);
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().to_owned()[0..5],
+            [1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32]
+        );
+    }
+
+    #[test]
+    fn test_free() {
+        let size = 20usize;
+        let mock = make_shared(MockFunc::new());
+        let vertex_buffer = MockVertexBuffer::new(&mock, &vec![0.0f32; size]);
+        let mut batch_buffer = MockBatchBufferF32::new_with_size(
+            vertex_buffer,
+            |b, v| MockVertexBuffer::new(&b.mock, v),
+            size,
+        );
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().deref(),
+            &vec![0.0f32; size]
+        );
+
+        let al_0_5 = batch_buffer.allocate(5);
+        assert_eq!(al_0_5.borrow().start, 0);
+        assert_eq!(al_0_5.borrow().size, 5);
+
+        let al_5_15 = batch_buffer.allocate(10);
+        assert_eq!(al_5_15.borrow().start, 5);
+        assert_eq!(al_5_15.borrow().size, 10);
+
+        let al_15_27 = batch_buffer.allocate(12);
+        assert_eq!(al_15_27.borrow().start, 15);
+        assert_eq!(al_15_27.borrow().size, 12);
+
+        let al_27_35 = batch_buffer.allocate(8);
+        assert_eq!(al_27_35.borrow().start, 27);
+        assert_eq!(al_27_35.borrow().size, 8);
+
+        for i in 0..35 {
+            batch_buffer.copy(i, i as f32 + 1.0f32);
+        }
+        batch_buffer.update_with_range(0, 35);
+        assert_eq!(
+            batch_buffer.change_range.get_range(),
+            Some(Range { start: 0, end: 35 })
+        );
+        batch_buffer.flush();
+
+        batch_buffer.free(&al_5_15);
+        assert_eq!(
+            batch_buffer.change_range.get_range(),
+            Some(Range { start: 5, end: 25 })
+        );
+        batch_buffer.flush();
+        assert_eq!(batch_buffer.size, 25);
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().deref()[0..25],
+            [
+                1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32, 16.0f32, 17.0f32, 18.0f32, 19.0f32,
+                20.0f32, 21.0f32, 22.0f32, 23.0f32, 24.0f32, 25.0f32, 26.0f32, 27.0f32, 28.0f32,
+                29.0f32, 30.0f32, 31.0f32, 32.0f32, 33.0f32, 34.0f32, 35.0f32,
+            ]
+        );
+
+        batch_buffer.free(&al_27_35);
+        assert_eq!(batch_buffer.change_range.get_range(), None);
+        batch_buffer.flush();
+        assert_eq!(batch_buffer.size, 17);
+        assert_eq!(
+            batch_buffer.vertex_buffer().vertices.borrow().deref()[0..17],
+            [
+                1.0f32, 2.0f32, 3.0f32, 4.0f32, 5.0f32, 16.0f32, 17.0f32, 18.0f32, 19.0f32,
+                20.0f32, 21.0f32, 22.0f32, 23.0f32, 24.0f32, 25.0f32, 26.0f32, 27.0f32,
+            ]
+        );
+
+        batch_buffer.free(&al_0_5);
+        batch_buffer.free(&al_15_27);
+        assert_eq!(batch_buffer.change_range.get_range(), None);
+        batch_buffer.flush();
     }
 }

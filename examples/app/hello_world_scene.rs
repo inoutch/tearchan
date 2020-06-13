@@ -94,7 +94,7 @@ impl SceneBase for HelloWorldScene {
                 .batch
                 .batch_buffers()
                 .iter()
-                .map(|x| x.borrow_vertex_buffer())
+                .map(|x| x.vertex_buffer())
                 .collect::<Vec<_>>(),
             self.batch.triangle_count(),
         );

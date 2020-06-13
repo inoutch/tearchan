@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ChangeRange {
     pub size: usize,
     range_start: usize,
@@ -18,10 +18,11 @@ impl ChangeRange {
 
     pub fn resize(&mut self, size: usize) {
         self.size = size;
-        self.range_end = size;
-        if self.range_start > size {
-            self.range_start = size;
+        if self.range_start >= size {
+            self.reset();
+            return;
         }
+        self.range_end = size;
     }
 
     pub fn resize_and_update(&mut self, start: usize, size: usize) {
@@ -70,40 +71,71 @@ impl ChangeRange {
     }
 }
 
-#[test]
-fn test_standard() {
-    let mut change_range = ChangeRange::new(32);
+#[cfg(test)]
+mod test {
+    use crate::math::change_range::ChangeRange;
+    use std::ops::Range;
 
-    assert_eq!(change_range.size, 32);
+    #[test]
+    fn test_standard() {
+        let mut change_range = ChangeRange::new(32);
 
-    assert_eq!(change_range.range_start, 0);
-    assert_eq!(change_range.range_end, 32);
+        assert_eq!(change_range.size, 32);
 
-    assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 32 }));
+        assert_eq!(change_range.range_start, 0);
+        assert_eq!(change_range.range_end, 32);
 
-    change_range.reset();
-    assert_eq!(change_range.get_range(), None);
+        assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 32 }));
 
-    change_range.update(10, 25);
-    assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 25 }));
+        change_range.reset();
+        assert_eq!(change_range.get_range(), None);
 
-    change_range.update(5, 15);
-    assert_eq!(change_range.get_range(), Some(Range { start: 5, end: 25 }));
+        change_range.update(10, 25);
+        assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 25 }));
 
-    change_range.update_all();
-    assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 32 }));
+        change_range.update(5, 15);
+        assert_eq!(change_range.get_range(), Some(Range { start: 5, end: 25 }));
 
-    change_range.resize(0);
-    assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 0 }));
+        change_range.update_all();
+        assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 32 }));
 
-    change_range.resize(10);
-    assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 10 }));
+        change_range.resize(0);
+        assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 0 }));
 
-    change_range.reset();
-    change_range.resize_and_update(10, 35);
-    assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 35 }));
+        change_range.resize(10);
+        assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 10 }));
 
-    change_range.update(20, 25);
-    change_range.resize(26);
-    assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 26 }));
+        change_range.reset();
+        change_range.resize_and_update(10, 35);
+        assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 35 }));
+
+        change_range.update(20, 25);
+        change_range.resize(26);
+        assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 26 }));
+    }
+
+    #[test]
+    fn test_resize_to_none() {
+        let mut change_range = ChangeRange::new(32);
+        change_range.reset();
+        change_range.update(20, 32);
+        change_range.resize(20);
+
+        assert_eq!(change_range.get_range(), None);
+
+        change_range.update(10, 15);
+        change_range.resize(12);
+
+        assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 12 }));
+    }
+
+    #[test]
+    fn test_resize_and_update() {
+        let mut change_range = ChangeRange::new(32);
+        change_range.reset();
+        change_range.update(20, 32);
+        change_range.resize_and_update(10, 25);
+
+        assert_eq!(change_range.get_range(), Some(Range { start: 10, end: 25 }));
+    }
 }

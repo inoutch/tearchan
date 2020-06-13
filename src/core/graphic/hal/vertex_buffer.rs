@@ -137,3 +137,38 @@ fn create_vertex_buffer<B: Backend>(
     }
     (Rc::downgrade(device), buffer, buffer_memory)
 }
+
+#[cfg(test)]
+pub mod test {
+    use crate::core::graphic::hal::vertex_buffer::VertexBufferInterface;
+    use crate::extension::shared::{clone_shared, Shared};
+    use crate::utility::test::func::MockFunc;
+    use std::cell::RefCell;
+
+    pub struct MockVertexBuffer {
+        pub mock: Shared<MockFunc>,
+        pub vertices: RefCell<Vec<f32>>,
+    }
+
+    impl MockVertexBuffer {
+        pub fn new(mock: &Shared<MockFunc>, vertices: &[f32]) -> Self {
+            MockVertexBuffer {
+                mock: clone_shared(mock),
+                vertices: RefCell::new(vertices.to_owned()),
+            }
+        }
+    }
+
+    impl VertexBufferInterface for MockVertexBuffer {
+        fn copy_to_buffer(&self, vertices: &[f32], offset: usize, size: usize) {
+            self.mock.borrow_mut().call(vec![
+                "copy_to_buffer".to_string(),
+                format!("{:?}", vertices),
+                offset.to_string(),
+                size.to_string(),
+            ]);
+            let mut v = self.vertices.borrow_mut();
+            v[offset..(offset + size)].clone_from_slice(vertices);
+        }
+    }
+}
