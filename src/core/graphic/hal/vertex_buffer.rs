@@ -8,6 +8,10 @@ use std::option::Option::Some;
 use std::rc::{Rc, Weak};
 use std::{iter, mem, ptr};
 
+pub trait VertexBufferInterface {
+    fn copy_to_buffer(&self, vertices: &[f32], offset: usize, size: usize);
+}
+
 pub struct VertexBufferCommon<B: Backend> {
     device: Weak<B::Device>,
     buffer: ManuallyDrop<B::Buffer>,
@@ -49,7 +53,21 @@ impl<B: Backend> VertexBufferCommon<B> {
         }
     }
 
-    pub fn copy_to_buffer(&self, vertices: &[f32], offset: usize, size: usize) {
+    pub fn borrow_buffer(&self) -> &B::Buffer {
+        &self.buffer
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+impl<B: Backend> VertexBufferInterface for VertexBufferCommon<B> {
+    fn copy_to_buffer(&self, vertices: &[f32], offset: usize, size: usize) {
         if let Some(device) = self.device.upgrade() {
             let binary_offset = offset * std::mem::size_of::<f32>();
             let binary_size = size * std::mem::size_of::<f32>();
@@ -68,18 +86,6 @@ impl<B: Backend> VertexBufferCommon<B> {
                 device.unmap_memory(memory);
             }
         }
-    }
-
-    pub fn borrow_buffer(&self) -> &B::Buffer {
-        &self.buffer
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
     }
 }
 

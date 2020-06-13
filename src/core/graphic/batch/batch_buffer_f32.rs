@@ -1,31 +1,32 @@
 use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::batch_buffer_pointer::BatchBufferPointer;
 use crate::core::graphic::hal::backend::{RendererApi, VertexBuffer};
+use crate::core::graphic::hal::vertex_buffer::VertexBufferInterface;
 use crate::extension::collection::VecExt;
 use crate::extension::shared::{make_shared, Shared};
 use crate::math::change_range::ChangeRange;
 use crate::utility::buffer_interface::BufferInterface;
 use std::ops::Deref;
 
-pub struct BatchBufferF32 {
-    vertex_buffer: VertexBuffer,
+pub struct BatchBufferF32Common<T: VertexBufferInterface> {
+    vertex_buffer: T,
+    vertex_buffer_factory: fn(&T, vertices: &Vec<f32>) -> T,
     vertices: Vec<f32>,
     size: usize,
     pointers: Vec<Shared<BatchBufferPointer>>,
     change_range: ChangeRange,
 }
 
-impl BatchBufferF32 {
-    pub fn new(api: &RendererApi) -> BatchBufferF32 {
-        BatchBufferF32::new_with_size(api, 1_usize)
-    }
-
-    pub fn new_with_size(api: &RendererApi, size: usize) -> BatchBufferF32 {
+impl<T: VertexBufferInterface> BatchBufferF32Common<T> {
+    pub fn new_with_size(
+        vertex_buffer: T,
+        vertex_buffer_factory: fn(&T, vertices: &Vec<f32>) -> T,
+        size: usize,
+    ) -> BatchBufferF32Common<T> {
         let vertices = vec![0.0f32; size];
-        let vertex_buffer = api.create_vertex_buffer(&vertices);
-
-        BatchBufferF32 {
+        BatchBufferF32Common {
             vertex_buffer,
+            vertex_buffer_factory,
             vertices,
             size: 0,
             pointers: vec![],
@@ -33,12 +34,12 @@ impl BatchBufferF32 {
         }
     }
 
-    pub fn borrow_vertex_buffer(&self) -> &VertexBuffer {
+    pub fn borrow_vertex_buffer(&self) -> &T {
         &self.vertex_buffer
     }
 }
 
-impl BatchBufferF32 {
+impl<T: VertexBufferInterface> BatchBufferF32Common<T> {
     fn last(&self) -> usize {
         self.pointers.last().map_or(0, |x| x.borrow().last())
     }
@@ -51,15 +52,12 @@ impl BatchBufferF32 {
         self.vertices.resize(new_size, 0.0f32);
 
         self.size = size;
-        let new_vertex_buffer = self
-            .vertex_buffer
-            .create_vertex_buffer(&self.vertices)
-            .expect("device is already dropped");
-        self.vertex_buffer = new_vertex_buffer;
+        let factory = &self.vertex_buffer_factory;
+        self.vertex_buffer = factory(&self.vertex_buffer, &self.vertices);
     }
 }
 
-impl BatchBuffer for BatchBufferF32 {
+impl<T: VertexBufferInterface> BatchBuffer for BatchBufferF32Common<T> {
     fn size(&self) -> usize {
         self.size
     }
@@ -78,36 +76,30 @@ impl BatchBuffer for BatchBufferF32 {
     }
 
     fn reallocate(&mut self, pointer: &Shared<BatchBufferPointer>, size: usize) {
-        let diff = |val: usize| -> usize {
-            let p = size > pointer.borrow().size;
-            if p {
-                val + size - pointer.borrow().size
-            } else {
-                pointer.borrow().size - val - size
-            }
-        };
         let old_size = self.size;
-        let new_size = diff(self.last());
+        let new_size = self.last() - size - pointer.borrow().size;
         self.size = new_size;
 
+        // Set to update new size
         self.change_range
-            .resize_and_update(new_size, pointer.borrow().start);
+            .resize_and_update(pointer.borrow().start, new_size);
 
         if self.vertices.len() < new_size {
             self.reallocate_vertex_buffer(new_size);
         }
 
         let last = pointer.borrow().last();
-        let new_last = diff(last);
-        let old_vertices = if old_size > last {
+        let new_last = last + size - pointer.borrow().size;
+        let old_vertices = if old_size == last {
             None
         } else {
             let v = vec![0.0f32; old_size - last];
             self.vertices[last..old_size].clone_from_slice(&v);
             Some(v)
         };
+
         if let Some(x) = old_vertices {
-            let l = old_size - last;
+            let l = x.len();
             let n = l + new_last;
             if n > 0 {
                 self.vertices[new_last..n].clone_from_slice(&x[last..(l + last)]);
@@ -159,7 +151,7 @@ impl BatchBuffer for BatchBufferF32 {
     }
 }
 
-impl BufferInterface<f32> for BatchBufferF32 {
+impl<T: VertexBufferInterface> BufferInterface<f32> for BatchBufferF32Common<T> {
     fn update_with_range(&mut self, start: usize, end: usize) {
         self.change_range.update(start, end);
     }
@@ -170,5 +162,23 @@ impl BufferInterface<f32> for BatchBufferF32 {
 
     fn resize(&mut self, _size: usize) {
         unimplemented!();
+    }
+}
+
+pub type BatchBufferF32 = BatchBufferF32Common<VertexBuffer>;
+
+impl BatchBufferF32Common<VertexBuffer> {
+    pub fn new(api: &RendererApi) -> BatchBufferF32 {
+        let size = 256usize;
+        let vertices = vec![0.0f32; size];
+        BatchBufferF32::new_with_size(
+            api.create_vertex_buffer(&vertices),
+            |vertex_buffer, vertices| {
+                vertex_buffer
+                    .create_vertex_buffer(vertices)
+                    .expect("device is already dropped")
+            },
+            1_usize,
+        )
     }
 }

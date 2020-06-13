@@ -26,11 +26,15 @@ impl ChangeRange {
 
     pub fn resize_and_update(&mut self, start: usize, size: usize) {
         self.size = size;
+        self.range_end = size;
         self.update(start, size);
     }
 
     pub fn update(&mut self, start: usize, end: usize) {
-        debug_assert!(start <= end, "start wasn't less than end");
+        debug_assert!(
+            start <= end,
+            format!("start wasn't less than end [s={}, e={}]", start, end)
+        );
 
         if self.range_start == std::usize::MAX {
             self.range_start = start;
