@@ -1,9 +1,11 @@
+use gfx_hal::pso::{PolygonMode, Rasterizer, State};
 use nalgebra_glm::vec3;
 use tearchan::core::graphic::batch::batch3d::Batch3D;
 use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
 use tearchan::core::graphic::batch::Batch;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
+use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
 use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::image::Image;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
@@ -42,9 +44,10 @@ impl HelloWorldScene {
 
             let standard_3d_shader_program =
                 Standard3DShaderProgram::new(scene_context.renderer_api, camera_3d.base());
-            let graphic_pipeline_3d = scene_context
-                .renderer_api
-                .create_graphic_pipeline(standard_3d_shader_program.shader());
+            let graphic_pipeline_3d = scene_context.renderer_api.create_graphic_pipeline(
+                standard_3d_shader_program.shader(),
+                GraphicPipelineConfig::default(),
+            );
 
             let mesh3 = MeshBuilder::new().with_cube(1.0f32).build().unwrap();
             let mut batch_3d = Batch3D::new(scene_context.renderer_api);

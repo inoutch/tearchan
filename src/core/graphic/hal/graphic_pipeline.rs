@@ -2,11 +2,23 @@ use crate::core::graphic::hal::descriptor_set::DescriptorSetCommon;
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::ShaderCommon;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool};
+use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool, Rasterizer};
 use gfx_hal::Backend;
 use std::borrow::Borrow;
 use std::mem::ManuallyDrop;
 use std::rc::{Rc, Weak};
+
+pub struct GraphicPipelineConfig {
+    pub rasterizer: Rasterizer,
+}
+
+impl Default for GraphicPipelineConfig {
+    fn default() -> Self {
+        GraphicPipelineConfig {
+            rasterizer: Rasterizer::FILL,
+        }
+    }
+}
 
 pub struct GraphicPipelineCommon<B: Backend> {
     device: Weak<B::Device>,
@@ -22,6 +34,7 @@ impl<B: Backend> GraphicPipelineCommon<B> {
         device: &Rc<B::Device>,
         render_pass: &B::RenderPass,
         shader: &ShaderCommon<B>,
+        config: GraphicPipelineConfig,
     ) -> Self {
         let descriptor_ranges = create_default_descriptor_range_descriptors();
         let mut descriptor_pool = unsafe {
@@ -58,7 +71,7 @@ impl<B: Backend> GraphicPipelineCommon<B> {
         let mut pipeline_desc = gfx_hal::pso::GraphicsPipelineDesc::new(
             shader.create_entries(),
             gfx_hal::pso::Primitive::TriangleList,
-            gfx_hal::pso::Rasterizer::FILL,
+            config.rasterizer,
             &pipeline_layout,
             subpass,
         );

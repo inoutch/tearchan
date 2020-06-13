@@ -1,4 +1,4 @@
-use crate::core::graphic::hal::graphic_pipeline::GraphicPipelineCommon;
+use crate::core::graphic::hal::graphic_pipeline::{GraphicPipelineCommon, GraphicPipelineConfig};
 use crate::core::graphic::hal::renderer::{RendererApiContext, RendererApiStaticContext};
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
@@ -90,11 +90,13 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     pub fn create_graphic_pipeline(
         &mut self,
         shader: &ShaderCommon<B>,
+        config: GraphicPipelineConfig,
     ) -> GraphicPipelineCommon<B> {
         GraphicPipelineCommon::new(
             &self.context.device,
             self.context.render_pass.deref(),
             shader,
+            config,
         )
     }
 
