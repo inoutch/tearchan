@@ -1,6 +1,7 @@
 use gfx_hal::pso::Descriptor;
 use gfx_hal::Backend;
 
+#[derive(Debug)]
 pub struct WriteDescriptorSetsCommon<'a, B: Backend> {
     raw: Vec<gfx_hal::pso::DescriptorSetWrite<'a, B, Option<Descriptor<'a, B>>>>,
 }

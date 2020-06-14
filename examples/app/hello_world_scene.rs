@@ -12,6 +12,7 @@ use tearchan::core::graphic::shader::standard_3d_shader_program::Standard3DShade
 use tearchan::core::scene::scene_base::SceneBase;
 use tearchan::core::scene::scene_context::SceneContext;
 use tearchan::core::scene::scene_creator::SceneCreator;
+use tearchan::core::scene::touch::Touch;
 use tearchan::extension::shared::{make_shared, Shared};
 use tearchan::math::mesh::MeshBuilder;
 
@@ -98,5 +99,21 @@ impl SceneBase for HelloWorldScene {
                 .collect::<Vec<_>>(),
             self.batch.vertex_count(),
         );
+    }
+
+    fn on_touch_start(&self, touch: &Touch) {
+        println!("onTouchStart: {:?}", touch);
+    }
+
+    fn on_touch_end(&self, touch: &Touch) {
+        println!("onTouchEnd: {:?}", touch);
+    }
+
+    fn on_touch_move(&self, touch: &Touch) {
+        println!("onTouchMove: {:?}", touch);
+    }
+
+    fn on_touch_cancel(&self, touch: &Touch) {
+        println!("onTouchCancel: {:?}", touch);
     }
 }

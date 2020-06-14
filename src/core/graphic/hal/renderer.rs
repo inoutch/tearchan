@@ -8,6 +8,7 @@ use gfx_hal::pso::{Rect, Viewport};
 use gfx_hal::queue::{CommandQueue, QueueFamily, QueueGroup, Submission};
 use gfx_hal::window::{PresentationSurface, Surface};
 use gfx_hal::{window, Backend, Instance, Limits};
+use nalgebra_glm::{vec4, Vec4};
 use std::borrow::Borrow;
 use std::iter;
 use std::mem::ManuallyDrop;
@@ -97,7 +98,7 @@ where
         let (depth_image, depth_memory, depth_image_view, depth_stencil_format) =
             create_depth::<B>(&device, extent, &static_context.memory_types);
 
-        let render_pass = {
+        let first_render_pass = {
             let attachment = gfx_hal::pass::Attachment {
                 format: Some(surface_format),
                 samples: 1,
@@ -114,7 +115,47 @@ where
                 samples: 1,
                 ops: gfx_hal::pass::AttachmentOps::new(
                     gfx_hal::pass::AttachmentLoadOp::Clear,
-                    gfx_hal::pass::AttachmentStoreOp::DontCare,
+                    gfx_hal::pass::AttachmentStoreOp::Store,
+                ),
+                stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
+                layouts: gfx_hal::image::Layout::Undefined
+                    ..gfx_hal::image::Layout::DepthStencilAttachmentOptimal,
+            };
+
+            let subpass = gfx_hal::pass::SubpassDesc {
+                colors: &[(0, gfx_hal::image::Layout::ColorAttachmentOptimal)],
+                depth_stencil: Some(&(1, gfx_hal::image::Layout::DepthStencilAttachmentOptimal)),
+                inputs: &[],
+                resolves: &[],
+                preserves: &[],
+            };
+
+            ManuallyDrop::new(
+                unsafe {
+                    device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[])
+                }
+                .expect("Can't create render pass"),
+            )
+        };
+
+        let render_pass = {
+            let attachment = gfx_hal::pass::Attachment {
+                format: Some(surface_format),
+                samples: 1,
+                ops: gfx_hal::pass::AttachmentOps::new(
+                    gfx_hal::pass::AttachmentLoadOp::DontCare,
+                    gfx_hal::pass::AttachmentStoreOp::Store,
+                ),
+                stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
+                layouts: gfx_hal::image::Layout::Undefined..gfx_hal::image::Layout::Present,
+            };
+
+            let depth_attachment = gfx_hal::pass::Attachment {
+                format: Some(depth_stencil_format),
+                samples: 1,
+                ops: gfx_hal::pass::AttachmentOps::new(
+                    gfx_hal::pass::AttachmentLoadOp::DontCare,
+                    gfx_hal::pass::AttachmentStoreOp::Store,
                 ),
                 stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
                 layouts: gfx_hal::image::Layout::Undefined
@@ -191,6 +232,10 @@ where
                 device: Rc::new(device),
                 queue_group,
                 render_pass,
+                first_render_pass,
+                use_first_render_pass: true,
+                clear_color: vec4(0.0f32, 0.0f32, 0.0f32, 1.0f32),
+                clear_depth: 0.0f32,
             },
             surface_format,
             dimensions: default_dimensions,
@@ -229,6 +274,8 @@ where
     where
         F: FnMut(&mut RendererApiCommon<B>) -> (),
     {
+        self.context.use_first_render_pass = true;
+
         let frame_idx = self.frame as usize % self.frames_in_flight;
         let surface_image = unsafe {
             match self.surface.acquire_image(!0) {
@@ -379,7 +426,11 @@ where
 pub struct RendererApiContext<B: Backend> {
     pub device: Rc<B::Device>,
     pub queue_group: QueueGroup<B>,
+    pub first_render_pass: ManuallyDrop<B::RenderPass>,
     pub render_pass: ManuallyDrop<B::RenderPass>,
+    pub use_first_render_pass: bool,
+    pub clear_color: Vec4,
+    pub clear_depth: f32,
 }
 
 pub struct RendererApiStaticContext {

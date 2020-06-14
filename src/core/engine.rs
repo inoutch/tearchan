@@ -68,26 +68,21 @@ impl Engine {
                 winit::event::WindowEvent::CloseRequested => {
                     *control_flow = winit::event_loop::ControlFlow::Exit
                 }
-                winit::event::WindowEvent::KeyboardInput {
-                    input:
-                        winit::event::KeyboardInput {
-                            virtual_keycode: Some(winit::event::VirtualKeyCode::Escape),
-                            ..
-                        },
-                    ..
-                } => *control_flow = winit::event_loop::ControlFlow::Exit,
-                _ => {}
+                _ => {
+                    scene_manager.event(&event);
+                }
             },
             winit::event::Event::RedrawRequested(_) => {
                 renderer.render(|renderer_api| {
                     scene_manager.render(1.0f32 / 6.0f32, renderer_api, &mut file_api);
                 });
             }
-            _ => {
+            winit::event::Event::MainEventsCleared => {
                 *control_flow =
                     winit::event_loop::ControlFlow::WaitUntil(Instant::now() + timer_length);
                 window.request_redraw();
             }
+            _ => {}
         });
     }
 }

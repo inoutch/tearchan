@@ -12,6 +12,7 @@ use tearchan::core::graphic::shader::grid_shader_program::GridShaderProgram;
 use tearchan::core::scene::scene_base::SceneBase;
 use tearchan::core::scene::scene_context::SceneContext;
 use tearchan::core::scene::scene_creator::SceneCreator;
+use tearchan::core::scene::touch::Touch;
 use tearchan::extension::shared::make_shared;
 use tearchan::math::mesh::MeshBuilder;
 
@@ -106,4 +107,12 @@ impl SceneBase for GridScene {
             self.batch.vertex_count(),
         );
     }
+
+    fn on_touch_start(&self, _touch: &Touch) {}
+
+    fn on_touch_end(&self, _touch: &Touch) {}
+
+    fn on_touch_move(&self, _touch: &Touch) {}
+
+    fn on_touch_cancel(&self, _touch: &Touch) {}
 }

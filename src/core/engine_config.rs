@@ -40,10 +40,27 @@ mod test {
     use crate::core::engine_config::StartupConfigBuilder;
     use crate::core::scene::scene_base::SceneBase;
     use crate::core::scene::scene_context::SceneContext;
+    use crate::core::scene::touch::Touch;
 
     struct MockScene;
     impl SceneBase for MockScene {
         fn update(&mut self, _context: &mut SceneContext, _delta: f32) {
+            unimplemented!()
+        }
+
+        fn on_touch_start(&self, _touch: &Touch) {
+            unimplemented!()
+        }
+
+        fn on_touch_end(&self, _touch: &Touch) {
+            unimplemented!()
+        }
+
+        fn on_touch_move(&self, _touch: &Touch) {
+            unimplemented!()
+        }
+
+        fn on_touch_cancel(&self, _touch: &Touch) {
             unimplemented!()
         }
     }
