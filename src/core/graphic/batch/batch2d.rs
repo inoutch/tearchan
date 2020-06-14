@@ -52,11 +52,6 @@ where
     fn bundles(&self) -> &Vec<BatchBundle<TBatchBuffer>> {
         &self.bundles
     }
-
-    fn triangle_count(&self) -> usize {
-        let bundle = &self.bundles[0];
-        bundle.batch_buffer.size() / bundle.stride as usize
-    }
 }
 
 impl<TBatchBuffer> Batch<Polygon, TBatchBuffer, Batch2D<TBatchBuffer>>

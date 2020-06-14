@@ -2,7 +2,7 @@ use crate::core::graphic::hal::descriptor_set::DescriptorSetCommon;
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::ShaderCommon;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool, Rasterizer};
+use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool, Primitive, Rasterizer};
 use gfx_hal::Backend;
 use std::borrow::Borrow;
 use std::mem::ManuallyDrop;
@@ -10,12 +10,14 @@ use std::rc::{Rc, Weak};
 
 pub struct GraphicPipelineConfig {
     pub rasterizer: Rasterizer,
+    pub primitive: Primitive,
 }
 
 impl Default for GraphicPipelineConfig {
     fn default() -> Self {
         GraphicPipelineConfig {
             rasterizer: Rasterizer::FILL,
+            primitive: Primitive::TriangleList,
         }
     }
 }
@@ -70,7 +72,7 @@ impl<B: Backend> GraphicPipelineCommon<B> {
         };
         let mut pipeline_desc = gfx_hal::pso::GraphicsPipelineDesc::new(
             shader.create_entries(),
-            gfx_hal::pso::Primitive::TriangleList,
+            config.primitive,
             config.rasterizer,
             &pipeline_layout,
             subpass,

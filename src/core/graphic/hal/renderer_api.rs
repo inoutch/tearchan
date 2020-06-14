@@ -100,11 +100,11 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         )
     }
 
-    pub fn draw_triangle(
+    pub fn draw_vertices(
         &mut self,
         graphic_pipeline: &GraphicPipelineCommon<B>,
         vertex_buffers: &[&VertexBufferCommon<B>],
-        triangle_count: usize,
+        vertices_size: usize,
     ) {
         unsafe {
             self.command_buffer
@@ -140,7 +140,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
                 ],
                 gfx_hal::command::SubpassContents::Inline,
             );
-            self.command_buffer.draw(0..triangle_count as u32, 0..1);
+            self.command_buffer.draw(0..vertices_size as u32, 0..1);
             self.command_buffer.end_render_pass();
         }
     }

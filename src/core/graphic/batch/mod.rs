@@ -15,6 +15,7 @@ pub mod batch_buffer;
 pub mod batch_buffer_f32;
 pub mod batch_buffer_pointer;
 pub mod batch_bundle;
+pub mod batch_line;
 pub mod batch_object_bundle;
 
 pub struct Batch<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBuffer>> {
@@ -75,7 +76,7 @@ impl<TObject, TBatchBuffer: BatchBuffer, TBatchBase: BatchBase<TObject, TBatchBu
 
     pub fn sort_by_render_order(&mut self) {}
 
-    pub fn triangle_count(&self) -> usize {
+    pub fn vertex_count(&self) -> usize {
         match self.base.bundles().first() {
             Some(x) => x.batch_buffer.size() / x.stride as usize,
             None => 0,

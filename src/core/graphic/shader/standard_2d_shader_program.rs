@@ -34,7 +34,7 @@ impl Standard2DShaderProgram {
         &self.shader
     }
 
-    pub fn prepare(&mut self, mvp_matrix: &Mat4, _texture: &Texture) {
+    pub fn prepare(&mut self, mvp_matrix: &Mat4) {
         self.mvp_matrix_uniform
             .copy_to_buffer(&[mvp_matrix.clone_owned()]);
     }

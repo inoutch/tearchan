@@ -1,6 +1,7 @@
 use crate::core::graphic::texture::TextureFrame;
 use crate::math::vec::make_vec4_white;
 use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
+use std::ops::Range;
 
 #[derive(Clone, Debug)]
 pub struct Mesh {
@@ -116,6 +117,45 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
+    pub fn with_grid(
+        self,
+        interval: f32,
+        range: Range<(i32, i32)>,
+    ) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        debug_assert_ne!(range.start, range.end);
+
+        let mut positions = vec![];
+        let mut colors = vec![];
+
+        let p1x = range.start.0 as f32 * interval;
+        let p2x = range.end.0 as f32 * interval;
+        let p1y = range.start.1 as f32 * interval;
+        let p2y = range.end.1 as f32 * interval;
+
+        for x in range.start.0..=range.end.0 {
+            let p1x = x as f32 * interval;
+            positions.push(vec3(p1x, p1y, 0.0f32));
+            positions.push(vec3(p1x, p2y, 0.0f32));
+            colors.push(make_vec4_white());
+            colors.push(make_vec4_white());
+        }
+
+        for y in range.start.1..=range.end.1 {
+            let p1y = y as f32 * interval;
+            positions.push(vec3(p1x, p1y, 0.0f32));
+            positions.push(vec3(p2x, p1y, 0.0f32));
+            colors.push(make_vec4_white());
+            colors.push(make_vec4_white());
+        }
+
+        MeshBuilder {
+            positions,
+            colors,
+            texcoords: vec![],
+            normals: vec![],
+        }
+    }
+
     pub fn positions(
         self,
         positions: Vec<Vec3>,
@@ -168,7 +208,7 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
 impl MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
     pub fn build(self) -> Result<Mesh, String> {
         if self.positions.len() == self.colors.len()
-            && self.positions.len() == self.texcoords.len()
+            && (self.positions.len() == self.texcoords.len() || self.texcoords.is_empty())
             && (self.positions.len() == self.normals.len() || self.normals.is_empty())
         {
             return Ok(Mesh {
