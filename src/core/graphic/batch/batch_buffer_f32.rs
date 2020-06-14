@@ -312,6 +312,7 @@ mod test {
         assert_eq!(al_27_35.borrow().start, 27);
         assert_eq!(al_27_35.borrow().size, 8);
 
+        assert_eq!(batch_buffer.pointers.len(), 4);
         for i in 0..35 {
             batch_buffer.copy(i, i as f32 + 1.0f32);
         }
@@ -323,6 +324,7 @@ mod test {
         batch_buffer.flush();
 
         batch_buffer.free(&al_5_15);
+        assert_eq!(batch_buffer.pointers.len(), 3);
         assert_eq!(
             batch_buffer.change_range.get_range(),
             Some(Range { start: 5, end: 25 })
@@ -339,6 +341,7 @@ mod test {
         );
 
         batch_buffer.free(&al_27_35);
+        assert_eq!(batch_buffer.pointers.len(), 2);
         assert_eq!(batch_buffer.change_range.get_range(), None);
         batch_buffer.flush();
         assert_eq!(batch_buffer.size, 17);
@@ -351,7 +354,9 @@ mod test {
         );
 
         batch_buffer.free(&al_0_5);
+        assert_eq!(batch_buffer.pointers.len(), 1);
         batch_buffer.free(&al_15_27);
+        assert_eq!(batch_buffer.pointers.len(), 0);
         assert_eq!(batch_buffer.change_range.get_range(), None);
         batch_buffer.flush();
     }
