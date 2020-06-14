@@ -17,6 +17,10 @@ impl ChangeRange {
     }
 
     pub fn resize(&mut self, size: usize) {
+        if self.range_start == std::usize::MAX && self.size == 0 {
+            self.range_start = 0;
+        }
+
         self.size = size;
         if self.range_start >= size {
             self.reset();
@@ -100,7 +104,7 @@ mod test {
         assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 32 }));
 
         change_range.resize(0);
-        assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 0 }));
+        assert_eq!(change_range.get_range(), None);
 
         change_range.resize(10);
         assert_eq!(change_range.get_range(), Some(Range { start: 0, end: 10 }));
