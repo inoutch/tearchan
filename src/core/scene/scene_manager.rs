@@ -5,7 +5,7 @@ use crate::core::scene::scene_context::{SceneContext, SceneContextCommand, Scene
 use crate::core::scene::scene_creator::SceneCreator;
 use crate::core::scene::touch::Touch;
 use nalgebra_glm::{vec2, TVec2};
-use winit::event::{ElementState, MouseButton, TouchPhase, WindowEvent};
+use winit::event::{ElementState, KeyboardInput, MouseButton, TouchPhase, WindowEvent};
 
 pub struct SceneManager {
     current_scene: Box<dyn SceneBase>,
@@ -61,7 +61,14 @@ impl SceneManager {
             WindowEvent::HoveredFileCancelled => {}
             WindowEvent::ReceivedCharacter(_) => {}
             WindowEvent::Focused(_) => {}
-            WindowEvent::KeyboardInput { .. } => {}
+            WindowEvent::KeyboardInput { input, .. } => match input.state {
+                ElementState::Pressed => {
+                    self.current_scene.on_key_down(input);
+                }
+                ElementState::Released => {
+                    self.current_scene.on_key_up(input);
+                }
+            },
             WindowEvent::ModifiersChanged(_) => {}
             WindowEvent::CursorMoved { position, .. } => {
                 let prev_location = vec2(position.x as u32, position.y as u32);
@@ -140,11 +147,15 @@ pub struct DummyScene;
 impl SceneBase for DummyScene {
     fn update(&mut self, _scene_context: &mut SceneContext, _delta: f32) {}
 
-    fn on_touch_start(&self, _touch: &Touch) {}
+    fn on_touch_start(&mut self, _touch: &Touch) {}
 
-    fn on_touch_end(&self, _touch: &Touch) {}
+    fn on_touch_end(&mut self, _touch: &Touch) {}
 
-    fn on_touch_move(&self, _touch: &Touch) {}
+    fn on_touch_move(&mut self, _touch: &Touch) {}
 
-    fn on_touch_cancel(&self, _touch: &Touch) {}
+    fn on_touch_cancel(&mut self, _touch: &Touch) {}
+
+    fn on_key_down(&mut self, _input: &KeyboardInput) {}
+
+    fn on_key_up(&mut self, _input: &KeyboardInput) {}
 }

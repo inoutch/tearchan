@@ -15,6 +15,7 @@ use tearchan::core::scene::scene_creator::SceneCreator;
 use tearchan::core::scene::touch::Touch;
 use tearchan::extension::shared::{make_shared, Shared};
 use tearchan::math::mesh::MeshBuilder;
+use winit::event::KeyboardInput;
 
 pub struct HelloWorldScene {
     camera: Camera3D,
@@ -101,19 +102,27 @@ impl SceneBase for HelloWorldScene {
         );
     }
 
-    fn on_touch_start(&self, touch: &Touch) {
+    fn on_touch_start(&mut self, touch: &Touch) {
         println!("onTouchStart: {:?}", touch);
     }
 
-    fn on_touch_end(&self, touch: &Touch) {
+    fn on_touch_end(&mut self, touch: &Touch) {
         println!("onTouchEnd: {:?}", touch);
     }
 
-    fn on_touch_move(&self, touch: &Touch) {
+    fn on_touch_move(&mut self, touch: &Touch) {
         println!("onTouchMove: {:?}", touch);
     }
 
-    fn on_touch_cancel(&self, touch: &Touch) {
+    fn on_touch_cancel(&mut self, touch: &Touch) {
         println!("onTouchCancel: {:?}", touch);
+    }
+
+    fn on_key_down(&mut self, input: &KeyboardInput) {
+        println!("onKeyDown: {:?}", input.virtual_keycode);
+    }
+
+    fn on_key_up(&mut self, input: &KeyboardInput) {
+        println!("onKeyUp: {:?}", input.virtual_keycode);
     }
 }
