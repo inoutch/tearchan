@@ -143,7 +143,7 @@ where
                 format: Some(surface_format),
                 samples: 1,
                 ops: gfx_hal::pass::AttachmentOps::new(
-                    gfx_hal::pass::AttachmentLoadOp::DontCare,
+                    gfx_hal::pass::AttachmentLoadOp::Load,
                     gfx_hal::pass::AttachmentStoreOp::Store,
                 ),
                 stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
@@ -154,7 +154,7 @@ where
                 format: Some(depth_stencil_format),
                 samples: 1,
                 ops: gfx_hal::pass::AttachmentOps::new(
-                    gfx_hal::pass::AttachmentLoadOp::DontCare,
+                    gfx_hal::pass::AttachmentLoadOp::Load,
                     gfx_hal::pass::AttachmentStoreOp::Store,
                 ),
                 stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
