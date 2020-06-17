@@ -2,6 +2,7 @@ use crate::core::graphic::polygon::{Polygon, PolygonCore, PolygonProvider};
 use crate::extension::shared::{make_shared, Shared};
 use crate::math::mesh::Mesh;
 use nalgebra_glm::{translate, vec2, vec3, Mat4, Vec2, Vec3};
+use std::any::Any;
 
 pub struct Polygon2DProvider {
     anchor_point: Vec2,
@@ -30,6 +31,10 @@ impl PolygonProvider for Polygon2DProvider {
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4 {
         translate(&Mat4::identity(), &self.transform_anchor_point_for_child())
             * self.transform(core)
+    }
+
+    fn as_any_provider_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
