@@ -8,7 +8,9 @@ use nalgebra_glm::{vec3, Mat4, Vec3};
 
 struct BillboardCamera {
     pub camera_right: Vec3,
+    _pad1: f32, // alignment
     pub camera_up: Vec3,
+    _pad2: f32,
 }
 
 impl BillboardCamera {
@@ -16,14 +18,16 @@ impl BillboardCamera {
         BillboardCamera {
             camera_right: vec3(
                 camera.view_matrix.data[0],
-                camera.view_matrix.data[1],
-                camera.view_matrix.data[2],
+                camera.view_matrix.data[4],
+                camera.view_matrix.data[8],
             ),
             camera_up: vec3(
-                camera.view_matrix.data[3],
-                camera.view_matrix.data[4],
+                camera.view_matrix.data[1],
                 camera.view_matrix.data[5],
+                camera.view_matrix.data[9],
             ),
+            _pad1: 0.0f32,
+            _pad2: 0.0f32,
         }
     }
 }
