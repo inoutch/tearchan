@@ -21,5 +21,5 @@ void main(void) {
     outColor = color;
     outTexcoord = texcoord;
     vec3 p = origin + cameraRight * position.x + cameraUp * position.y;
-    gl_Position = vec4(p, 1.0);
+    gl_Position = viewProjectionMatrix * vec4(p, 1.0);
 }
