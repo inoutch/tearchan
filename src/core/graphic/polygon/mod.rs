@@ -77,6 +77,8 @@ pub trait PolygonProvider {
     fn transform(&self, core: &PolygonCore) -> Mat4;
 
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4;
+
+    fn as_any_provider_mut(&mut self) -> &mut dyn Any;
 }
 
 pub trait PolygonCommon {
@@ -245,7 +247,7 @@ impl Polygon {
     }
 
     pub fn provider_as_any_mut(&mut self) -> &mut dyn Any {
-        &mut self.provider
+        self.provider.as_any_provider_mut()
     }
 }
 
@@ -561,6 +563,10 @@ impl PolygonProvider for PolygonDefaultProvider {
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4 {
         core.transform_for_children(self)
     }
+
+    fn as_any_provider_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 #[cfg(test)]
@@ -573,6 +579,7 @@ mod test {
     use crate::utility::buffer_interface::tests::MockBuffer;
     use crate::utility::test::func::MockFunc;
     use nalgebra_glm::{vec2, vec3, vec4, Mat4, Vec3, Vec4};
+    use std::any::Any;
     use std::ops::Range;
 
     struct MockPolygonProvider {
@@ -677,6 +684,10 @@ mod test {
                 .borrow_mut()
                 .call(vec!["transform_for_child".to_string()]);
             core.transform_for_children(self)
+        }
+
+        fn as_any_provider_mut(&mut self) -> &mut dyn Any {
+            self
         }
     }
 
