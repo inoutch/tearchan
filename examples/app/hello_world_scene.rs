@@ -1,3 +1,4 @@
+use crate::app::billboard_scene::BillboardScene;
 use nalgebra_glm::vec3;
 use tearchan::core::graphic::batch::batch3d::Batch3D;
 use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
@@ -100,6 +101,7 @@ impl SceneBase for HelloWorldScene {
                 .collect::<Vec<_>>(),
             self.batch.vertex_count(),
         );
+        scene_context.transit_scene(BillboardScene::creator(), None);
     }
 
     fn on_touch_start(&mut self, touch: &Touch) {

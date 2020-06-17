@@ -1,5 +1,5 @@
 use crate::core::graphic::polygon::polygon_2d::Polygon2D;
-use crate::core::graphic::polygon::Polygon;
+use crate::core::graphic::polygon::{Polygon, PolygonProvider};
 use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
 use crate::math::mesh::{
@@ -39,6 +39,33 @@ impl SpriteAtlas {
         }
     }
 
+    pub fn new_with_provider(
+        provider: Box<dyn PolygonProvider>,
+        texture_atlas: TextureAtlas,
+    ) -> Self {
+        let frame = texture_atlas
+            .frames
+            .first()
+            .expect("There must be at least one or more frames");
+        let mesh = MeshBuilder::new()
+            .with_frame(texture_atlas.size.to_vec2(), frame)
+            .build()
+            .unwrap();
+        let key_map: HashMap<_, _> = texture_atlas
+            .frames
+            .iter()
+            .enumerate()
+            .map(|(i, frame)| (frame.key.to_string(), i as usize))
+            .collect();
+
+        let polygon = Polygon2D::new_with_provider(provider, mesh);
+        SpriteAtlas {
+            texture_atlas,
+            polygon,
+            key_map,
+        }
+    }
+
     pub fn set_atlas(&mut self, index: usize) {
         if let Some(frame) = self.texture_atlas.frames.get(index) {
             let positions = create_square_positions_from_frame(frame);
@@ -54,6 +81,8 @@ impl SpriteAtlas {
                 .borrow_mut()
                 .core
                 .update_texcoords_of_mesh(texcoords);
+            self.polygon
+                .set_size(vec2(frame.rect.w as f32, frame.rect.h as f32));
         }
     }
 
@@ -65,7 +94,7 @@ impl SpriteAtlas {
     }
 
     #[inline]
-    pub fn polygon(&mut self) -> &Shared<Polygon> {
+    pub fn polygon(&self) -> &Shared<Polygon> {
         &self.polygon.polygon()
     }
 }

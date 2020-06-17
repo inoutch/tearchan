@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::option::Option::Some;
 use std::rc::Rc;
 
+pub mod billboard;
 pub mod polygon_2d;
 pub mod sprite_atlas;
 
