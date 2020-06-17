@@ -6,6 +6,7 @@ use crate::extension::shared::Shared;
 use crate::math::change_range::ChangeRange;
 use crate::utility::buffer_interface::BufferInterface;
 use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec3};
+use std::any::Any;
 
 pub struct BillboardProvider {
     polygon_2d_provider: Polygon2DProvider,
@@ -30,6 +31,10 @@ impl PolygonProvider for BillboardProvider {
             &Mat4::identity(),
             &self.polygon_2d_provider.transform_anchor_point_for_child(),
         ) * self.transform(core)
+    }
+
+    fn as_any_provider_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
@@ -79,8 +84,8 @@ impl Billboard {
         buffer: &mut TBuffer,
         offset: usize,
     ) {
+        let position = { self.polygon.polygon().borrow().position().to_owned() };
         let mut polygon = self.polygon.polygon().borrow_mut();
-        let position = polygon.position().to_owned();
         let provider: &mut BillboardProvider =
             polygon.provider_as_any_mut().downcast_mut().unwrap();
 
