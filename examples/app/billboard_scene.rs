@@ -1,8 +1,8 @@
 use crate::texture_bundle::generate_texture_bundle;
 use gfx_hal::pso::{FrontFace, PolygonMode, Primitive, Rasterizer, State};
-use nalgebra_glm::{vec2, vec3};
+use nalgebra_glm::vec3;
 use std::ops::Range;
-use tearchan::core::graphic::batch::batch3d::Batch3D;
+use tearchan::core::graphic::batch::batch_billboard::BatchBillboard;
 use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
 use tearchan::core::graphic::batch::batch_line::BatchLine;
 use tearchan::core::graphic::batch::Batch;
@@ -10,9 +10,10 @@ use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
 use tearchan::core::graphic::hal::texture::TextureConfig;
+use tearchan::core::graphic::polygon::billboard::Billboard;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
+use tearchan::core::graphic::shader::billboard_shader_program::BillboardShaderProgram;
 use tearchan::core::graphic::shader::grid_shader_program::GridShaderProgram;
-use tearchan::core::graphic::shader::standard_3d_shader_program::Standard3DShaderProgram;
 use tearchan::core::scene::scene_base::SceneBase;
 use tearchan::core::scene::scene_context::SceneContext;
 use tearchan::core::scene::scene_creator::SceneCreator;
@@ -23,11 +24,12 @@ use winit::event::KeyboardInput;
 
 pub struct BillboardScene {
     camera: Camera3D,
+    camera_radian: f32,
     grid_batch: Batch<Polygon, BatchBufferF32, BatchLine<BatchBufferF32>>,
     grid_shader_program: GridShaderProgram,
     grid_graphic_pipeline: GraphicPipeline,
-    billboard_batch: Batch<Polygon, BatchBufferF32, Batch3D<BatchBufferF32>>,
-    billboard_shader_program: Standard3DShaderProgram,
+    billboard_batch: Batch<Billboard, BatchBufferF32, BatchBillboard<BatchBufferF32>>,
+    billboard_shader_program: BillboardShaderProgram,
     billboard_graphic_pipeline: GraphicPipeline,
     billboard_texture: Texture,
 }
@@ -40,8 +42,13 @@ impl BillboardScene {
     pub fn new(ctx: &mut SceneContext) -> Self {
         let screen_size = ctx.renderer_api.screen_size();
 
+        let camera_radian = 0.0f32;
         let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
-        camera.position = vec3(0.0f32, 2.0f32, 4.0f32);
+        camera.position = vec3(
+            camera_radian.sin() * 4.0f32,
+            0.0f32,
+            camera_radian.cos() * 4.0f32,
+        );
         camera.target_position = vec3(0.0f32, 0.0f32, 0.0f32);
         camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
         camera.update();
@@ -84,52 +91,53 @@ impl BillboardScene {
         grid_batch.add(&polygon, 0);
 
         let (texture_atlas, image) = generate_texture_bundle();
-        let point_sprite_texture = ctx
+        let billboard_texture = ctx
             .renderer_api
             .create_texture(&image, TextureConfig::default());
 
-        let mut point_sprite_batch = Batch3D::new(ctx.renderer_api);
-        let point_sprite_shader_program =
-            Standard3DShaderProgram::new(ctx.renderer_api, camera.base());
-        let point_sprite_graphic_pipeline = ctx.renderer_api.create_graphic_pipeline(
-            point_sprite_shader_program.shader(),
+        let mut billboard_batch = BatchBillboard::new(ctx.renderer_api);
+        let billboard_shader_program = BillboardShaderProgram::new(ctx.renderer_api, camera.base());
+        let billboard_graphic_pipeline = ctx.renderer_api.create_graphic_pipeline(
+            billboard_shader_program.shader(),
             GraphicPipelineConfig::default(),
         );
 
-        {
-            let frame = &texture_atlas.frames[0];
-            let mesh = MeshBuilder::new()
-                .with_frame(
-                    vec2(
-                        point_sprite_texture.size().x as f32,
-                        point_sprite_texture.size().y as f32,
-                    ),
-                    frame,
-                )
-                .build()
-                .unwrap();
-            let polygon = make_shared(Polygon::new(mesh));
-            polygon
-                .borrow_mut()
-                .set_scale(vec3(0.005f32, 0.005f32, 0.005f32));
-            point_sprite_batch.add(&polygon, 0);
-        }
+        let billboard = make_shared(Billboard::new(texture_atlas));
+        billboard
+            .borrow_mut()
+            .polygon()
+            .borrow_mut()
+            .set_scale(vec3(0.005f32, 0.005f32, 0.005f32));
+        billboard
+            .borrow_mut()
+            .polygon()
+            .borrow_mut()
+            .set_position(vec3(0.5f32, 0.0f32, 0.0f32));
+        billboard_batch.add(&billboard, 0);
 
         BillboardScene {
             camera,
+            camera_radian,
             grid_batch,
             grid_shader_program,
             grid_graphic_pipeline,
-            billboard_batch: point_sprite_batch,
-            billboard_shader_program: point_sprite_shader_program,
-            billboard_graphic_pipeline: point_sprite_graphic_pipeline,
-            billboard_texture: point_sprite_texture,
+            billboard_batch,
+            billboard_shader_program,
+            billboard_graphic_pipeline,
+            billboard_texture,
         }
     }
 }
 
 impl SceneBase for BillboardScene {
     fn update(&mut self, ctx: &mut SceneContext, _delta: f32) {
+        self.camera_radian += 0.01f32;
+        self.camera.position = vec3(
+            self.camera_radian.sin() * 4.0f32,
+            2.0f32,
+            self.camera_radian.cos() * 4.0f32,
+        );
+
         self.camera.update();
         self.grid_batch.flush();
         self.billboard_batch.flush();
@@ -154,12 +162,7 @@ impl SceneBase for BillboardScene {
             self.grid_batch.vertex_count(),
         );
 
-        self.billboard_shader_program.prepare(
-            self.camera.combine(),
-            &vec3(0.0f32, 2.0f32, 4.0f32),
-            &vec3(1.0f32, 1.0f32, 1.0f32),
-            0.2f32,
-        );
+        self.billboard_shader_program.prepare(self.camera.base());
 
         let descriptor_set = self.billboard_graphic_pipeline.descriptor_set();
         let write_descriptor_sets = self
