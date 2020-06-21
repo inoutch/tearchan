@@ -82,7 +82,7 @@ impl SpriteAtlas {
                 .core
                 .update_texcoords_of_mesh(texcoords);
             self.polygon
-                .set_size(vec2(frame.rect.w as f32, frame.rect.h as f32));
+                .set_size(vec2(frame.source.w as f32, frame.source.h as f32));
         }
     }
 
@@ -96,5 +96,15 @@ impl SpriteAtlas {
     #[inline]
     pub fn polygon(&self) -> &Shared<Polygon> {
         &self.polygon.polygon()
+    }
+
+    #[inline]
+    pub fn polygon2d(&self) -> &Polygon2D {
+        &self.polygon
+    }
+
+    #[inline]
+    pub fn polygon2d_mut(&mut self) -> &mut Polygon2D {
+        &mut self.polygon
     }
 }
