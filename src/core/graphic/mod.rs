@@ -1,3 +1,4 @@
+pub mod animation;
 pub mod batch;
 pub mod camera;
 pub mod camera_2d;
