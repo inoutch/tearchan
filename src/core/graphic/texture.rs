@@ -6,7 +6,7 @@ use std::fs::read_to_string;
 use std::path::Path;
 use texture_packer::Frame;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -14,7 +14,7 @@ pub struct Rect {
     pub h: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TextureFrame {
     pub key: String,
     pub rect: Rect,
@@ -23,7 +23,7 @@ pub struct TextureFrame {
     pub source: Rect,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Size {
     w: u32,
     h: u32,
@@ -39,7 +39,7 @@ impl Size {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TextureAtlas {
     pub image: String,
     pub size: Size,
