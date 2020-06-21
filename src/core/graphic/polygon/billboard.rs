@@ -5,7 +5,7 @@ use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
 use crate::math::change_range::ChangeRange;
 use crate::utility::buffer_interface::BufferInterface;
-use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec3};
+use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec2, Vec3};
 use std::any::Any;
 
 pub struct BillboardProvider {
@@ -67,7 +67,7 @@ impl Billboard {
     pub fn new(texture_atlas: TextureAtlas) -> Self {
         let size = {
             let frame = texture_atlas.frames.first().unwrap();
-            vec2(frame.rect.w as f32, frame.rect.h as f32)
+            vec2(frame.source.w as f32, frame.source.h as f32)
         };
         let rect_size = 6;
         let provider = BillboardProvider {
@@ -105,5 +105,38 @@ impl Billboard {
     #[inline]
     pub fn polygon(&self) -> &Shared<Polygon> {
         &self.polygon.polygon()
+    }
+
+    #[inline]
+    pub fn sprite_atlas(&self) -> &SpriteAtlas {
+        &self.polygon
+    }
+
+    #[inline]
+    pub fn sprite_atlas_mut(&mut self) -> &mut SpriteAtlas {
+        &mut self.polygon
+    }
+
+    pub fn set_anchor_point(&mut self, anchor_point: Vec2) {
+        let is_changed = {
+            let mut polygon = self.polygon.polygon2d_mut().polygon().borrow_mut();
+            let provider: &mut BillboardProvider =
+                polygon.provider_as_any_mut().downcast_mut().unwrap();
+            if provider.polygon_2d_provider.anchor_point == anchor_point {
+                false
+            } else {
+                provider.polygon_2d_provider.anchor_point = anchor_point;
+                true
+            }
+        };
+
+        if is_changed {
+            self.polygon
+                .polygon2d_mut()
+                .polygon()
+                .borrow_mut()
+                .core
+                .update_all_positions();
+        }
     }
 }
