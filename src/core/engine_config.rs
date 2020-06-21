@@ -65,11 +65,11 @@ mod test {
             unimplemented!()
         }
 
-        fn on_key_down(&mut self, input: &KeyboardInput) {
+        fn on_key_down(&mut self, _input: &KeyboardInput) {
             unimplemented!()
         }
 
-        fn on_key_up(&mut self, input: &KeyboardInput) {
+        fn on_key_up(&mut self, _input: &KeyboardInput) {
             unimplemented!()
         }
     }
