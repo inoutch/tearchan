@@ -5,8 +5,8 @@ use nalgebra_glm::{translate, vec2, vec3, Mat4, Vec2, Vec3};
 use std::any::Any;
 
 pub struct Polygon2DProvider {
-    anchor_point: Vec2,
-    size: Vec2,
+    pub anchor_point: Vec2,
+    pub size: Vec2,
 }
 
 impl Polygon2DProvider {
@@ -70,8 +70,12 @@ impl Polygon2D {
             let mut polygon = self.polygon.borrow_mut();
             let provider: &mut Polygon2DProvider =
                 polygon.provider_as_any_mut().downcast_mut().unwrap();
-            provider.anchor_point = anchor_point;
-            provider.anchor_point == anchor_point
+            if provider.anchor_point == anchor_point {
+                false
+            } else {
+                provider.anchor_point = anchor_point;
+                true
+            }
         };
 
         if is_changed {
@@ -84,8 +88,12 @@ impl Polygon2D {
             let mut polygon = self.polygon.borrow_mut();
             let provider: &mut Polygon2DProvider =
                 polygon.provider_as_any_mut().downcast_mut().unwrap();
-            provider.size = size;
-            provider.size == size
+            if provider.size == size {
+                false
+            } else {
+                provider.size = size;
+                false
+            }
         };
 
         if is_changed {
