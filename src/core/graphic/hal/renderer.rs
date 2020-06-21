@@ -257,7 +257,7 @@ where
         let caps = self.surface.capabilities(&self.adapter.physical_device);
         let swap_config =
             window::SwapchainConfig::from_caps(&caps, self.surface_format, self.dimensions);
-        println!("{:?}", swap_config);
+        // println!("{:?}", swap_config);
         let extent = swap_config.extent.to_extent();
 
         unsafe {
