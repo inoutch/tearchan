@@ -1,5 +1,5 @@
-use crate::core::graphic::polygon::polygon_2d::Polygon2DProvider;
-use crate::core::graphic::polygon::sprite_atlas::SpriteAtlas;
+use crate::core::graphic::polygon::polygon_2d::{Polygon2DProvider, Polygon2DProviderInterface};
+use crate::core::graphic::polygon::sprite_atlas::{SpriteAtlas, SpriteAtlasCommon};
 use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, PolygonProvider};
 use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
@@ -38,6 +38,24 @@ impl PolygonProvider for BillboardProvider {
     }
 }
 
+impl Polygon2DProviderInterface for BillboardProvider {
+    fn anchor_point(&self) -> &Vec2 {
+        self.polygon_2d_provider.anchor_point()
+    }
+
+    fn size(&self) -> &Vec2 {
+        self.polygon_2d_provider.size()
+    }
+
+    fn set_anchor_point(&mut self, anchor_point: Vec2) {
+        self.polygon_2d_provider.set_anchor_point(anchor_point)
+    }
+
+    fn set_size(&mut self, size: Vec2) {
+        self.polygon_2d_provider.set_size(size)
+    }
+}
+
 impl BillboardProvider {
     fn billboard_transform(&self, core: &PolygonCore) -> Mat4 {
         let current = scale(
@@ -60,7 +78,7 @@ impl BillboardProvider {
 }
 
 pub struct Billboard {
-    polygon: SpriteAtlas,
+    polygon: SpriteAtlasCommon<BillboardProvider>,
 }
 
 impl Billboard {
@@ -108,12 +126,12 @@ impl Billboard {
     }
 
     #[inline]
-    pub fn sprite_atlas(&self) -> &SpriteAtlas {
+    pub fn sprite_atlas(&self) -> &SpriteAtlasCommon<BillboardProvider> {
         &self.polygon
     }
 
     #[inline]
-    pub fn sprite_atlas_mut(&mut self) -> &mut SpriteAtlas {
+    pub fn sprite_atlas_mut(&mut self) -> &mut SpriteAtlasCommon<BillboardProvider> {
         &mut self.polygon
     }
 
