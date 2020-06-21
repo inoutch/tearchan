@@ -1,4 +1,6 @@
-use crate::core::graphic::polygon::polygon_2d::Polygon2D;
+use crate::core::graphic::polygon::polygon_2d::{
+    Polygon2D, Polygon2DProvider, Polygon2DProviderInterface,
+};
 use crate::core::graphic::polygon::{Polygon, PolygonProvider};
 use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
@@ -6,16 +8,21 @@ use crate::math::mesh::{
     create_square_positions_from_frame, create_square_texcoords_from_frame, MeshBuilder,
 };
 use nalgebra_glm::vec2;
+use serde::export::PhantomData;
 use std::collections::HashMap;
 
-pub struct SpriteAtlas {
+pub type SpriteAtlas = SpriteAtlasCommon<Polygon2DProvider>;
+
+pub struct SpriteAtlasCommon<T: 'static + Polygon2DProviderInterface> {
     polygon: Polygon2D,
     texture_atlas: TextureAtlas,
     key_map: HashMap<String, usize>,
+    _provider: PhantomData<T>,
 }
 
-impl SpriteAtlas {
-    pub fn new(texture_atlas: TextureAtlas) -> Self {
+impl<T: 'static + Polygon2DProviderInterface> SpriteAtlasCommon<T> {
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(texture_atlas: TextureAtlas) -> SpriteAtlas {
         let frame = texture_atlas
             .frames
             .first()
@@ -36,13 +43,14 @@ impl SpriteAtlas {
             texture_atlas,
             polygon,
             key_map,
+            _provider: PhantomData,
         }
     }
 
-    pub fn new_with_provider(
+    pub fn new_with_provider<U: Polygon2DProviderInterface>(
         provider: Box<dyn PolygonProvider>,
         texture_atlas: TextureAtlas,
-    ) -> Self {
+    ) -> SpriteAtlasCommon<U> {
         let frame = texture_atlas
             .frames
             .first()
@@ -59,10 +67,11 @@ impl SpriteAtlas {
             .collect();
 
         let polygon = Polygon2D::new_with_provider(provider, mesh);
-        SpriteAtlas {
+        SpriteAtlasCommon {
             texture_atlas,
             polygon,
             key_map,
+            _provider: PhantomData,
         }
     }
 
@@ -82,7 +91,7 @@ impl SpriteAtlas {
                 .core
                 .update_texcoords_of_mesh(texcoords);
             self.polygon
-                .set_size(vec2(frame.source.w as f32, frame.source.h as f32));
+                .set_size::<T>(vec2(frame.source.w as f32, frame.source.h as f32));
         }
     }
 
