@@ -4,6 +4,13 @@ use crate::math::mesh::Mesh;
 use nalgebra_glm::{translate, vec2, vec3, Mat4, Vec2, Vec3};
 use std::any::Any;
 
+pub trait Polygon2DProviderInterface {
+    fn anchor_point(&self) -> &Vec2;
+    fn size(&self) -> &Vec2;
+    fn set_anchor_point(&mut self, anchor_point: Vec2);
+    fn set_size(&mut self, size: Vec2);
+}
+
 pub struct Polygon2DProvider {
     pub anchor_point: Vec2,
     pub size: Vec2,
@@ -47,6 +54,24 @@ impl Polygon2DProvider {
     }
 }
 
+impl Polygon2DProviderInterface for Polygon2DProvider {
+    fn anchor_point(&self) -> &Vec2 {
+        &self.anchor_point
+    }
+
+    fn size(&self) -> &Vec2 {
+        &self.size
+    }
+
+    fn set_anchor_point(&mut self, anchor_point: Vec2) {
+        self.anchor_point = anchor_point;
+    }
+
+    fn set_size(&mut self, size: Vec2) {
+        self.size = size;
+    }
+}
+
 pub struct Polygon2D {
     polygon: Shared<Polygon>,
 }
@@ -65,15 +90,17 @@ impl Polygon2D {
         }
     }
 
-    pub fn set_anchor_point(&mut self, anchor_point: Vec2) {
+    pub fn set_anchor_point<T: 'static + Polygon2DProviderInterface>(
+        &mut self,
+        anchor_point: Vec2,
+    ) {
         let is_changed = {
             let mut polygon = self.polygon.borrow_mut();
-            let provider: &mut Polygon2DProvider =
-                polygon.provider_as_any_mut().downcast_mut().unwrap();
-            if provider.anchor_point == anchor_point {
+            let provider: &mut T = polygon.provider_as_any_mut().downcast_mut().unwrap();
+            if provider.anchor_point() == &anchor_point {
                 false
             } else {
-                provider.anchor_point = anchor_point;
+                provider.set_anchor_point(anchor_point);
                 true
             }
         };
@@ -83,15 +110,14 @@ impl Polygon2D {
         }
     }
 
-    pub fn set_size(&mut self, size: Vec2) {
+    pub fn set_size<T: 'static + Polygon2DProviderInterface>(&mut self, size: Vec2) {
         let is_changed = {
             let mut polygon = self.polygon.borrow_mut();
-            let provider: &mut Polygon2DProvider =
-                polygon.provider_as_any_mut().downcast_mut().unwrap();
-            if provider.size == size {
+            let provider: &mut T = polygon.provider_as_any_mut().downcast_mut().unwrap();
+            if provider.size() == &size {
                 false
             } else {
-                provider.size = size;
+                provider.set_size(size);
                 false
             }
         };
