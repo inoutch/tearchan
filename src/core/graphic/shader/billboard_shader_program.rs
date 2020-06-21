@@ -40,12 +40,34 @@ pub struct BillboardShaderProgram {
 
 impl BillboardShaderProgram {
     pub fn new(api: &RendererApi, camera: &CameraBase) -> Self {
-        let shader_source = ShaderSource::new(
-            include_bytes!("../../../../target/data/shaders/billboard.vert"),
-            include_bytes!("../../../../target/data/shaders/billboard.frag"),
+        BillboardShaderProgram::new_with_shader_source(
+            api,
+            camera,
+            ShaderSource::new(
+                include_bytes!("../../../../target/data/shaders/billboard.vert"),
+                include_bytes!("../../../../target/data/shaders/billboard.frag"),
+            )
+            .unwrap(),
         )
-        .unwrap();
+    }
 
+    pub fn new_with_alpha(api: &RendererApi, camera: &CameraBase) -> Self {
+        BillboardShaderProgram::new_with_shader_source(
+            api,
+            camera,
+            ShaderSource::new(
+                include_bytes!("../../../../target/data/shaders/billboard.vert"),
+                include_bytes!("../../../../target/data/shaders/billboard_alpha.frag"),
+            )
+            .unwrap(),
+        )
+    }
+
+    fn new_with_shader_source(
+        api: &RendererApi,
+        camera: &CameraBase,
+        shader_source: ShaderSource,
+    ) -> Self {
         let vp_matrix: Mat4 = camera.combine().clone_owned();
         let attributes = create_billboard_attributes();
         let descriptor_sets = create_billboard_descriptor_set_layout_bindings();
