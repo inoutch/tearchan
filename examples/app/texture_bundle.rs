@@ -16,14 +16,14 @@ pub fn generate_texture_bundle() -> (TextureAtlas, Image) {
         ..Default::default()
     };
 
-    let t1 = include_bytes!("data/img/go_1.png");
-    let t2 = include_bytes!("data/img/go_2.png");
-    let t3 = include_bytes!("data/img/go_3.png");
-    let t4 = include_bytes!("data/img/go_4.png");
-    let t5 = include_bytes!("data/img/go_5.png");
-    let t6 = include_bytes!("data/img/go_6.png");
-    let t7 = include_bytes!("data/img/go_7.png");
-    let t8 = include_bytes!("data/img/go_8.png");
+    let t1 = include_bytes!("../data/img/go_1.png");
+    let t2 = include_bytes!("../data/img/go_2.png");
+    let t3 = include_bytes!("../data/img/go_3.png");
+    let t4 = include_bytes!("../data/img/go_4.png");
+    let t5 = include_bytes!("../data/img/go_5.png");
+    let t6 = include_bytes!("../data/img/go_6.png");
+    let t7 = include_bytes!("../data/img/go_7.png");
+    let t8 = include_bytes!("../data/img/go_8.png");
 
     let mut packer = TexturePacker::new_skyline(config);
     packer

@@ -6,7 +6,6 @@ use tearchan::core::engine_config::StartupConfigBuilder;
 use tearchan::core::screen::ScreenMode;
 
 pub mod app;
-pub mod texture_bundle;
 
 fn main() {
     env::set_var("RUST_LOG", "info");

@@ -1,4 +1,3 @@
-use crate::texture_bundle::generate_texture_bundle;
 use gfx_hal::pso::{FrontFace, PolygonMode, Primitive, Rasterizer, State};
 use nalgebra_glm::vec3;
 use std::ops::Range;
@@ -21,6 +20,7 @@ use tearchan::core::scene::touch::Touch;
 use tearchan::extension::shared::make_shared;
 use tearchan::math::mesh::MeshBuilder;
 use winit::event::KeyboardInput;
+use crate::app::texture_bundle::generate_texture_bundle;
 
 pub struct BillboardScene {
     camera: Camera3D,
