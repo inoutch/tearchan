@@ -2,6 +2,7 @@ use serde::export::Option::Some;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::Hash;
+use serde::export::fmt::Debug;
 
 #[derive(Serialize, Deserialize)]
 pub struct AnimationData<T, U>
@@ -11,7 +12,7 @@ where
     pub groups: HashMap<T, AnimationGroup<U>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AnimationGroup<U> {
     pub frames: Vec<U>,
     pub duration_sec: f32,
@@ -29,7 +30,8 @@ where
 
 impl<T, U> Animator<T, U>
 where
-    T: Hash + Eq,
+    T: Hash + Eq + Debug,
+    U: Debug,
 {
     pub fn new(data: AnimationData<T, U>, start_state: T) -> Self {
         debug_assert!(!data.groups.is_empty());
@@ -55,8 +57,12 @@ where
     }
 
     pub fn set_state(&mut self, state: T) {
+        if self.current_state == state {
+            return;
+        }
         debug_assert!(self.data.groups.contains_key(&state));
         debug_assert!(!self.data.groups[&state].frames.is_empty());
+        self.current_animation_time_ms = calc_animation_time(&self.data, &state);
         self.current_state = state;
         self.current_time_ms = 0;
     }
@@ -78,7 +84,7 @@ mod test {
     use crate::core::graphic::animation::animator::{AnimationData, AnimationGroup, Animator};
     use std::collections::HashMap;
 
-    #[derive(Hash, Eq, PartialEq)]
+    #[derive(Hash, Eq, PartialEq, Debug)]
     enum ExampleState {
         Standing,
         Walking,
