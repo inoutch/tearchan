@@ -62,6 +62,7 @@ impl Engine {
         let mut scene_manager = self.scene_manager;
         let mut file_api = FileApi::new(self.config.resource_path, self.config.writable_path);
 
+        let mut prev_time = std::time::Instant::now();
         let timer_length = std::time::Duration::from_millis(1000 / 60);
         event_loop.run(move |event, _, control_flow| match event {
             winit::event::Event::WindowEvent { event, .. } => match event {
@@ -73,9 +74,15 @@ impl Engine {
                 }
             },
             winit::event::Event::RedrawRequested(_) => {
+                let now = std::time::Instant::now();
                 renderer.render(|renderer_api| {
-                    scene_manager.render(1.0f32 / 6.0f32, renderer_api, &mut file_api);
+                    scene_manager.render(
+                        (now - prev_time).as_secs_f32(),
+                        renderer_api,
+                        &mut file_api,
+                    );
                 });
+                prev_time = now;
             }
             winit::event::Event::MainEventsCleared => {
                 *control_flow =
