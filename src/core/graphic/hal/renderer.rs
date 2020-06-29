@@ -2,11 +2,14 @@ use crate::core::graphic::hal::renderer_api::RendererApiCommon;
 use gfx_hal::adapter::{Adapter, MemoryType, PhysicalDevice};
 use gfx_hal::command::CommandBuffer;
 use gfx_hal::device::Device;
-use gfx_hal::format::{ChannelType, Swizzle};
+use gfx_hal::format::{ChannelType, Format, Swizzle};
+use gfx_hal::image::Layout;
+use gfx_hal::pass::{Attachment, AttachmentLoadOp, AttachmentOps, AttachmentStoreOp};
 use gfx_hal::pool::CommandPool;
+use gfx_hal::pool::CommandPoolCreateFlags;
 use gfx_hal::pso::{Rect, Viewport};
 use gfx_hal::queue::{CommandQueue, QueueFamily, QueueGroup, Submission};
-use gfx_hal::window::{PresentationSurface, Surface};
+use gfx_hal::window::{PresentationSurface, Surface, SwapchainConfig};
 use gfx_hal::{window, Backend, Instance, Limits};
 use nalgebra_glm::{vec4, Vec4};
 use std::borrow::Borrow;
@@ -19,7 +22,7 @@ pub struct Renderer<B: gfx_hal::Backend> {
     surface: ManuallyDrop<B::Surface>,
     adapter: Adapter<B>,
     surface_format: gfx_hal::format::Format,
-    dimensions: window::Extent2D,
+    pub dimensions: window::Extent2D,
     viewport: gfx_hal::pso::Viewport,
     cmd_pools: Vec<B::CommandPool>,
     cmd_buffers: Vec<B::CommandBuffer>,
@@ -28,7 +31,7 @@ pub struct Renderer<B: gfx_hal::Backend> {
     frames_in_flight: usize,
     frame: u64,
     context: RendererApiContext<B>,
-    static_context: RendererApiStaticContext,
+    properties: RendererApiProperties,
     depth_image: ManuallyDrop<B::Image>,
     depth_memory: ManuallyDrop<B::Memory>,
     depth_image_view: ManuallyDrop<B::ImageView>,
@@ -46,19 +49,13 @@ where
     ) -> Renderer<B> {
         let memory_types = adapter.physical_device.memory_properties().memory_types;
         let limits = adapter.physical_device.limits();
-        let static_context = RendererApiStaticContext {
+        let properties = RendererApiProperties {
             memory_types,
             limits,
         };
 
         // Build a new device and associated command queues
-        let family = adapter
-            .queue_families
-            .iter()
-            .find(|family| {
-                surface.supports_queue_family(family) && family.queue_type().supports_graphics()
-            })
-            .unwrap();
+        let family = find_queue_family(&adapter, &surface);
         let mut gpu = unsafe {
             adapter
                 .physical_device
@@ -67,14 +64,6 @@ where
         };
         let queue_group = gpu.queue_groups.pop().unwrap();
         let device = gpu.device;
-
-        let command_pool = unsafe {
-            device.create_command_pool(
-                queue_group.family,
-                gfx_hal::pool::CommandPoolCreateFlags::empty(),
-            )
-        }
-        .expect("Can't create command pool");
 
         let caps = surface.capabilities(&adapter.physical_device);
         let formats = surface.supported_formats(&adapter.physical_device);
@@ -86,8 +75,7 @@ where
                 .unwrap_or(formats[0])
         });
 
-        let swap_config =
-            window::SwapchainConfig::from_caps(&caps, surface_format, default_dimensions);
+        let swap_config = SwapchainConfig::from_caps(&caps, surface_format, default_dimensions);
         let extent = swap_config.extent;
         unsafe {
             surface
@@ -96,87 +84,21 @@ where
         };
 
         let (depth_image, depth_memory, depth_image_view, depth_stencil_format) =
-            create_depth::<B>(&device, extent, &static_context.memory_types);
+            create_depth_resources::<B>(&device, extent, &properties.memory_types);
 
-        let first_render_pass = {
-            let attachment = gfx_hal::pass::Attachment {
-                format: Some(surface_format),
-                samples: 1,
-                ops: gfx_hal::pass::AttachmentOps::new(
-                    gfx_hal::pass::AttachmentLoadOp::Clear,
-                    gfx_hal::pass::AttachmentStoreOp::Store,
-                ),
-                stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
-                layouts: gfx_hal::image::Layout::Undefined..gfx_hal::image::Layout::Present,
-            };
+        let first_render_pass = ManuallyDrop::new(create_render_pass::<B>(
+            &device,
+            &surface_format,
+            &depth_stencil_format,
+            true,
+        ));
 
-            let depth_attachment = gfx_hal::pass::Attachment {
-                format: Some(depth_stencil_format),
-                samples: 1,
-                ops: gfx_hal::pass::AttachmentOps::new(
-                    gfx_hal::pass::AttachmentLoadOp::Clear,
-                    gfx_hal::pass::AttachmentStoreOp::Store,
-                ),
-                stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
-                layouts: gfx_hal::image::Layout::Undefined
-                    ..gfx_hal::image::Layout::DepthStencilAttachmentOptimal,
-            };
-
-            let subpass = gfx_hal::pass::SubpassDesc {
-                colors: &[(0, gfx_hal::image::Layout::ColorAttachmentOptimal)],
-                depth_stencil: Some(&(1, gfx_hal::image::Layout::DepthStencilAttachmentOptimal)),
-                inputs: &[],
-                resolves: &[],
-                preserves: &[],
-            };
-
-            ManuallyDrop::new(
-                unsafe {
-                    device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[])
-                }
-                .expect("Can't create render pass"),
-            )
-        };
-
-        let render_pass = {
-            let attachment = gfx_hal::pass::Attachment {
-                format: Some(surface_format),
-                samples: 1,
-                ops: gfx_hal::pass::AttachmentOps::new(
-                    gfx_hal::pass::AttachmentLoadOp::Load,
-                    gfx_hal::pass::AttachmentStoreOp::Store,
-                ),
-                stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
-                layouts: gfx_hal::image::Layout::Undefined..gfx_hal::image::Layout::Present,
-            };
-
-            let depth_attachment = gfx_hal::pass::Attachment {
-                format: Some(depth_stencil_format),
-                samples: 1,
-                ops: gfx_hal::pass::AttachmentOps::new(
-                    gfx_hal::pass::AttachmentLoadOp::Load,
-                    gfx_hal::pass::AttachmentStoreOp::Store,
-                ),
-                stencil_ops: gfx_hal::pass::AttachmentOps::DONT_CARE,
-                layouts: gfx_hal::image::Layout::Undefined
-                    ..gfx_hal::image::Layout::DepthStencilAttachmentOptimal,
-            };
-
-            let subpass = gfx_hal::pass::SubpassDesc {
-                colors: &[(0, gfx_hal::image::Layout::ColorAttachmentOptimal)],
-                depth_stencil: Some(&(1, gfx_hal::image::Layout::DepthStencilAttachmentOptimal)),
-                inputs: &[],
-                resolves: &[],
-                preserves: &[],
-            };
-
-            ManuallyDrop::new(
-                unsafe {
-                    device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[])
-                }
-                .expect("Can't create render pass"),
-            )
-        };
+        let render_pass = ManuallyDrop::new(create_render_pass::<B>(
+            &device,
+            &surface_format,
+            &depth_stencil_format,
+            false,
+        ));
 
         let frames_in_flight = 3;
 
@@ -185,18 +107,13 @@ where
         let mut cmd_pools = Vec::with_capacity(frames_in_flight);
         let mut cmd_buffers = Vec::with_capacity(frames_in_flight);
 
-        cmd_pools.push(command_pool);
-        for _ in 1..frames_in_flight {
-            unsafe {
-                cmd_pools.push(
-                    device
-                        .create_command_pool(
-                            queue_group.family,
-                            gfx_hal::pool::CommandPoolCreateFlags::empty(),
-                        )
-                        .expect("Can't create command pool"),
-                );
-            }
+        for _ in 0..frames_in_flight {
+            let cmd_pool = unsafe {
+                device
+                    .create_command_pool(queue_group.family, CommandPoolCreateFlags::empty())
+                    .expect("Can't create command pool")
+            };
+            cmd_pools.push(cmd_pool);
         }
 
         cmd_pools[0..frames_in_flight]
@@ -246,7 +163,7 @@ where
             cmd_pools,
             cmd_buffers,
             frame: 0,
-            static_context,
+            properties,
             depth_image: ManuallyDrop::new(depth_image),
             depth_memory: ManuallyDrop::new(depth_memory),
             depth_image_view: ManuallyDrop::new(depth_image_view),
@@ -257,8 +174,7 @@ where
         let caps = self.surface.capabilities(&self.adapter.physical_device);
         let swap_config =
             window::SwapchainConfig::from_caps(&caps, self.surface_format, self.dimensions);
-        // println!("{:?}", swap_config);
-        let extent = swap_config.extent.to_extent();
+        let extent = swap_config.extent;
 
         unsafe {
             self.surface
@@ -268,11 +184,64 @@ where
 
         self.viewport.rect.w = extent.width as _;
         self.viewport.rect.h = extent.height as _;
+
+        unsafe {
+            self.context
+                .device
+                .destroy_render_pass(ManuallyDrop::into_inner(std::ptr::read(
+                    &self.context.render_pass,
+                )));
+            self.context
+                .device
+                .destroy_render_pass(ManuallyDrop::into_inner(std::ptr::read(
+                    &self.context.first_render_pass,
+                )));
+
+            // Destroy depth resources
+            self.context
+                .device
+                .destroy_image_view(ManuallyDrop::into_inner(std::ptr::read(
+                    &self.depth_image_view,
+                )));
+            self.context
+                .device
+                .destroy_image(ManuallyDrop::into_inner(std::ptr::read(&self.depth_image)));
+            self.context
+                .device
+                .free_memory(ManuallyDrop::into_inner(std::ptr::read(&self.depth_memory)));
+        }
+
+        let (depth_image, depth_memory, depth_image_view, depth_stencil_format) =
+            create_depth_resources::<B>(
+                &self.context.device,
+                extent,
+                &self.properties.memory_types,
+            );
+
+        let first_render_pass = ManuallyDrop::new(create_render_pass::<B>(
+            &self.context.device,
+            &self.surface_format,
+            &depth_stencil_format,
+            true,
+        ));
+
+        let render_pass = ManuallyDrop::new(create_render_pass::<B>(
+            &self.context.device,
+            &self.surface_format,
+            &depth_stencil_format,
+            false,
+        ));
+
+        self.context.render_pass = render_pass;
+        self.context.first_render_pass = first_render_pass;
+        self.depth_image = ManuallyDrop::new(depth_image);
+        self.depth_memory = ManuallyDrop::new(depth_memory);
+        self.depth_image_view = ManuallyDrop::new(depth_image_view);
     }
 
     pub fn render<F>(&mut self, mut callback: F)
     where
-        F: FnMut(&mut RendererApiCommon<B>) -> (),
+        F: FnMut(&mut RendererApiCommon<B>),
     {
         self.context.use_first_render_pass = true;
 
@@ -338,7 +307,7 @@ where
 
             let mut api = RendererApiCommon::new(
                 &mut self.context,
-                &self.static_context,
+                &self.properties,
                 &mut self.cmd_pools[frame_idx],
                 cmd_buffer,
                 &framebuffer,
@@ -400,6 +369,11 @@ where
                 .destroy_render_pass(ManuallyDrop::into_inner(std::ptr::read(
                     &self.context.render_pass,
                 )));
+            self.context
+                .device
+                .destroy_render_pass(ManuallyDrop::into_inner(std::ptr::read(
+                    &self.context.first_render_pass,
+                )));
 
             // Destroy depth resources
             self.context
@@ -433,12 +407,12 @@ pub struct RendererApiContext<B: Backend> {
     pub clear_depth: f32,
 }
 
-pub struct RendererApiStaticContext {
+pub struct RendererApiProperties {
     pub memory_types: Vec<MemoryType>,
     pub limits: Limits,
 }
 
-fn create_depth<B: Backend>(
+fn create_depth_resources<B: Backend>(
     device: &B::Device,
     extent: gfx_hal::window::Extent2D,
     memory_types: &[MemoryType],
@@ -496,4 +470,54 @@ fn create_depth<B: Backend>(
     .unwrap();
 
     (image, image_memory, image_view, depth_stencil_format)
+}
+
+fn find_queue_family<'a, B: Backend>(
+    adapter: &'a Adapter<B>,
+    surface: &B::Surface,
+) -> &'a B::QueueFamily {
+    adapter
+        .queue_families
+        .iter()
+        .find(|family| {
+            surface.supports_queue_family(family) && family.queue_type().supports_graphics()
+        })
+        .unwrap()
+}
+
+fn create_render_pass<B: Backend>(
+    device: &B::Device,
+    surface_format: &Format,
+    depth_stencil_format: &Format,
+    first: bool,
+) -> B::RenderPass {
+    let load_op = if first {
+        AttachmentLoadOp::Clear
+    } else {
+        AttachmentLoadOp::Load
+    };
+
+    let attachment = Attachment {
+        format: Some(*surface_format),
+        samples: 1,
+        ops: AttachmentOps::new(load_op, AttachmentStoreOp::Store),
+        stencil_ops: AttachmentOps::DONT_CARE,
+        layouts: Layout::Undefined..Layout::Present,
+    };
+    let depth_attachment = Attachment {
+        format: Some(*depth_stencil_format),
+        samples: 1,
+        ops: AttachmentOps::new(load_op, AttachmentStoreOp::Store),
+        stencil_ops: AttachmentOps::DONT_CARE,
+        layouts: Layout::Undefined..Layout::DepthStencilAttachmentOptimal,
+    };
+    let subpass = gfx_hal::pass::SubpassDesc {
+        colors: &[(0, gfx_hal::image::Layout::ColorAttachmentOptimal)],
+        depth_stencil: Some(&(1, gfx_hal::image::Layout::DepthStencilAttachmentOptimal)),
+        inputs: &[],
+        resolves: &[],
+        preserves: &[],
+    };
+
+    unsafe { device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[]) }.unwrap()
 }

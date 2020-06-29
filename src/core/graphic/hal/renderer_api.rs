@@ -1,5 +1,5 @@
 use crate::core::graphic::hal::graphic_pipeline::{GraphicPipelineCommon, GraphicPipelineConfig};
-use crate::core::graphic::hal::renderer::{RendererApiContext, RendererApiStaticContext};
+use crate::core::graphic::hal::renderer::{RendererApiContext, RendererApiProperties};
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
 use crate::core::graphic::hal::shader::ShaderCommon;
@@ -15,7 +15,7 @@ use std::ops::Deref;
 
 pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
     context: &'a mut RendererApiContext<B>,
-    static_context: &'a RendererApiStaticContext,
+    static_context: &'a RendererApiProperties,
     command_pool: &'a mut B::CommandPool,
     command_buffer: &'a mut B::CommandBuffer,
     frame_buffer: &'a B::Framebuffer,
@@ -26,7 +26,7 @@ pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
 impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     pub fn new(
         context: &'a mut RendererApiContext<B>,
-        static_context: &'a RendererApiStaticContext,
+        static_context: &'a RendererApiProperties,
         command_pool: &'a mut B::CommandPool,
         command_buffer: &'a mut B::CommandBuffer,
         frame_buffer: &'a B::Framebuffer,
