@@ -18,7 +18,7 @@ derive_builder = "0.9.0"
 image = "0.23.4"
 winit = { version = "0.22.2", features = ["web-sys"] }
 gfx = "0.18.2"
-gfx-hal = "0.5"
+gfx-hal = "0.5.3"
 gfx-backend-empty = "0.5"
 nalgebra-glm = "0.7.0"
 serde = { version = "1.0.111", features = ["derive", "rc"] }
@@ -27,24 +27,24 @@ tobj = "2.0.1"
 texture_packer = "0.21.1"
 
 [dependencies.gfx-backend-gl]
-version = "0.5"
+version = "0.5.1"
 optional = true
 
 [dependencies.gfx-backend-vulkan]
-version = "0.5"
+version = "0.5.1"
 features = ["x11"]
 optional = true
 
 [target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies.gfx-backend-metal]
-version = "0.5"
+version = "0.5.1"
 optional = true
 
 [target.'cfg(windows)'.dependencies.gfx-backend-dx11]
-version = "0.5"
+version = "0.5.1"
 optional = true
 
 [target.'cfg(windows)'.dependencies.gfx-backend-dx12]
-version = "0.5"
+version = "0.5.1"
 optional = true
 
 [target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies]
