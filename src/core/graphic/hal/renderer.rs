@@ -1,16 +1,15 @@
 use crate::core::graphic::hal::renderer_api::RendererApiCommon;
 use gfx_hal::adapter::{Adapter, MemoryType, PhysicalDevice};
-use gfx_hal::command::CommandBuffer;
+use gfx_hal::command::{CommandBuffer, CommandBufferFlags, Level};
 use gfx_hal::device::Device;
 use gfx_hal::format::{ChannelType, Format, Swizzle};
 use gfx_hal::image::Layout;
 use gfx_hal::pass::{Attachment, AttachmentLoadOp, AttachmentOps, AttachmentStoreOp};
-use gfx_hal::pool::CommandPool;
-use gfx_hal::pool::CommandPoolCreateFlags;
+use gfx_hal::pool::{CommandPool, CommandPoolCreateFlags};
 use gfx_hal::pso::{Rect, Viewport};
 use gfx_hal::queue::{CommandQueue, QueueFamily, QueueGroup, Submission};
-use gfx_hal::window::{PresentationSurface, Surface, SwapchainConfig};
-use gfx_hal::{window, Backend, Instance, Limits};
+use gfx_hal::window::{Extent2D, PresentationSurface, Surface, SwapchainConfig};
+use gfx_hal::{Backend, Instance, Limits};
 use nalgebra_glm::{vec4, Vec4};
 use std::borrow::Borrow;
 use std::iter;
@@ -22,8 +21,8 @@ pub struct Renderer<B: gfx_hal::Backend> {
     surface: ManuallyDrop<B::Surface>,
     adapter: Adapter<B>,
     surface_format: gfx_hal::format::Format,
-    pub dimensions: window::Extent2D,
-    viewport: gfx_hal::pso::Viewport,
+    pub dimensions: Extent2D,
+    viewport: Viewport,
     cmd_pools: Vec<B::CommandPool>,
     cmd_buffers: Vec<B::CommandBuffer>,
     submission_complete_semaphores: Vec<B::Semaphore>,
@@ -45,7 +44,7 @@ where
         instance: Option<B::Instance>,
         adapter: Adapter<B>,
         mut surface: B::Surface,
-        default_dimensions: window::Extent2D,
+        default_dimensions: Extent2D,
     ) -> Renderer<B> {
         let memory_types = adapter.physical_device.memory_properties().memory_types;
         let limits = adapter.physical_device.limits();
@@ -126,12 +125,11 @@ where
                 );
                 submission_complete_fences
                     .push(device.create_fence(true).expect("Could not create fence"));
-                cmd_buffers
-                    .push(unsafe { cmd_pool.allocate_one(gfx_hal::command::Level::Primary) });
+                cmd_buffers.push(unsafe { cmd_pool.allocate_one(Level::Primary) });
             });
 
         // Rendering setup
-        let viewport = gfx_hal::pso::Viewport {
+        let viewport = Viewport {
             rect: gfx_hal::pso::Rect {
                 x: 0,
                 y: 0,
@@ -172,8 +170,7 @@ where
 
     pub fn recreate_swapchain(&mut self) {
         let caps = self.surface.capabilities(&self.adapter.physical_device);
-        let swap_config =
-            window::SwapchainConfig::from_caps(&caps, self.surface_format, self.dimensions);
+        let swap_config = SwapchainConfig::from_caps(&caps, self.surface_format, self.dimensions);
         let extent = swap_config.extent;
 
         unsafe {
@@ -288,7 +285,7 @@ where
         // Rendering
         let cmd_buffer = &mut self.cmd_buffers[frame_idx];
         unsafe {
-            cmd_buffer.begin_primary(gfx_hal::command::CommandBufferFlags::ONE_TIME_SUBMIT);
+            cmd_buffer.begin_primary(CommandBufferFlags::ONE_TIME_SUBMIT);
 
             cmd_buffer.set_viewports(
                 0,
@@ -302,8 +299,7 @@ where
                     depth: self.viewport.depth.clone(),
                 }],
             );
-            // TODO: Fix me!
-            // cmd_buffer.set_scissors(0, &[self.viewport.rect]);
+            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
 
             let mut api = RendererApiCommon::new(
                 &mut self.context,

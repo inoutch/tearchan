@@ -30,30 +30,31 @@ impl Engine {
     }
 
     pub fn run(self) {
+        let event_loop = winit::event_loop::EventLoop::new();
+        let monitor = prompt_for_monitor(&event_loop);
+
         let window_size = match &self.config.screen_mode {
             ScreenMode::FullScreenWindow => Extent2D {
-                width: 1,
-                height: 1,
+                width: monitor.size().width,
+                height: monitor.size().height,
             },
             ScreenMode::Windowed { resolutions } => resolutions[0],
         };
 
-        let event_loop = winit::event_loop::EventLoop::new();
         let mut window_builder = winit::window::WindowBuilder::new()
             .with_min_inner_size(winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
                 64.0, 64.0,
             )))
             .with_title(self.config.application_name.to_string());
         window_builder = match &self.config.screen_mode {
-            ScreenMode::FullScreenWindow => window_builder.with_fullscreen(Some(
-                Fullscreen::Borderless(prompt_for_monitor(&event_loop)),
-            )),
-            ScreenMode::Windowed { resolutions } => window_builder.with_inner_size(
-                winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
-                    resolutions[0].width as f64,
-                    resolutions[0].height as f64,
-                )),
-            ),
+            ScreenMode::FullScreenWindow => {
+                window_builder.with_fullscreen(Some(Fullscreen::Borderless(monitor)))
+            }
+            ScreenMode::Windowed { resolutions } => {
+                window_builder.with_inner_size(winit::dpi::Size::Physical(
+                    winit::dpi::PhysicalSize::new(resolutions[0].width, resolutions[0].height),
+                ))
+            }
         };
 
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
