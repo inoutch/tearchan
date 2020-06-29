@@ -15,8 +15,8 @@ fn main() {
         .application_name("test".to_string())
         .screen_mode(ScreenMode::Windowed {
             resolutions: vec![Extent2D {
-                width: 600,
-                height: 400,
+                width: 1200,
+                height: 800,
             }],
         })
         .scene_creator(HelloWorldScene::creator())
