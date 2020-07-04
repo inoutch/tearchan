@@ -142,7 +142,7 @@ mod tests {
     use crate::utility::test::func::MockFunc;
 
     struct Object {
-        id: i32,
+        pub id: i32,
     }
 
     impl ChangeNotifierObject<BatchChangeNotifier<Object>> for Object {
