@@ -1,8 +1,10 @@
+use crate::core::graphic::batch::batch_change_manager::BatchChangeNotifier;
 use crate::extension::shared::{Shared, WeakShared};
 use crate::math::change_range::ChangeRange;
 use crate::math::mesh::Mesh;
 use crate::math::vec::{make_vec3_fill, make_vec3_zero, make_vec4_white};
 use crate::utility::buffer_interface::BufferInterface;
+use crate::utility::change_notifier::{ChangeNotifier, ChangeNotifierObject};
 use nalgebra_glm::{rotate, scale, translate, vec3, vec3_to_vec4, vec4, Mat4, Vec2, Vec3, Vec4};
 use std::any::Any;
 use std::cell::RefCell;
@@ -18,16 +20,26 @@ pub trait PolygonProvider {
         core.position()
     }
 
-    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) {
-        core.set_position(position);
+    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) -> bool {
+        if core.set_position(position) {
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn color<'a>(&self, core: &'a PolygonCore) -> &'a Vec4 {
         core.color()
     }
 
-    fn set_color(&mut self, core: &mut PolygonCore, color: Vec4) {
-        core.set_color(color);
+    fn set_color(&mut self, core: &mut PolygonCore, color: Vec4) -> bool {
+        if core.set_color(color) {
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn computed_color(&self, core: &PolygonCore) -> Vec4 {
@@ -38,32 +50,52 @@ pub trait PolygonProvider {
         core.scale()
     }
 
-    fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3) {
-        core.set_scale(scale);
+    fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3) -> bool {
+        if core.set_scale(scale) {
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn rotation_axis<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
         core.rotation_axis()
     }
 
-    fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3) {
-        core.set_rotation_axis(rotation_axis);
+    fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3) -> bool {
+        if core.set_rotation_axis(rotation_axis) {
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn rotation_radian(&self, core: &PolygonCore) -> f32 {
         core.rotation_radian()
     }
 
-    fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32) {
-        core.set_rotation_radian(rotation_radian);
+    fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32) -> bool {
+        if core.set_rotation_radian(rotation_radian) {
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn visible(&self, core: &PolygonCore) -> bool {
         core.visible()
     }
 
-    fn set_visible(&mut self, core: &mut PolygonCore, visible: bool) {
-        core.set_visible(visible);
+    fn set_visible(&mut self, core: &mut PolygonCore, visible: bool) -> bool {
+        if core.set_visible(visible) {
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn computed_visible(&self, core: &PolygonCore) -> bool {
@@ -79,23 +111,29 @@ pub trait PolygonProvider {
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4;
 
     fn as_any_provider_mut(&mut self) -> &mut dyn Any;
+
+    fn request_change(&mut self, core: &mut PolygonCore) {
+        if let Some(notifier) = &mut core.notifier {
+            notifier.request_change();
+        }
+    }
 }
 
 pub trait PolygonCommon {
     fn mesh(&self) -> &Mesh;
     fn position(&self) -> &Vec3;
-    fn set_position(&mut self, position: Vec3);
+    fn set_position(&mut self, position: Vec3) -> bool;
     fn color(&self) -> &Vec4;
-    fn set_color(&mut self, color: Vec4);
+    fn set_color(&mut self, color: Vec4) -> bool;
     fn computed_color(&self) -> Vec4;
     fn scale(&self) -> &Vec3;
-    fn set_scale(&mut self, scale: Vec3);
+    fn set_scale(&mut self, scale: Vec3) -> bool;
     fn rotation_axis(&self) -> &Vec3;
-    fn set_rotation_axis(&mut self, rotation_axis: Vec3);
+    fn set_rotation_axis(&mut self, rotation_axis: Vec3) -> bool;
     fn rotation_radian(&self) -> f32;
-    fn set_rotation_radian(&mut self, rotation_radian: f32);
+    fn set_rotation_radian(&mut self, rotation_radian: f32) -> bool;
     fn visible(&self) -> bool;
-    fn set_visible(&mut self, visible: bool);
+    fn set_visible(&mut self, visible: bool) -> bool;
     fn computed_visible(&self) -> bool;
     fn add_child(&mut self, polygon: &Shared<Polygon>);
 }
@@ -130,6 +168,7 @@ impl Polygon {
                 color_change_range,
                 texcoord_change_range,
                 normal_change_range,
+                notifier: None,
             },
             provider,
         }
@@ -251,6 +290,14 @@ impl Polygon {
     }
 }
 
+impl ChangeNotifierObject<BatchChangeNotifier<Polygon>> for Polygon {
+    fn set_change_notifier(&mut self, notifier: BatchChangeNotifier<Polygon>) {
+        let mut n = notifier;
+        n.request_change();
+        self.core.notifier = Some(n);
+    }
+}
+
 impl PolygonCommon for Polygon {
     #[inline]
     fn mesh(&self) -> &Mesh {
@@ -263,8 +310,8 @@ impl PolygonCommon for Polygon {
     }
 
     #[inline]
-    fn set_position(&mut self, position: Vec3) {
-        self.provider.set_position(&mut self.core, position);
+    fn set_position(&mut self, position: Vec3) -> bool {
+        self.provider.set_position(&mut self.core, position)
     }
 
     #[inline]
@@ -273,7 +320,7 @@ impl PolygonCommon for Polygon {
     }
 
     #[inline]
-    fn set_color(&mut self, color: Vec4) {
+    fn set_color(&mut self, color: Vec4) -> bool {
         self.provider.set_color(&mut self.core, color)
     }
 
@@ -288,8 +335,8 @@ impl PolygonCommon for Polygon {
     }
 
     #[inline]
-    fn set_scale(&mut self, scale: Vec3) {
-        self.provider.set_scale(&mut self.core, scale);
+    fn set_scale(&mut self, scale: Vec3) -> bool {
+        self.provider.set_scale(&mut self.core, scale)
     }
 
     #[inline]
@@ -298,9 +345,9 @@ impl PolygonCommon for Polygon {
     }
 
     #[inline]
-    fn set_rotation_axis(&mut self, rotation_axis: Vec3) {
+    fn set_rotation_axis(&mut self, rotation_axis: Vec3) -> bool {
         self.provider
-            .set_rotation_axis(&mut self.core, rotation_axis);
+            .set_rotation_axis(&mut self.core, rotation_axis)
     }
 
     #[inline]
@@ -309,9 +356,9 @@ impl PolygonCommon for Polygon {
     }
 
     #[inline]
-    fn set_rotation_radian(&mut self, rotation_radian: f32) {
+    fn set_rotation_radian(&mut self, rotation_radian: f32) -> bool {
         self.provider
-            .set_rotation_radian(&mut self.core, rotation_radian);
+            .set_rotation_radian(&mut self.core, rotation_radian)
     }
 
     #[inline]
@@ -320,8 +367,8 @@ impl PolygonCommon for Polygon {
     }
 
     #[inline]
-    fn set_visible(&mut self, visible: bool) {
-        self.provider.set_visible(&mut self.core, visible);
+    fn set_visible(&mut self, visible: bool) -> bool {
+        self.provider.set_visible(&mut self.core, visible)
     }
 
     #[inline]
@@ -335,7 +382,7 @@ impl PolygonCommon for Polygon {
     }
 }
 
-pub struct PolygonCore {
+pub struct PolygonCore<TNotifier = Polygon> {
     mesh: Mesh,
     position: Vec3,
     color: Vec4,
@@ -349,6 +396,7 @@ pub struct PolygonCore {
     color_change_range: ChangeRange,
     texcoord_change_range: ChangeRange,
     normal_change_range: ChangeRange,
+    notifier: Option<BatchChangeNotifier<TNotifier>>,
 }
 
 impl PolygonCore {
@@ -459,9 +507,14 @@ impl PolygonCommon for PolygonCore {
     }
 
     #[inline]
-    fn set_position(&mut self, position: Vec3) {
-        self.position = position;
-        self.update_all_positions();
+    fn set_position(&mut self, position: Vec3) -> bool {
+        if position != self.position {
+            self.position = position;
+            self.update_all_positions();
+            true
+        } else {
+            false
+        }
     }
 
     #[inline]
@@ -470,9 +523,14 @@ impl PolygonCommon for PolygonCore {
     }
 
     #[inline]
-    fn set_color(&mut self, color: Vec4) {
-        self.color = color;
-        self.color_change_range.update_all();
+    fn set_color(&mut self, color: Vec4) -> bool {
+        if color != self.color {
+            self.color = color;
+            self.color_change_range.update_all();
+            true
+        } else {
+            false
+        }
     }
 
     #[inline]
@@ -495,10 +553,13 @@ impl PolygonCommon for PolygonCore {
     }
 
     #[inline]
-    fn set_scale(&mut self, scale: Vec3) {
+    fn set_scale(&mut self, scale: Vec3) -> bool {
         if scale != self.scale {
             self.scale = scale;
             self.update_all_positions();
+            true
+        } else {
+            false
         }
     }
 
@@ -508,11 +569,14 @@ impl PolygonCommon for PolygonCore {
     }
 
     #[inline]
-    fn set_rotation_axis(&mut self, rotation_axis: Vec3) {
+    fn set_rotation_axis(&mut self, rotation_axis: Vec3) -> bool {
         if rotation_axis != self.rotation_axis {
             self.rotation_axis = rotation_axis;
             self.update_all_positions();
             self.update_all_normals();
+            true
+        } else {
+            false
         }
     }
 
@@ -522,10 +586,16 @@ impl PolygonCommon for PolygonCore {
     }
 
     #[inline]
-    fn set_rotation_radian(&mut self, rotation_radian: f32) {
-        self.rotation_radian = rotation_radian;
-        self.update_all_positions();
-        self.update_all_normals();
+    #[allow(clippy::float_cmp)]
+    fn set_rotation_radian(&mut self, rotation_radian: f32) -> bool {
+        if self.rotation_radian != rotation_radian {
+            self.rotation_radian = rotation_radian;
+            self.update_all_positions();
+            self.update_all_normals();
+            true
+        } else {
+            false
+        }
     }
 
     #[inline]
@@ -534,9 +604,14 @@ impl PolygonCommon for PolygonCore {
     }
 
     #[inline]
-    fn set_visible(&mut self, visible: bool) {
-        self.visible = visible;
-        self.update_all_positions();
+    fn set_visible(&mut self, visible: bool) -> bool {
+        if self.visible != visible {
+            self.visible = visible;
+            self.update_all_positions();
+            true
+        } else {
+            false
+        }
     }
 
     #[inline]
@@ -577,6 +652,7 @@ mod test {
         create_square_colors, create_square_positions, create_square_texcoords, MeshBuilder,
     };
     use crate::utility::buffer_interface::tests::MockBuffer;
+    use crate::utility::change_notifier::ChangeNotifier;
     use crate::utility::test::func::MockFunc;
     use nalgebra_glm::{vec2, vec3, vec4, Mat4, Vec3, Vec4};
     use std::any::Any;
@@ -688,6 +764,16 @@ mod test {
 
         fn as_any_provider_mut(&mut self) -> &mut dyn Any {
             self
+        }
+
+        fn request_change(&mut self, core: &mut PolygonCore<Polygon>) {
+            self.mock
+                .borrow_mut()
+                .call(vec!["request_change".to_string()]);
+
+            if let Some(notifier) = &mut core.notifier {
+                notifier.request_change();
+            }
         }
     }
 

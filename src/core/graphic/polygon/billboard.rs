@@ -1,3 +1,4 @@
+use crate::core::graphic::batch::batch_change_manager::BatchChangeNotifier;
 use crate::core::graphic::polygon::polygon_2d::{Polygon2DProvider, Polygon2DProviderInterface};
 use crate::core::graphic::polygon::sprite_atlas::{SpriteAtlas, SpriteAtlasCommon};
 use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, PolygonProvider};
@@ -5,18 +6,26 @@ use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
 use crate::math::change_range::ChangeRange;
 use crate::utility::buffer_interface::BufferInterface;
+use crate::utility::change_notifier::{ChangeNotifier, ChangeNotifierObject};
 use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec2, Vec3};
 use std::any::Any;
 
 pub struct BillboardProvider {
     polygon_2d_provider: Polygon2DProvider,
     origin_change_range: ChangeRange,
+    notifier: Option<BatchChangeNotifier<Billboard>>,
 }
 
 impl PolygonProvider for BillboardProvider {
-    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) {
-        core.position = position;
-        self.origin_change_range.update_all();
+    fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) -> bool {
+        if core.position != position {
+            core.position = position;
+            self.origin_change_range.update_all();
+            self.request_change(core);
+            true
+        } else {
+            false
+        }
     }
 
     fn transform(&self, core: &PolygonCore) -> Mat4 {
@@ -35,6 +44,12 @@ impl PolygonProvider for BillboardProvider {
 
     fn as_any_provider_mut(&mut self) -> &mut dyn Any {
         self
+    }
+
+    fn request_change(&mut self, _core: &mut PolygonCore) {
+        if let Some(notifier) = &mut self.notifier {
+            notifier.request_change();
+        }
     }
 }
 
@@ -91,6 +106,7 @@ impl Billboard {
         let provider = BillboardProvider {
             polygon_2d_provider: Polygon2DProvider::new(size),
             origin_change_range: ChangeRange::new(rect_size),
+            notifier: None,
         };
         Billboard {
             polygon: SpriteAtlas::new_with_provider(Box::new(provider), texture_atlas),
@@ -156,5 +172,16 @@ impl Billboard {
                 .core
                 .update_all_positions();
         }
+    }
+}
+
+impl ChangeNotifierObject<BatchChangeNotifier<Billboard>> for Billboard {
+    fn set_change_notifier(&mut self, notifier: BatchChangeNotifier<Billboard>) {
+        let mut polygon = self.polygon.polygon2d_mut().polygon().borrow_mut();
+        let provider: &mut BillboardProvider =
+            polygon.provider_as_any_mut().downcast_mut().unwrap();
+        let mut n = notifier;
+        n.request_change();
+        provider.notifier = Some(n);
     }
 }
