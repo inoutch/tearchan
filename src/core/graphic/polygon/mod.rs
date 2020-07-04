@@ -189,7 +189,7 @@ impl Polygon {
             let matrix = self.provider.transform(&self.core);
             let mesh_positions = &self.mesh().positions;
 
-            buffer.update_with_range(range.start * 3, range.end * 3);
+            buffer.update_with_range(range.start * 3 + offset, range.end * 3 + offset);
             if self.computed_visible() {
                 for i in range {
                     let mesh_position = &mesh_positions[i as usize];
@@ -224,7 +224,7 @@ impl Polygon {
             };
             let mesh_colors = &self.mesh().colors;
 
-            buffer.update_with_range(range.start * 4, range.end * 4);
+            buffer.update_with_range(range.start * 4 + offset, range.end * 4 + offset);
             for i in range {
                 let base_color = &mesh_colors[i as usize];
                 buffer.copy(offset + i * 4, color.x * base_color.x);
@@ -245,7 +245,7 @@ impl Polygon {
         if let Some(range) = change_range.get_range() {
             let mesh_texcoords = &self.mesh().texcoords;
 
-            buffer.update_with_range(range.start * 2, range.end * 2);
+            buffer.update_with_range(range.start * 2 + offset, range.end * 2 + offset);
             for i in range {
                 let uv = &mesh_texcoords[i as usize];
                 buffer.copy(offset + i * 2, uv.x);
@@ -265,7 +265,7 @@ impl Polygon {
             let matrix = self.provider.transform(&self.core);
             let mesh_normals = &self.mesh().normals;
 
-            buffer.update_with_range(range.start * 3, range.end * 3);
+            buffer.update_with_range(range.start * 3 + offset, range.end * 3 + offset);
             for i in range {
                 let m = &matrix;
                 let v = m * vec3_to_vec4(&mesh_normals[i as usize]);

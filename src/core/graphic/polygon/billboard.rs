@@ -125,7 +125,7 @@ impl Billboard {
 
         let change_range = &provider.origin_change_range;
         if let Some(range) = change_range.get_range() {
-            buffer.update_with_range(range.start * 3, range.end * 3);
+            buffer.update_with_range(range.start * 3 + offset, range.end * 3 + offset);
             for i in range {
                 buffer.copy(offset + i * 3, position.x);
                 buffer.copy(offset + i * 3 + 1, position.y);
