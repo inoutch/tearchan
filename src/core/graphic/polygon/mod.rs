@@ -668,11 +668,11 @@ mod test {
             core.position()
         }
 
-        fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) {
+        fn set_position(&mut self, core: &mut PolygonCore, position: Vec3) -> bool {
             self.mock
                 .borrow_mut()
                 .call(vec!["set_position".to_string()]);
-            core.set_position(position);
+            core.set_position(position)
         }
 
         fn color<'a>(&self, core: &'a PolygonCore) -> &'a Vec4 {
@@ -680,9 +680,9 @@ mod test {
             core.color()
         }
 
-        fn set_color(&mut self, core: &mut PolygonCore, color: Vec4) {
+        fn set_color(&mut self, core: &mut PolygonCore, color: Vec4) -> bool {
             self.mock.borrow_mut().call(vec!["set_color".to_string()]);
-            core.set_color(color);
+            core.set_color(color)
         }
 
         fn computed_color(&self, core: &PolygonCore) -> Vec4 {
@@ -697,9 +697,9 @@ mod test {
             core.scale()
         }
 
-        fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3) {
+        fn set_scale(&mut self, core: &mut PolygonCore, scale: Vec3) -> bool {
             self.mock.borrow_mut().call(vec!["set_scale".to_string()]);
-            core.set_scale(scale);
+            core.set_scale(scale)
         }
 
         fn rotation_axis<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
@@ -707,11 +707,11 @@ mod test {
             core.rotation_axis()
         }
 
-        fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3) {
+        fn set_rotation_axis(&mut self, core: &mut PolygonCore, rotation_axis: Vec3) -> bool {
             self.mock
                 .borrow_mut()
                 .call(vec!["set_rotation_axis".to_string()]);
-            core.set_rotation_axis(rotation_axis);
+            core.set_rotation_axis(rotation_axis)
         }
 
         fn rotation_radian<'a>(&self, core: &PolygonCore) -> f32 {
@@ -721,11 +721,11 @@ mod test {
             core.rotation_radian()
         }
 
-        fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32) {
+        fn set_rotation_radian(&mut self, core: &mut PolygonCore, rotation_radian: f32) -> bool {
             self.mock
                 .borrow_mut()
                 .call(vec!["set_rotation_radian".to_string()]);
-            core.set_rotation_radian(rotation_radian);
+            core.set_rotation_radian(rotation_radian)
         }
 
         fn visible(&self, core: &PolygonCore) -> bool {
@@ -733,9 +733,9 @@ mod test {
             core.visible()
         }
 
-        fn set_visible(&mut self, core: &mut PolygonCore, visible: bool) {
+        fn set_visible(&mut self, core: &mut PolygonCore, visible: bool) -> bool {
             self.mock.borrow_mut().call(vec!["set_visible".to_string()]);
-            core.set_visible(visible);
+            core.set_visible(visible)
         }
 
         fn computed_visible(&self, core: &PolygonCore) -> bool {
