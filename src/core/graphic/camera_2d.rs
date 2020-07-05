@@ -2,6 +2,7 @@ use crate::core::graphic::camera::CameraBase;
 use crate::math::mat::create_orthographic;
 use nalgebra_glm::{vec3, Mat4, Vec2, Vec3};
 
+#[derive(Clone)]
 pub struct Camera2D {
     base: CameraBase,
     pub position: Vec3,

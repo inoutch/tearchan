@@ -4,6 +4,7 @@ pub trait Camera {
     fn update();
 }
 
+#[derive(Clone)]
 pub struct CameraBase {
     pub projection_matrix: Mat4,
     pub view_matrix: Mat4,
