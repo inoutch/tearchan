@@ -85,8 +85,22 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
     }
 
     pub fn with_model(self, model: &tobj::Model) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
-        let (positions, colors, texcoords, normals) =
-            create_bundles_from_mesh(&model.mesh, 0.0f32, 0.0f32, 1.0f32, 1.0f32);
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
+        create_bundles_from_mesh(
+            &mut positions,
+            &mut colors,
+            &mut texcoords,
+            &mut normals,
+            &model.mesh,
+            0.0f32,
+            0.0f32,
+            1.0f32,
+            1.0f32,
+        );
 
         MeshBuilder {
             positions,
@@ -102,12 +116,26 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
         frame: &TextureFrame,
         model: &tobj::Model,
     ) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
         let fx = frame.rect.x as f32 / texture_size.x;
         let fy = frame.rect.y as f32 / texture_size.y;
         let fw = frame.rect.w as f32 / texture_size.x;
         let fh = frame.rect.h as f32 / texture_size.y;
-        let (positions, colors, texcoords, normals) =
-            create_bundles_from_mesh(&model.mesh, fx, fy, fw, fh);
+        create_bundles_from_mesh(
+            &mut positions,
+            &mut colors,
+            &mut texcoords,
+            &mut normals,
+            &model.mesh,
+            fx,
+            fy,
+            fw,
+            fh,
+        );
 
         MeshBuilder {
             positions,
@@ -117,6 +145,42 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
+    pub fn with_models_and_frame(
+        self,
+        texture_size: Vec2,
+        frame: &TextureFrame,
+        models: Vec<&tobj::Model>,
+    ) -> MeshBuilder<Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
+        let fx = frame.rect.x as f32 / texture_size.x;
+        let fy = frame.rect.y as f32 / texture_size.y;
+        let fw = frame.rect.w as f32 / texture_size.x;
+        let fh = frame.rect.h as f32 / texture_size.y;
+        for model in models {
+            create_bundles_from_mesh(
+                &mut positions,
+                &mut colors,
+                &mut texcoords,
+                &mut normals,
+                &model.mesh,
+                fx,
+                fy,
+                fw,
+                fh,
+            );
+        }
+
+        MeshBuilder {
+            positions,
+            colors,
+            texcoords,
+            normals,
+        }
+    }
     pub fn with_grid(
         self,
         interval: f32,
@@ -447,17 +511,16 @@ pub fn create_square_texcoords_from_frame(texture_size: Vec2, frame: &TextureFra
 }
 
 pub fn create_bundles_from_mesh(
+    positions: &mut Vec<Vec3>,
+    colors: &mut Vec<Vec4>,
+    texcoords: &mut Vec<Vec2>,
+    normals: &mut Vec<Vec3>,
     mesh: &tobj::Mesh,
     texture_rx: f32,
     texture_ry: f32,
     texture_rw: f32,
     texture_rh: f32,
-) -> (Vec<Vec3>, Vec<Vec4>, Vec<Vec2>, Vec<Vec3>) {
-    let mut positions: Vec<Vec3> = vec![];
-    let mut colors: Vec<Vec4> = vec![];
-    let mut texcoords: Vec<Vec2> = vec![];
-    let mut normals: Vec<Vec3> = vec![];
-
+) {
     let mut next_face = 0;
     for f in 0..mesh.num_face_indices.len() {
         let end = next_face + mesh.num_face_indices[f] as usize;
@@ -485,7 +548,6 @@ pub fn create_bundles_from_mesh(
         }
         next_face = end;
     }
-    (positions, colors, texcoords, normals)
 }
 
 pub fn convert_texcoord_into_rect(u: f32, v: f32, rx: f32, ry: f32, rw: f32, rh: f32) -> Vec2 {
