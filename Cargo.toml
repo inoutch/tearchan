@@ -20,7 +20,7 @@ winit = { version = "0.22.2", features = ["web-sys"] }
 gfx = "0.18.2"
 gfx-hal = "0.5.3"
 gfx-backend-empty = "0.5"
-nalgebra-glm = "0.7.0"
+nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
 tobj = "2.0.1"
