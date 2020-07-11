@@ -1,4 +1,5 @@
 use crate::core::graphic::texture::TextureFrame;
+use crate::math::rect::{rect2, Rect2};
 use crate::math::vec::make_vec4_white;
 use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use std::ops::Range;
@@ -96,10 +97,7 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
             &mut texcoords,
             &mut normals,
             &model.mesh,
-            0.0f32,
-            0.0f32,
-            1.0f32,
-            1.0f32,
+            &rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32),
         );
 
         MeshBuilder {
@@ -131,10 +129,7 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
             &mut texcoords,
             &mut normals,
             &model.mesh,
-            fx,
-            fy,
-            fw,
-            fh,
+            &rect2(fx, fy, fw, fh),
         );
 
         MeshBuilder {
@@ -167,10 +162,7 @@ impl<TPositionsType, TColorsType, TTexcoordsType>
                 &mut texcoords,
                 &mut normals,
                 &model.mesh,
-                fx,
-                fy,
-                fw,
-                fh,
+                &rect2(fx, fy, fw, fh),
             );
         }
 
@@ -516,10 +508,7 @@ pub fn create_bundles_from_mesh(
     texcoords: &mut Vec<Vec2>,
     normals: &mut Vec<Vec3>,
     mesh: &tobj::Mesh,
-    texture_rx: f32,
-    texture_ry: f32,
-    texture_rw: f32,
-    texture_rh: f32,
+    texture_rect: &Rect2<f32>,
 ) {
     let mut next_face = 0;
     for f in 0..mesh.num_face_indices.len() {
@@ -535,10 +524,7 @@ pub fn create_bundles_from_mesh(
             texcoords.push(convert_texcoord_into_rect(
                 mesh.texcoords[(*v * 2) as usize],
                 1.0f32 - mesh.texcoords[(*v * 2 + 1) as usize],
-                texture_rx,
-                texture_ry,
-                texture_rw,
-                texture_rh,
+                texture_rect,
             ));
             normals.push(vec3(
                 mesh.normals[(*v * 3) as usize],
@@ -550,8 +536,11 @@ pub fn create_bundles_from_mesh(
     }
 }
 
-pub fn convert_texcoord_into_rect(u: f32, v: f32, rx: f32, ry: f32, rw: f32, rh: f32) -> Vec2 {
-    vec2(rx + u * rw, ry + v * rh)
+pub fn convert_texcoord_into_rect(u: f32, v: f32, rect: &Rect2<f32>) -> Vec2 {
+    vec2(
+        rect.origin.x + u * rect.size.x,
+        rect.origin.y + v * rect.size.y,
+    )
 }
 
 #[test]
