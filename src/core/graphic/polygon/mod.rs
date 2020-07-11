@@ -648,9 +648,11 @@ impl PolygonProvider for PolygonDefaultProvider {
 mod test {
     use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, PolygonProvider};
     use crate::extension::shared::{make_shared, Shared};
-    use crate::math::mesh::{
-        create_square_colors, create_square_positions, create_square_texcoords, MeshBuilder,
+    use crate::math::mesh::square::{
+        create_square_colors, create_square_positions, create_square_texcoords,
     };
+    use crate::math::mesh::MeshBuilder;
+    use crate::math::rect::{rect2, Rect2};
     use crate::utility::buffer_interface::tests::MockBuffer;
     use crate::utility::change_notifier::ChangeNotifier;
     use crate::utility::test::func::MockFunc;
@@ -842,12 +844,15 @@ mod test {
         polygon.copy_positions_into(&mut mock_buffer, 0);
 
         let slice = &mock_buffer.data[(mock_buffer.start as usize)..(mock_buffer.end as usize)];
-        let vertices = create_square_positions(vec2(0.0f32, 0.0f32), vec2(32.0f32, 64.0f32))
-            .iter()
-            .map(|x| x + vec3(1.0f32, 2.0f32, 3.0f32))
-            .map(|x| vec![x.x, x.y, x.z])
-            .flatten()
-            .collect::<Vec<_>>();
+        let vertices = create_square_positions(&Rect2 {
+            origin: vec2(0.0f32, 0.0f32),
+            size: vec2(32.0f32, 64.0f32),
+        })
+        .iter()
+        .map(|x| x + vec3(1.0f32, 2.0f32, 3.0f32))
+        .map(|x| vec![x.x, x.y, x.z])
+        .flatten()
+        .collect::<Vec<_>>();
         // check copied buffer
         assert_eq!(slice, vertices.as_slice());
 
@@ -896,12 +901,11 @@ mod test {
 
         let mut polygon = Polygon::new(mesh);
         let mut buffer = MockBuffer::new(256);
-        let expected_texcoords =
-            create_square_texcoords(vec2(0.0f32, 0.0f32), vec2(1.0f32, 1.0f32))
-                .iter()
-                .map(|texcoord| vec![texcoord.x, texcoord.y])
-                .flatten()
-                .collect::<Vec<_>>();
+        let expected_texcoords = create_square_texcoords(&rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32))
+            .iter()
+            .map(|texcoord| vec![texcoord.x, texcoord.y])
+            .flatten()
+            .collect::<Vec<_>>();
 
         polygon.copy_texcoords_into(&mut buffer, 0);
         assert_eq!(buffer.get_changes(), expected_texcoords.as_slice());

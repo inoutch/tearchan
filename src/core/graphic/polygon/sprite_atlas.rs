@@ -4,9 +4,10 @@ use crate::core::graphic::polygon::polygon_2d::{
 use crate::core::graphic::polygon::{Polygon, PolygonProvider};
 use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
-use crate::math::mesh::{
-    create_square_positions_from_frame, create_square_texcoords_from_frame, MeshBuilder,
+use crate::math::mesh::square::{
+    create_square_positions_from_frame, create_square_texcoords_from_frame,
 };
+use crate::math::mesh::MeshBuilder;
 use nalgebra_glm::vec2;
 use serde::export::PhantomData;
 use std::collections::HashMap;
