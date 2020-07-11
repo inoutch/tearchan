@@ -49,7 +49,7 @@ impl HelloWorldScene {
                 .renderer_api
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
-            let mesh = MeshBuilder::new().with_cube(1.0f32).build().unwrap();
+            let mesh = MeshBuilder::new().with_simple_cube(1.0f32).build().unwrap();
             let mut batch = Batch3D::new(scene_context.renderer_api);
             let polygon = make_shared(Polygon::new(mesh));
             polygon
