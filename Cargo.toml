@@ -53,6 +53,7 @@ objc-foundation = "0.1.1"
 
 [dev-dependencies]
 float-cmp = "0.7.0"
+nearly_eq = "0.2.4"
 
 [build-dependencies]
 shaderc = "0.6.2"
