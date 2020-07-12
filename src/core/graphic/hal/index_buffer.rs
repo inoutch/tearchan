@@ -1,16 +1,12 @@
+use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
 use crate::math::mesh::IndexType;
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::device::Device;
 use gfx_hal::memory::Segment;
 use gfx_hal::{buffer, memory, Backend};
 use std::mem::ManuallyDrop;
-use std::ops::Deref;
 use std::rc::{Rc, Weak};
 use std::{iter, mem, ptr};
-
-pub trait IndexBufferInterface {
-    fn copy_to_buffer(&self, vertices: &[IndexType], offset: usize, size: usize);
-}
 
 pub struct IndexBufferCommon<B: Backend> {
     device: Weak<B::Device>,
@@ -55,25 +51,33 @@ impl<B: Backend> IndexBufferCommon<B> {
     }
 }
 
-impl<B: Backend> IndexBufferInterface for IndexBufferCommon<B> {
-    fn copy_to_buffer(&self, vertices: &[u32], offset: usize, size: usize) {
-        let device = match self.device.upgrade() {
-            Some(device) => device,
-            None => return,
-        };
+impl<B: Backend> BufferInterface for IndexBufferCommon<B> {
+    type DataType = IndexType;
+    type MappedMemoryType = IndexBufferMemoryMapped;
+
+    fn open(&self, offset: usize, size: usize) -> Self::MappedMemoryType {
+        let device = self.device.upgrade().unwrap();
         let binary_offset = offset * std::mem::size_of::<IndexType>();
         let binary_size = size * std::mem::size_of::<IndexType>();
-
-        let memory = self.buffer_memory.deref();
         let segment = Segment {
             offset: binary_offset as u64,
             size: Some(binary_size as u64),
         };
-        unsafe {
-            let mapping = device.map_memory(memory, segment).unwrap();
-            ptr::copy_nonoverlapping(vertices.as_ptr() as *const u8, mapping, binary_size);
-            device.unmap_memory(memory);
+
+        let mapping = unsafe { device.map_memory(&self.buffer_memory, segment).unwrap() };
+        IndexBufferMemoryMapped {
+            mapping,
+            binary_size,
         }
+    }
+
+    fn close(&self, _mapped_memory: Self::MappedMemoryType) {
+        let device = self.device.upgrade().unwrap();
+        unsafe { device.unmap_memory(&self.buffer_memory) };
+    }
+
+    fn size(&self) -> usize {
+        self.size
     }
 }
 
@@ -84,6 +88,25 @@ impl<B: Backend> Drop for IndexBufferCommon<B> {
                 device.destroy_buffer(ManuallyDrop::into_inner(ptr::read(&self.buffer)));
                 device.free_memory(ManuallyDrop::into_inner(ptr::read(&self.buffer_memory)));
             }
+        }
+    }
+}
+
+pub struct IndexBufferMemoryMapped {
+    mapping: *mut u8,
+    binary_size: usize,
+}
+
+impl BufferMappedMemoryInterface<IndexType> for IndexBufferMemoryMapped {
+    fn copy(&mut self, value: IndexType, offset: usize) {
+        let binary_offset = offset * std::mem::size_of::<f32>();
+        debug_assert!(binary_offset < self.binary_size);
+        unsafe {
+            ptr::copy_nonoverlapping(
+                &value as *const IndexType as *const u8,
+                self.mapping.add(binary_offset),
+                std::mem::size_of::<f32>(),
+            );
         }
     }
 }
@@ -127,37 +150,61 @@ fn create_index_buffer<B: Backend>(
 
 #[cfg(test)]
 pub mod test {
-    use crate::core::graphic::hal::index_buffer::IndexBufferInterface;
-    use crate::extension::shared::{clone_shared, Shared};
+    use crate::core::graphic::hal::buffer_interface::{
+        BufferInterface, BufferMappedMemoryInterface,
+    };
+    use crate::extension::shared::{clone_shared, Shared, make_shared};
     use crate::math::mesh::IndexType;
     use crate::utility::test::func::MockFunc;
-    use std::cell::RefCell;
 
     pub struct MockIndexBuffer {
         pub mock: Shared<MockFunc>,
-        pub indices: RefCell<Vec<IndexType>>,
+        pub indices: Shared<Vec<IndexType>>,
     }
 
     impl MockIndexBuffer {
         pub fn new(mock: &Shared<MockFunc>, indices: &[IndexType]) -> Self {
             MockIndexBuffer {
                 mock: clone_shared(mock),
-                indices: RefCell::new(indices.to_owned()),
+                indices: make_shared(indices.to_owned()),
             }
         }
     }
 
-    impl IndexBufferInterface for MockIndexBuffer {
-        fn copy_to_buffer(&self, vertices: &[u32], offset: usize, size: usize) {
-            self.mock.borrow_mut().call(vec![
-                "copy_to_buffer".to_string(),
-                format!("{:?}", vertices),
-                offset.to_string(),
-                size.to_string(),
-            ]);
+    impl BufferInterface for MockIndexBuffer {
+        type DataType = IndexType;
+        type MappedMemoryType = MockIndexBufferMappedMemory;
 
-            let mut indices = self.indices.borrow_mut();
-            indices[offset..(offset + size)].clone_from_slice(vertices);
+        fn open(&self, offset: usize, size: usize) -> MockIndexBufferMappedMemory {
+            self.mock
+                .borrow_mut()
+                .call(vec!["open".to_string(), format!("{}, {}", offset, size)]);
+            MockIndexBufferMappedMemory {
+                indices: clone_shared(&self.indices),
+                offset,
+                size,
+            }
+        }
+
+        fn close(&self, mapped_memory: MockIndexBufferMappedMemory) {
+            self.mock.borrow_mut().call(vec!["close".to_string()]);
+        }
+
+        fn size(&self) -> usize {
+            self.indices.borrow().len()
+        }
+    }
+
+    pub struct MockIndexBufferMappedMemory {
+        pub indices: Shared<Vec<IndexType>>,
+        pub offset: usize,
+        pub size: usize,
+    }
+
+    impl BufferMappedMemoryInterface<IndexType> for MockIndexBufferMappedMemory {
+        fn copy(&mut self, value: IndexType, offset: usize) {
+            assert!(offset < self.size);
+            self.indices.borrow_mut()[offset] = value;
         }
     }
 }
