@@ -1,4 +1,5 @@
 pub mod backend;
+pub mod buffer_interface;
 pub mod descriptor_set;
 pub mod graphic_pipeline;
 pub mod index_buffer;
