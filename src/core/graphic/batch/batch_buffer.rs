@@ -1,7 +1,6 @@
 use crate::core::graphic::batch::batch_pointer::BatchPointer;
 use crate::core::graphic::hal::buffer_interface::BufferInterface;
 use crate::extension::shared::{clone_shared, make_shared, Shared};
-use crate::math::change_range::ChangeRange;
 use std::collections::{HashMap, VecDeque};
 use std::ops::Deref;
 
@@ -10,7 +9,6 @@ pub struct BatchBuffer<TBuffer: BufferInterface> {
     buffer_factory: fn(&TBuffer, usize) -> TBuffer,
     pointer_indices: HashMap<*const BatchPointer, usize>,
     pointers: VecDeque<Shared<BatchPointer>>,
-    change_pointer_range: ChangeRange,
 }
 
 impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
@@ -20,7 +18,6 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
             buffer_factory,
             pointers: VecDeque::new(),
             pointer_indices: HashMap::new(),
-            change_pointer_range: ChangeRange::new(0),
         }
     }
 
@@ -39,8 +36,6 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
 
         self.pointers.push_back(clone_shared(&ptr));
         self.pointer_indices.insert(key, index);
-
-        self.change_pointer_range.resize(self.pointers.len());
         ptr
     }
 
@@ -52,13 +47,14 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         let index = self.reallocate_or_free(pointer, 0, true);
         self.pointers.remove(index);
         self.pointer_indices.remove(&get_batch_pointer_key(pointer));
-        self.change_pointer_range.reset();
-        self.change_pointer_range
-            .update(index, self.pointer_indices.len());
     }
 
     pub fn buffer(&self) -> &TBuffer {
         &self.buffer
+    }
+
+    pub fn buffer_mut(&mut self) -> &mut TBuffer {
+        &mut self.buffer
     }
 
     pub fn size(&self) -> usize {
@@ -73,14 +69,6 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         }
     }
 
-    pub fn change_pointer_range(&self) -> &ChangeRange {
-        &self.change_pointer_range
-    }
-
-    pub fn flush(&mut self) {
-        self.change_pointer_range.reset();
-    }
-
     fn reallocate_buffer(&mut self, size: usize) {
         let new_size = size * 2;
         let factory = &self.buffer_factory;
@@ -92,14 +80,6 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         let new_size = self.last() + size - ptr.borrow().size;
 
         // Set to update new size
-        if ptr.borrow().size < size {
-            self.change_pointer_range
-                .update(index, self.change_pointer_range.size);
-        } else {
-            self.change_pointer_range
-                .update(index + 1, self.change_pointer_range.size);
-        }
-
         if self.buffer.size() < new_size {
             self.reallocate_buffer(new_size);
         }
@@ -138,7 +118,6 @@ mod test {
     use crate::core::graphic::hal::vertex_buffer::test::MockVertexBuffer;
     use crate::extension::shared::make_shared;
     use crate::utility::test::func::MockFunc;
-    use std::ops::Range;
 
     #[test]
     fn test_batch_buffer() {
@@ -173,13 +152,6 @@ mod test {
 
         assert_eq!(batch_buffer.size(), 160); // (30 + 50) * 2
         assert_eq!(batch_buffer.last(), 122);
-        assert_eq!(
-            batch_buffer.change_pointer_range().get_range(),
-            Some(Range { start: 0, end: 3 })
-        );
-
-        batch_buffer.flush();
-        assert_eq!(batch_buffer.change_pointer_range().get_range(), None);
 
         batch_buffer.reallocate(&p1, 40);
         assert_eq!(p1.borrow().first, 0);
@@ -195,12 +167,6 @@ mod test {
         assert_eq!(batch_buffer.size(), 160); // (30 + 50) * 2
         assert_eq!(batch_buffer.last(), 132);
 
-        assert_eq!(
-            batch_buffer.change_pointer_range().get_range(),
-            Some(Range { start: 0, end: 3 })
-        );
-        batch_buffer.flush();
-
         batch_buffer.free(&p2);
         assert_eq!(p1.borrow().first, 0);
         assert_eq!(p1.borrow().last(), 40);
@@ -213,10 +179,5 @@ mod test {
         assert_eq!(batch_buffer.pointers.len(), 2);
         assert_eq!(batch_buffer.pointer_indices.len(), 2);
         assert_eq!(batch_buffer.pointer_indices[&get_batch_pointer_key(&p3)], 1);
-
-        assert_eq!(
-            batch_buffer.change_pointer_range().get_range(),
-            Some(Range { start: 1, end: 2 })
-        );
     }
 }
