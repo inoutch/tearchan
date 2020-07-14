@@ -222,11 +222,12 @@ pub mod test {
     impl BufferMappedMemoryInterface<f32> for MockVertexBufferMappedMemory {
         fn set(&mut self, value: f32, offset: usize) {
             assert!(offset < self.size);
-            self.vertices.borrow_mut()[offset] = value;
+            self.vertices.borrow_mut()[self.offset + offset] = value;
         }
 
         fn get(&self, offset: usize) -> f32 {
-            self.vertices.borrow()[offset]
+            assert!(offset < self.size);
+            self.vertices.borrow()[self.offset + offset]
         }
     }
 }

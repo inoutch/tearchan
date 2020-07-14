@@ -1,9 +1,12 @@
 use crate::core::graphic::batch::batch_pointer::BatchPointer;
-use crate::core::graphic::hal::buffer_interface::BufferInterface;
+use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
 use crate::extension::shared::{clone_shared, make_shared, Shared};
 use crate::utility::btree::DuplicatableBTreeMap;
 use std::collections::HashMap;
 use std::ops::Deref;
+
+const DEFRAG_POINTER_SIZE: usize = 20;
+const DEFRAG_FRAGMENT_SIZE: usize = 300;
 
 pub struct BatchBuffer<TBuffer: BufferInterface> {
     buffer: TBuffer,
@@ -38,7 +41,7 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
                 (key, ptr)
             };
             self.pointers.insert(key, clone_shared(&ptr));
-            self.fragmentation_size -= size;
+            self.fragmentation_size -= ptr.borrow().size; // Note that reduce will increase the fragment size
 
             if ptr.borrow().size != size {
                 // Reducing unnecessary memory size
@@ -63,21 +66,21 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
                     (borrow.first, borrow.size)
                 };
                 let mut old_ptr = pointer.borrow_mut();
-                let new_ptr = {
-                    let (_, ptr) = self.allocate_new_pointer(size);
-                    ptr
-                };
+                let new_ptr = self.allocate(size);
+                // Swap values
                 {
                     let mut new_ptr_borrow_mut = new_ptr.borrow_mut();
 
-                    // Swap
                     old_ptr.first = new_ptr_borrow_mut.first;
                     old_ptr.size = new_ptr_borrow_mut.size;
                     new_ptr_borrow_mut.first = old_first;
                     new_ptr_borrow_mut.size = old_size;
 
+                    self.buffer.clear(old_first, old_size);
                     self.fragmentation_size += old_size;
                 }
+                // Swap registers
+                self.pointers.remove(&get_batch_pointer_key(&new_ptr));
                 self.pending_pointers.push_back(old_size, new_ptr);
             }
             _ => {}
@@ -89,6 +92,13 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
             .push_back(pointer.borrow().size, clone_shared(pointer));
         self.pointers.remove(&get_batch_pointer_key(pointer));
         self.fragmentation_size += pointer.borrow().size;
+        self.buffer
+            .clear(pointer.borrow().first, pointer.borrow().size);
+        if self.pending_pointers.len() >= DEFRAG_POINTER_SIZE
+            || self.fragmentation_size >= DEFRAG_FRAGMENT_SIZE
+        {
+            self.defragmentation();
+        }
     }
 
     pub fn buffer(&self) -> &TBuffer {
@@ -113,6 +123,7 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         self.buffer = factory(&self.buffer, new_size);
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn defragmentation(&mut self) {
         let mut cloned_pointers: Vec<_> = self
             .pointers
@@ -122,8 +133,22 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         cloned_pointers.sort_unstable_by(|a, b| a.borrow().first.cmp(&b.borrow().first));
 
         let mut first: usize = 0;
+        let mut mapping = self.buffer.open(0, self.last);
         for pointer in cloned_pointers {
-            self.buffer.copy_to(pointer.borrow().first, first, pointer.borrow().size);
+            let from = pointer.borrow().first;
+            let to = first;
+            let size = pointer.borrow().size;
+            let mut buffers = Vec::with_capacity(size);
+            // Copy from
+            for i in 0..size {
+                buffers.push(mapping.get(i + from));
+            }
+
+            // Copy to
+            for i in 0..size {
+                mapping.set(buffers[i].clone(), i + to);
+            }
+
             pointer.borrow_mut().first = first;
             first += pointer.borrow().size;
         }
@@ -154,6 +179,9 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
             let r_size = pointer_mut.size - size;
             let r_ptr = make_shared(BatchPointer::new(r_first, r_size));
             self.pending_pointers.push_back(r_size, r_ptr);
+
+            self.buffer.clear(r_first, r_size);
+            self.fragmentation_size += r_size;
         } else {
             self.last = pointer_mut.first + size;
         }
@@ -170,6 +198,10 @@ fn get_batch_pointer_key(ptr: &Shared<BatchPointer>) -> *const BatchPointer {
 #[cfg(test)]
 mod test {
     use crate::core::graphic::batch::batch_buffer::BatchBuffer;
+    use crate::core::graphic::hal::buffer_interface::{
+        BufferInterface, BufferMappedMemoryInterface,
+    };
+    use crate::core::graphic::hal::index_buffer::test::MockIndexBuffer;
     use crate::core::graphic::hal::vertex_buffer::test::MockVertexBuffer;
     use crate::extension::shared::make_shared;
     use crate::utility::test::func::MockFunc;
@@ -242,5 +274,164 @@ mod test {
         assert_eq!(batch_buffer.last(), 70);
         assert_eq!(batch_buffer.pending_pointers.len(), 0);
         assert_eq!(batch_buffer.fragmentation_size, 0);
+    }
+
+    #[test]
+    fn test_batch_buffer_values() {
+        let mock = make_shared(MockFunc::new());
+        let mock_vertex_buffer = MockIndexBuffer::new(&mock, vec![0u32; 32].as_slice());
+        let mut batch_buffer = BatchBuffer::new(mock_vertex_buffer, |buffer, size| {
+            let mut indices = buffer.indices.borrow().clone();
+            indices.resize(size, 0u32);
+            MockIndexBuffer::new(&buffer.mock, &indices)
+        });
+
+        let p1 = batch_buffer.allocate(8);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p1.borrow().first, p1.borrow().size);
+            for i in 0..8 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 6u32, 7u32]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 0);
+
+        let p2 = batch_buffer.allocate(3);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p2.borrow().first, p2.borrow().size);
+            for i in 0..3 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 6u32, 7u32, 0u32, 1u32, 2u32]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 0);
+
+        let p3 = batch_buffer.allocate(7);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p3.borrow().first, p3.borrow().size);
+            for i in 0..7 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 6u32, 7u32, 0u32, 1u32, 2u32, 0u32, 1u32, 2u32,
+                3u32, 4u32, 5u32, 6u32
+            ]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 0);
+
+        // reallocate
+        batch_buffer.reallocate(&p2, 4);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p2.borrow().first, p2.borrow().size);
+            for i in 0..4 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 6u32, 7u32, 0u32, 0u32, 0u32, 0u32, 1u32, 2u32,
+                3u32, 4u32, 5u32, 6u32, 0u32, 1u32, 2u32, 3u32
+            ]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 3);
+
+        batch_buffer.reallocate(&p3, 2);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p3.borrow().first, p3.borrow().size);
+            for i in 0..2 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 6u32, 7u32, 0u32, 0u32, 0u32, 0u32, 1u32, 0u32,
+                0u32, 0u32, 0u32, 0u32, 0u32, 1u32, 2u32, 3u32
+            ]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 8);
+
+        batch_buffer.free(&p1);
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 1u32, 0u32,
+                0u32, 0u32, 0u32, 0u32, 0u32, 1u32, 2u32, 3u32
+            ]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 16);
+
+        let p4 = batch_buffer.allocate(6);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p4.borrow().first, p4.borrow().size);
+            for i in 0..6 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 0u32, 0u32, 0u32, 0u32, 0u32, 0u32, 1u32, 0u32,
+                0u32, 0u32, 0u32, 0u32, 0u32, 1u32, 2u32, 3u32
+            ]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 10);
+
+        let p5 = batch_buffer.allocate(3);
+        {
+            let mut mapping = batch_buffer
+                .buffer()
+                .open(p5.borrow().first, p5.borrow().size);
+            for i in 0..3 {
+                mapping.set(i, i as usize);
+            }
+            batch_buffer.buffer().close(mapping);
+        }
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 0u32, 0u32, 0u32, 1u32, 2u32, 0u32, 1u32, 0u32,
+                0u32, 0u32, 0u32, 0u32, 0u32, 1u32, 2u32, 3u32
+            ]
+        );
+        assert_eq!(batch_buffer.fragmentation_size, 7);
+
+        batch_buffer.defragmentation();
+        assert_eq!(batch_buffer.fragmentation_size, 0);
+        assert_eq!(
+            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
+            &[
+                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 0u32, 1u32, 2u32, 0u32, 1u32, 0u32, 1u32, 2u32,
+                3u32
+            ]
+        );
     }
 }

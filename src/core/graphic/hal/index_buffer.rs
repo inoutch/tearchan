@@ -219,11 +219,12 @@ pub mod test {
 
     impl BufferMappedMemoryInterface<IndexType> for MockIndexBufferMappedMemory {
         fn set(&mut self, value: IndexType, offset: usize) {
-            assert!(offset < self.size);
-            self.indices.borrow_mut()[offset] = value;
+            assert!(offset < self.size, "{} !< {}", offset, self.size);
+            self.indices.borrow_mut()[self.offset + offset] = value;
         }
 
         fn get(&self, offset: usize) -> u32 {
+            assert!(offset < self.size, "{} !< {}", offset, self.size);
             self.indices.borrow()[offset]
         }
     }
