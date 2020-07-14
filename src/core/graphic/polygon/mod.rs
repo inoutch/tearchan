@@ -193,7 +193,7 @@ impl Polygon {
 
         for i in range {
             let index = self.mesh().indices[i];
-            buffer.copy(index, offset + i);
+            buffer.set(index, offset + i);
         }
         self.core.reset_all_index_change_range();
     }
@@ -213,15 +213,15 @@ impl Polygon {
                     let mesh_position = &mesh_positions[i as usize];
                     let m = &matrix;
                     let v = m * vec4(mesh_position.x, mesh_position.y, mesh_position.z, 1.0f32);
-                    buffer.copy(v.x, offset + i * 3);
-                    buffer.copy(v.y, offset + i * 3 + 1);
-                    buffer.copy(v.z, offset + i * 3 + 2);
+                    buffer.set(v.x, offset + i * 3);
+                    buffer.set(v.y, offset + i * 3 + 1);
+                    buffer.set(v.z, offset + i * 3 + 2);
                 }
             } else {
                 for i in range {
-                    buffer.copy(0.0f32, offset + i * 3);
-                    buffer.copy(0.0f32, offset + i * 3 + 1);
-                    buffer.copy(0.0f32, offset + i * 3 + 2);
+                    buffer.set(0.0f32, offset + i * 3);
+                    buffer.set(0.0f32, offset + i * 3 + 1);
+                    buffer.set(0.0f32, offset + i * 3 + 2);
                 }
             }
             self.core.reset_all_position_change_range();
@@ -244,10 +244,10 @@ impl Polygon {
 
             for i in range {
                 let base_color = &mesh_colors[i as usize];
-                buffer.copy(color.x * base_color.x, offset + i * 4);
-                buffer.copy(color.y * base_color.y, offset + i * 4 + 1);
-                buffer.copy(color.z * base_color.z, offset + i * 4 + 2);
-                buffer.copy(color.w * base_color.w, offset + i * 4 + 3);
+                buffer.set(color.x * base_color.x, offset + i * 4);
+                buffer.set(color.y * base_color.y, offset + i * 4 + 1);
+                buffer.set(color.z * base_color.z, offset + i * 4 + 2);
+                buffer.set(color.w * base_color.w, offset + i * 4 + 3);
             }
             self.core.reset_all_color_change_range();
         }
@@ -264,8 +264,8 @@ impl Polygon {
 
             for i in range {
                 let uv = &mesh_texcoords[i as usize];
-                buffer.copy(uv.x, offset + i * 2);
-                buffer.copy(uv.y, offset + i * 2 + 1);
+                buffer.set(uv.x, offset + i * 2);
+                buffer.set(uv.y, offset + i * 2 + 1);
             }
             self.core.reset_all_texcoord_change_range();
         }
@@ -284,9 +284,9 @@ impl Polygon {
             for i in range {
                 let m = &matrix;
                 let v = m * vec3_to_vec4(&mesh_normals[i as usize]);
-                buffer.copy(v.x, offset + i * 3);
-                buffer.copy(v.y, offset + i * 3 + 1);
-                buffer.copy(v.z, offset + i * 3 + 2);
+                buffer.set(v.x, offset + i * 3);
+                buffer.set(v.y, offset + i * 3 + 1);
+                buffer.set(v.z, offset + i * 3 + 2);
             }
             self.core.reset_all_normal_change_range();
         }

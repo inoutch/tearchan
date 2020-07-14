@@ -1,5 +1,6 @@
 use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
 use crate::math::mesh::IndexType;
+use crate::utility::binary::{get_value_from_ptr, set_value_to_ptr};
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::device::Device;
 use gfx_hal::memory::Segment;
@@ -79,6 +80,15 @@ impl<B: Backend> BufferInterface for IndexBufferCommon<B> {
     fn size(&self) -> usize {
         self.size
     }
+
+    fn clear(&self, offset: usize, size: usize) {
+        let mut mapping = self.open(offset, size);
+        debug_assert!(offset + size <= self.size);
+        unsafe {
+            std::ptr::write_bytes(&mut mapping, 0, size);
+        }
+        self.close(mapping);
+    }
 }
 
 impl<B: Backend> Drop for IndexBufferCommon<B> {
@@ -98,16 +108,16 @@ pub struct IndexBufferMemoryMapped {
 }
 
 impl BufferMappedMemoryInterface<IndexType> for IndexBufferMemoryMapped {
-    fn copy(&mut self, value: IndexType, offset: usize) {
-        let binary_offset = offset * std::mem::size_of::<f32>();
-        debug_assert!(binary_offset < self.binary_size);
+    fn set(&mut self, value: IndexType, offset: usize) {
+        debug_assert!(offset * std::mem::size_of::<IndexType>() < self.binary_size);
         unsafe {
-            ptr::copy_nonoverlapping(
-                &value as *const IndexType as *const u8,
-                self.mapping.add(binary_offset),
-                std::mem::size_of::<f32>(),
-            );
+            set_value_to_ptr(self.mapping, offset, value);
         }
+    }
+
+    fn get(&self, offset: usize) -> IndexType {
+        debug_assert!(offset * std::mem::size_of::<IndexType>() < self.binary_size);
+        unsafe { get_value_from_ptr(self.mapping, offset, 0) }
     }
 }
 
@@ -153,7 +163,7 @@ pub mod test {
     use crate::core::graphic::hal::buffer_interface::{
         BufferInterface, BufferMappedMemoryInterface,
     };
-    use crate::extension::shared::{clone_shared, Shared, make_shared};
+    use crate::extension::shared::{clone_shared, make_shared, Shared};
     use crate::math::mesh::IndexType;
     use crate::utility::test::func::MockFunc;
 
@@ -186,12 +196,18 @@ pub mod test {
             }
         }
 
-        fn close(&self, mapped_memory: MockIndexBufferMappedMemory) {
+        fn close(&self, _mapped_memory: MockIndexBufferMappedMemory) {
             self.mock.borrow_mut().call(vec!["close".to_string()]);
         }
 
         fn size(&self) -> usize {
             self.indices.borrow().len()
+        }
+
+        fn clear(&self, offset: usize, size: usize) {
+            for v in &mut self.indices.borrow_mut()[offset..(offset + size)] {
+                *v = 0;
+            }
         }
     }
 
@@ -202,9 +218,13 @@ pub mod test {
     }
 
     impl BufferMappedMemoryInterface<IndexType> for MockIndexBufferMappedMemory {
-        fn copy(&mut self, value: IndexType, offset: usize) {
+        fn set(&mut self, value: IndexType, offset: usize) {
             assert!(offset < self.size);
             self.indices.borrow_mut()[offset] = value;
+        }
+
+        fn get(&self, offset: usize) -> u32 {
+            self.indices.borrow()[offset]
         }
     }
 }

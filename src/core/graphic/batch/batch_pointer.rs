@@ -1,13 +1,12 @@
 #[derive(Debug)]
 pub struct BatchPointer {
-    pub index: usize,
     pub first: usize,
     pub size: usize,
 }
 
 impl BatchPointer {
-    pub fn new(index: usize, first: usize, size: usize) -> Self {
-        BatchPointer { index, first, size }
+    pub fn new(first: usize, size: usize) -> Self {
+        BatchPointer { first, size }
     }
 
     pub fn last(&self) -> usize {
@@ -21,7 +20,7 @@ mod test {
 
     #[test]
     fn test_size() {
-        let pointer = BatchPointer::new(0, 10, 30);
+        let pointer = BatchPointer::new(10, 30);
         assert_eq!(pointer.last(), 40);
     }
 }

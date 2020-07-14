@@ -1,4 +1,5 @@
 use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
+use crate::utility::binary::{get_value_from_ptr, set_value_to_ptr};
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::device::Device;
 use gfx_hal::memory::Segment;
@@ -82,6 +83,15 @@ impl<B: Backend> BufferInterface for VertexBufferCommon<B> {
     fn size(&self) -> usize {
         self.size
     }
+
+    fn clear(&self, offset: usize, size: usize) {
+        let mut mapping = self.open(offset, size);
+        debug_assert!(offset + size <= self.size);
+        unsafe {
+            std::ptr::write_bytes(&mut mapping, 0, size);
+        }
+        self.close(mapping);
+    }
 }
 
 pub struct VertexBufferMemoryMapped {
@@ -90,16 +100,16 @@ pub struct VertexBufferMemoryMapped {
 }
 
 impl BufferMappedMemoryInterface<f32> for VertexBufferMemoryMapped {
-    fn copy(&mut self, value: f32, offset: usize) {
-        let binary_offset = offset * std::mem::size_of::<f32>();
-        debug_assert!(binary_offset < self.binary_size);
+    fn set(&mut self, value: f32, offset: usize) {
+        debug_assert!(offset * std::mem::size_of::<f32>() < self.binary_size);
         unsafe {
-            ptr::copy_nonoverlapping(
-                &value as *const f32 as *const u8,
-                self.mapping.add(binary_offset),
-                std::mem::size_of::<f32>(),
-            );
+            set_value_to_ptr(self.mapping, offset, value);
         }
+    }
+
+    fn get(&self, offset: usize) -> f32 {
+        debug_assert!(offset * std::mem::size_of::<f32>() < self.binary_size);
+        unsafe { get_value_from_ptr(self.mapping, offset, 0.0f32) }
     }
 }
 
@@ -195,6 +205,12 @@ pub mod test {
         fn size(&self) -> usize {
             self.vertices.borrow().len()
         }
+
+        fn clear(&self, offset: usize, size: usize) {
+            for v in &mut self.vertices.borrow_mut()[offset..(offset + size)] {
+                *v = 0.0f32;
+            }
+        }
     }
 
     pub struct MockVertexBufferMappedMemory {
@@ -204,9 +220,13 @@ pub mod test {
     }
 
     impl BufferMappedMemoryInterface<f32> for MockVertexBufferMappedMemory {
-        fn copy(&mut self, value: f32, offset: usize) {
+        fn set(&mut self, value: f32, offset: usize) {
             assert!(offset < self.size);
             self.vertices.borrow_mut()[offset] = value;
+        }
+
+        fn get(&self, offset: usize) -> f32 {
+            self.vertices.borrow()[offset]
         }
     }
 }
