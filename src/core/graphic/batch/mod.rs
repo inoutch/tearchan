@@ -9,10 +9,12 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
+pub mod batch2d;
 pub mod batch_buffer;
 pub mod batch_change_manager;
 pub mod batch_pointer;
 pub mod batch_provider;
+pub mod helpers;
 
 pub type BatchIndex = u32;
 
@@ -101,6 +103,22 @@ where
         self.provider.close();
     }
 
+    pub fn index_size(&self) -> usize {
+        self.provider.index_buffer().last()
+    }
+
+    pub fn index_buffer(&self) -> &TIndexBuffer {
+        self.provider.index_buffer().buffer()
+    }
+
+    pub fn vertex_buffers(&self) -> Vec<&TVertexBuffer> {
+        self.provider
+            .vertex_buffer_contexts()
+            .iter()
+            .map(|x| x.buffer.buffer())
+            .collect()
+    }
+
     fn allocate(
         &mut self,
         object: &Shared<TObject>,
@@ -111,7 +129,7 @@ where
         let index_pointer = self.provider.index_buffer_mut().allocate(index_size);
         let vertex_pointers = self
             .provider
-            .contexts_mut()
+            .vertex_buffer_contexts_mut()
             .iter_mut()
             .map(|context| {
                 context
@@ -131,7 +149,12 @@ where
         self.provider
             .index_buffer_mut()
             .free(&context.index_pointer);
-        for (i, vertex_buffer) in self.provider.contexts_mut().iter_mut().enumerate() {
+        for (i, vertex_buffer) in self
+            .provider
+            .vertex_buffer_contexts_mut()
+            .iter_mut()
+            .enumerate()
+        {
             vertex_buffer.buffer.free(&context.vertex_pointers[i]);
         }
     }
@@ -149,10 +172,10 @@ mod test {
     use crate::core::graphic::hal::vertex_buffer::test::MockVertexBuffer;
     use crate::core::graphic::polygon::Polygon;
     use crate::extension::shared::make_shared;
+    use crate::math::mesh::square::create_square_normals;
     use crate::math::mesh::MeshBuilder;
     use crate::utility::test::func::MockFunc;
     use nalgebra_glm::vec2;
-    use crate::math::mesh::square::create_square_normals;
 
     pub type MockBatch = Batch<Polygon, MockBatchProvider, MockIndexBuffer, MockVertexBuffer>;
 
