@@ -26,6 +26,7 @@ use crate::core::graphic::hal::texture::TextureCommon;
 use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
 use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
+use crate::core::graphic::hal::index_buffer::IndexBufferCommon;
 
 pub type Backend = back::Backend;
 pub type Instance = back::Instance;
@@ -38,4 +39,5 @@ pub type Shader = ShaderCommon<back::Backend>;
 pub type Texture = TextureCommon<back::Backend>;
 pub type UniformBuffer<T> = UniformBufferCommon<back::Backend, T>;
 pub type VertexBuffer = VertexBufferCommon<back::Backend>;
+pub type IndexBuffer = IndexBufferCommon<back::Backend>;
 pub type WriteDescriptorSets<'a> = WriteDescriptorSetsCommon<'a, back::Backend>;
