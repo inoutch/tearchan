@@ -1,7 +1,8 @@
 use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::batch::BatchContext;
-use crate::core::graphic::hal::buffer_interface::BufferInterface;
+use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
 use crate::extension::shared::Shared;
+use serde::export::fmt::Debug;
 use std::rc::Rc;
 
 pub struct BatchBufferContext<TBuffer> {
@@ -24,9 +25,9 @@ pub trait BatchProvider<TObject, TIndexBuffer: BufferInterface, TBuffer: BufferI
 
     fn index_size(&self, object: &Shared<TObject>) -> usize;
 
-    fn contexts_mut(&mut self) -> &mut Vec<BatchBufferContext<BatchBuffer<TBuffer>>>;
+    fn vertex_buffer_contexts_mut(&mut self) -> &mut Vec<BatchBufferContext<BatchBuffer<TBuffer>>>;
 
-    fn contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<TBuffer>>>;
+    fn vertex_buffer_contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<TBuffer>>>;
 
     fn vertex_size(&self, object: &Shared<TObject>) -> usize;
 
@@ -35,12 +36,86 @@ pub trait BatchProvider<TObject, TIndexBuffer: BufferInterface, TBuffer: BufferI
     fn close(&mut self);
 }
 
+pub fn open_buffers<
+    TIndexBufferDataType,
+    TIndexBufferMappedMemory,
+    TIndexBuffer,
+    TVertexBufferDataType,
+    TVertexBufferMappedMemory,
+    TVertexBuffer,
+>(
+    index_buffer: &BatchBuffer<TIndexBuffer>,
+    index_mapping: &mut Option<TIndexBufferMappedMemory>,
+    vertex_buffer_contexts: &[BatchBufferContext<BatchBuffer<TVertexBuffer>>],
+    vertex_mappings: &mut Vec<TVertexBufferMappedMemory>,
+) where
+    TIndexBufferDataType: Clone + Debug,
+    TIndexBufferMappedMemory: BufferMappedMemoryInterface<TIndexBufferDataType>,
+    TIndexBuffer: BufferInterface<
+        DataType = TIndexBufferDataType,
+        MappedMemoryType = TIndexBufferMappedMemory,
+    >,
+    TVertexBufferDataType: Clone + Debug,
+    TVertexBufferMappedMemory: BufferMappedMemoryInterface<TVertexBufferDataType>,
+    TVertexBuffer: BufferInterface<
+        DataType = TVertexBufferDataType,
+        MappedMemoryType = TVertexBufferMappedMemory,
+    >,
+{
+    *index_mapping = Some(index_buffer.buffer().open(0, index_buffer.size()));
+    *vertex_mappings = vertex_buffer_contexts
+        .iter()
+        .map(|context| context.buffer.buffer().open(0, context.buffer.size()))
+        .collect();
+}
+
+pub fn close_buffers<
+    TIndexBufferDataType,
+    TIndexBufferMappedMemory,
+    TIndexBuffer,
+    TVertexBufferDataType,
+    TVertexBufferMappedMemory,
+    TVertexBuffer,
+>(
+    index_buffer: &BatchBuffer<TIndexBuffer>,
+    index_mapping: &mut Option<TIndexBufferMappedMemory>,
+    vertex_buffer_contexts: &[BatchBufferContext<BatchBuffer<TVertexBuffer>>],
+    vertex_mappings: &mut Vec<TVertexBufferMappedMemory>,
+) where
+    TIndexBufferDataType: Clone + Debug,
+    TIndexBufferMappedMemory: BufferMappedMemoryInterface<TIndexBufferDataType>,
+    TIndexBuffer: BufferInterface<
+        DataType = TIndexBufferDataType,
+        MappedMemoryType = TIndexBufferMappedMemory,
+    >,
+    TVertexBufferDataType: Clone + Debug,
+    TVertexBufferMappedMemory: BufferMappedMemoryInterface<TVertexBufferDataType>,
+    TVertexBuffer: BufferInterface<
+        DataType = TVertexBufferDataType,
+        MappedMemoryType = TVertexBufferMappedMemory,
+    >,
+{
+    let index_mapping = index_mapping.take().unwrap();
+    index_buffer.buffer().close(index_mapping);
+
+    let mut index = 0;
+    while !vertex_mappings.is_empty() {
+        let vertex_mapping = vertex_mappings.remove(0);
+        vertex_buffer_contexts[index]
+            .buffer
+            .buffer()
+            .close(vertex_mapping);
+        index += 1;
+    }
+}
+
 #[cfg(test)]
 pub mod test {
     use crate::core::graphic::batch::batch_buffer::BatchBuffer;
-    use crate::core::graphic::batch::batch_provider::{BatchBufferContext, BatchProvider};
+    use crate::core::graphic::batch::batch_provider::{
+        close_buffers, open_buffers, BatchBufferContext, BatchProvider,
+    };
     use crate::core::graphic::batch::BatchContext;
-    use crate::core::graphic::hal::buffer_interface::BufferInterface;
     use crate::core::graphic::hal::index_buffer::test::{
         MockIndexBuffer, MockIndexBufferMappedMemory,
     };
@@ -122,10 +197,6 @@ pub mod test {
             );
         }
 
-        fn index_size(&self, object: &Shared<Polygon>) -> usize {
-            object.borrow().index_size()
-        }
-
         fn index_buffer(&self) -> &BatchBuffer<MockIndexBuffer> {
             &self.index_buffer
         }
@@ -134,11 +205,15 @@ pub mod test {
             &mut self.index_buffer
         }
 
-        fn contexts_mut(&mut self) -> &mut Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
+        fn index_size(&self, object: &Shared<Polygon>) -> usize {
+            object.borrow().index_size()
+        }
+
+        fn vertex_buffer_contexts_mut(&mut self) -> &mut Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
             &mut self.vertex_buffers
         }
 
-        fn contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
+        fn vertex_buffer_contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
             &self.vertex_buffers
         }
 
@@ -147,27 +222,21 @@ pub mod test {
         }
 
         fn open(&mut self) {
-            self.index_mapping = Some(self.index_buffer.buffer().open(0, self.index_buffer.size()));
-            self.vertex_mappings = self
-                .vertex_buffers
-                .iter()
-                .map(|context| context.buffer.buffer().open(0, context.buffer.size()))
-                .collect();
+            open_buffers(
+                &self.index_buffer,
+                &mut self.index_mapping,
+                &self.vertex_buffers,
+                &mut self.vertex_mappings,
+            );
         }
 
         fn close(&mut self) {
-            let index_mapping = std::mem::replace(&mut self.index_mapping, None).unwrap();
-            self.index_buffer.buffer().close(index_mapping);
-
-            let mut index = 0;
-            while !self.vertex_mappings.is_empty() {
-                let vertex_mapping = self.vertex_mappings.remove(0);
-                self.vertex_buffers[index]
-                    .buffer
-                    .buffer()
-                    .close(vertex_mapping);
-                index += 1;
-            }
+            close_buffers(
+                &self.index_buffer,
+                &mut self.index_mapping,
+                &self.vertex_buffers,
+                &mut self.vertex_mappings,
+            );
         }
     }
 }
