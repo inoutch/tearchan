@@ -54,7 +54,7 @@ impl<B: Backend> IndexBufferCommon<B> {
 
 impl<B: Backend> BufferInterface for IndexBufferCommon<B> {
     type DataType = IndexType;
-    type MappedMemoryType = IndexBufferMemoryMapped;
+    type MappedMemoryType = IndexBufferMappedMemory;
 
     fn open(&self, offset: usize, size: usize) -> Self::MappedMemoryType {
         let device = self.device.upgrade().unwrap();
@@ -66,7 +66,7 @@ impl<B: Backend> BufferInterface for IndexBufferCommon<B> {
         };
 
         let mapping = unsafe { device.map_memory(&self.buffer_memory, segment).unwrap() };
-        IndexBufferMemoryMapped {
+        IndexBufferMappedMemory {
             mapping,
             binary_size,
         }
@@ -102,12 +102,12 @@ impl<B: Backend> Drop for IndexBufferCommon<B> {
     }
 }
 
-pub struct IndexBufferMemoryMapped {
+pub struct IndexBufferMappedMemory {
     mapping: *mut u8,
     binary_size: usize,
 }
 
-impl BufferMappedMemoryInterface<IndexType> for IndexBufferMemoryMapped {
+impl BufferMappedMemoryInterface<IndexType> for IndexBufferMappedMemory {
     fn set(&mut self, value: IndexType, offset: usize) {
         debug_assert!(offset * std::mem::size_of::<IndexType>() < self.binary_size);
         unsafe {

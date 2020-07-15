@@ -57,9 +57,9 @@ impl<B: Backend> VertexBufferCommon<B> {
 
 impl<B: Backend> BufferInterface for VertexBufferCommon<B> {
     type DataType = f32;
-    type MappedMemoryType = VertexBufferMemoryMapped;
+    type MappedMemoryType = VertexBufferMappedMemory;
 
-    fn open(&self, offset: usize, size: usize) -> VertexBufferMemoryMapped {
+    fn open(&self, offset: usize, size: usize) -> VertexBufferMappedMemory {
         let device = self.device.upgrade().unwrap();
         let binary_offset = offset * std::mem::size_of::<f32>();
         let binary_size = size * std::mem::size_of::<f32>();
@@ -69,13 +69,13 @@ impl<B: Backend> BufferInterface for VertexBufferCommon<B> {
         };
 
         let mapping = unsafe { device.map_memory(&self.buffer_memory, segment).unwrap() };
-        VertexBufferMemoryMapped {
+        VertexBufferMappedMemory {
             mapping,
             binary_size,
         }
     }
 
-    fn close(&self, _mapped_memory: VertexBufferMemoryMapped) {
+    fn close(&self, _mapped_memory: VertexBufferMappedMemory) {
         let device = self.device.upgrade().unwrap();
         unsafe { device.unmap_memory(&self.buffer_memory) };
     }
@@ -94,12 +94,12 @@ impl<B: Backend> BufferInterface for VertexBufferCommon<B> {
     }
 }
 
-pub struct VertexBufferMemoryMapped {
+pub struct VertexBufferMappedMemory {
     mapping: *mut u8,
     binary_size: usize,
 }
 
-impl BufferMappedMemoryInterface<f32> for VertexBufferMemoryMapped {
+impl BufferMappedMemoryInterface<f32> for VertexBufferMappedMemory {
     fn set(&mut self, value: f32, offset: usize) {
         debug_assert!(offset * std::mem::size_of::<f32>() < self.binary_size);
         unsafe {
