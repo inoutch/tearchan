@@ -98,9 +98,6 @@ where
                 self.provider.update(target);
             }
         }
-
-        //
-
         self.provider.close();
     }
 
@@ -165,6 +162,7 @@ mod test {
         let mut batch: MockBatch = Batch::new(MockBatchProvider::new(&mock));
 
         let mesh = MeshBuilder::new()
+            .normals(create_square_normals())
             .with_square(vec2(1.0f32, 2.0f32))
             .build()
             .unwrap();
@@ -323,10 +321,10 @@ mod test {
 
         batch.remove(&polygon1);
 
-        assert_eq!(batch.provider.vertex_buffers[0].buffer.last(), 12);
-        assert_eq!(batch.provider.vertex_buffers[1].buffer.last(), 16);
-        assert_eq!(batch.provider.vertex_buffers[2].buffer.last(), 8);
-        assert_eq!(batch.provider.vertex_buffers[3].buffer.last(), 12);
+        assert_eq!(batch.provider.vertex_buffers[0].buffer.last(), 24);
+        assert_eq!(batch.provider.vertex_buffers[1].buffer.last(), 32);
+        assert_eq!(batch.provider.vertex_buffers[2].buffer.last(), 16);
+        assert_eq!(batch.provider.vertex_buffers[3].buffer.last(), 24);
     }
 
     #[test]
