@@ -1,9 +1,9 @@
-use crate::app::hello_world_scene::HelloWorldScene;
 use gfx_hal::window::Extent2D;
 use std::env;
 use tearchan::core::engine::Engine;
 use tearchan::core::engine_config::StartupConfigBuilder;
 use tearchan::core::screen::ScreenMode;
+use crate::app::square_scene::SquareScene;
 
 pub mod app;
 
@@ -19,7 +19,7 @@ fn main() {
                 height: 800,
             }],
         })
-        .scene_creator(HelloWorldScene::creator())
+        .scene_creator(SquareScene::creator())
         .build()
         .unwrap();
 
