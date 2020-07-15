@@ -9,10 +9,10 @@ use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
 use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
 use crate::core::graphic::image::Image;
+use crate::math::mesh::IndexType;
 use gfx_hal::buffer::{IndexBufferView, SubRange};
 use gfx_hal::command::{ClearColor, ClearDepthStencil, ClearValue, CommandBuffer, SubpassContents};
 use gfx_hal::device::Device;
-use gfx_hal::IndexType;
 use nalgebra_glm::{vec2, Vec2};
 use std::ops::Deref;
 
@@ -52,6 +52,14 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
             &self.context.device,
             &self.static_context.memory_types,
             vertices,
+        )
+    }
+
+    pub fn create_index_buffer(&self, indices: &[IndexType]) -> IndexBufferCommon<B> {
+        IndexBufferCommon::new(
+            &self.context.device,
+            &self.static_context.memory_types,
+            indices,
         )
     }
 
@@ -164,7 +172,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         graphic_pipeline: &GraphicPipelineCommon<B>,
         index_size: usize,
         index_buffer: &IndexBufferCommon<B>,
-        vertex_buffers: &[VertexBufferCommon<B>],
+        vertex_buffers: &[&VertexBufferCommon<B>],
     ) {
         unsafe {
             // === Setup graphic pipeline
@@ -186,7 +194,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
             self.command_buffer.bind_index_buffer(IndexBufferView {
                 buffer: index_buffer.buffer(),
                 range: SubRange::WHOLE,
-                index_type: IndexType::U32,
+                index_type: gfx_hal::IndexType::U32,
             });
 
             // === Draw
