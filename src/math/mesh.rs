@@ -87,6 +87,23 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
+    pub fn with_square_and_color(
+        self,
+        size: Vec2,
+        color: Vec4,
+    ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        MeshBuilder {
+            indices: create_square_indices(),
+            positions: create_square_positions(&Rect2 {
+                origin: vec2(0.0f32, 0.0f32),
+                size,
+            }),
+            colors: create_square_colors(color),
+            texcoords: create_square_texcoords(&rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32)),
+            normals: self.normals,
+        }
+    }
+
     pub fn with_cube(
         self,
         rect: &Rect3<f32>,
