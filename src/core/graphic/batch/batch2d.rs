@@ -9,6 +9,7 @@ use crate::core::graphic::hal::index_buffer::IndexBufferMappedMemory;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferMappedMemory;
 use crate::core::graphic::polygon::Polygon;
 use crate::extension::shared::Shared;
+use crate::math::mesh::IndexType;
 use std::rc::Rc;
 
 pub type Batch2D = Batch<Polygon, Batch2DProvider, IndexBuffer, VertexBuffer>;
@@ -55,12 +56,18 @@ impl BatchProvider<Polygon, IndexBuffer, VertexBuffer> for Batch2DProvider {
         );
 
         // update positions, colors, texcoords, normals, indices
+        let vertex_offset =
+            context.vertex_pointers[0].borrow().first / self.vertex_buffers[0].stride;
         let mut object = context.object.borrow_mut();
         let index_mapping = match &mut self.index_mapping {
             Some(mapping) => mapping,
             None => return,
         };
-        object.copy_indices_into(index_mapping, context.index_pointer.borrow().first);
+        object.copy_indices_into(
+            index_mapping,
+            context.index_pointer.borrow().first,
+            vertex_offset as IndexType,
+        );
         object.copy_positions_into(
             &mut self.vertex_mappings[0],
             context.vertex_pointers[0].borrow().first,
