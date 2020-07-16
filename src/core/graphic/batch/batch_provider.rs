@@ -16,7 +16,7 @@ impl<TBuffer> BatchBufferContext<TBuffer> {
     }
 }
 
-pub trait BatchProvider<TObject, TIndexBuffer: BufferInterface, TBuffer: BufferInterface> {
+pub trait BatchProvider<TObject, TIndexBuffer: BufferInterface, TVertexBuffer: BufferInterface> {
     fn update(&mut self, context: &Rc<BatchContext<TObject>>);
 
     fn index_buffer(&self) -> &BatchBuffer<TIndexBuffer>;
@@ -25,9 +25,11 @@ pub trait BatchProvider<TObject, TIndexBuffer: BufferInterface, TBuffer: BufferI
 
     fn index_size(&self, object: &Shared<TObject>) -> usize;
 
-    fn vertex_buffer_contexts_mut(&mut self) -> &mut Vec<BatchBufferContext<BatchBuffer<TBuffer>>>;
+    fn vertex_buffer_contexts_mut(
+        &mut self,
+    ) -> &mut Vec<BatchBufferContext<BatchBuffer<TVertexBuffer>>>;
 
-    fn vertex_buffer_contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<TBuffer>>>;
+    fn vertex_buffer_contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<TVertexBuffer>>>;
 
     fn vertex_size(&self, object: &Shared<TObject>) -> usize;
 
@@ -124,6 +126,7 @@ pub mod test {
     };
     use crate::core::graphic::polygon::Polygon;
     use crate::extension::shared::Shared;
+    use crate::math::mesh::IndexType;
     use crate::utility::test::func::MockFunc;
     use std::rc::Rc;
 
@@ -178,7 +181,12 @@ pub mod test {
                 Some(mapping) => mapping,
                 None => return,
             };
-            object.copy_indices_into(index_mapping, context.index_pointer.borrow().first);
+            object.copy_indices_into(
+                index_mapping,
+                context.index_pointer.borrow().first,
+                (context.vertex_pointers[0].borrow().first / self.vertex_buffers[0].stride)
+                    as IndexType,
+            );
             object.copy_positions_into(
                 &mut self.vertex_mappings[0],
                 context.vertex_pointers[0].borrow().first,
@@ -209,11 +217,15 @@ pub mod test {
             object.borrow().index_size()
         }
 
-        fn vertex_buffer_contexts_mut(&mut self) -> &mut Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
+        fn vertex_buffer_contexts_mut(
+            &mut self,
+        ) -> &mut Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
             &mut self.vertex_buffers
         }
 
-        fn vertex_buffer_contexts(&self) -> &Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
+        fn vertex_buffer_contexts(
+            &self,
+        ) -> &Vec<BatchBufferContext<BatchBuffer<MockVertexBuffer>>> {
             &self.vertex_buffers
         }
 
