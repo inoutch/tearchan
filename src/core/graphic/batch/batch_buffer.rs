@@ -1,5 +1,5 @@
 use crate::core::graphic::batch::batch_pointer::BatchPointer;
-use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
+use crate::core::graphic::hal::buffer_interface::BufferInterface;
 use crate::extension::shared::{clone_shared, make_shared, Shared};
 use crate::utility::btree::DuplicatableBTreeMap;
 use std::collections::HashMap;
@@ -129,27 +129,11 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         cloned_pointers.sort_unstable_by(|a, b| a.borrow().first.cmp(&b.borrow().first));
 
         let mut first: usize = 0;
-        let mut mapping = self.buffer.open(0, self.last);
         for pointer in cloned_pointers {
-            let (from, size) = {
-                let p = pointer.borrow();
-                (p.first, p.size)
-            };
-            let to = first;
-            let mut buffers = Vec::with_capacity(size);
-            // Copy from
-            for i in 0..size {
-                buffers.push(mapping.get(i + from));
-            }
-
-            // Copy to
-            for i in 0..size {
-                mapping.set(buffers[i].clone(), i + to);
-            }
-
             pointer.borrow_mut().first = first;
             first += pointer.borrow().size;
         }
+
         self.last = first;
         self.pending_pointers.clear();
         self.fragmentation_size = 0;
@@ -424,12 +408,6 @@ mod test {
 
         batch_buffer.defragmentation();
         assert_eq!(batch_buffer.fragmentation_size, 0);
-        assert_eq!(
-            &batch_buffer.buffer.indices.borrow()[0..batch_buffer.last()],
-            &[
-                0u32, 1u32, 2u32, 3u32, 4u32, 5u32, 0u32, 1u32, 2u32, 0u32, 1u32, 0u32, 1u32, 2u32,
-                3u32
-            ]
-        );
+        assert_eq!(batch_buffer.last(), 15);
     }
 }
