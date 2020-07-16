@@ -185,6 +185,7 @@ impl Polygon {
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
+        vertex_offset: IndexType,
     ) {
         let range = match self.core.index_change_range.get_range() {
             Some(range) => range,
@@ -193,7 +194,7 @@ impl Polygon {
 
         for i in range {
             let index = self.mesh().indices[i];
-            buffer.set(index, offset + i);
+            buffer.set(index + vertex_offset, i + offset);
         }
         self.core.reset_all_index_change_range();
     }
