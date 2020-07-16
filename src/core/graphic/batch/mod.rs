@@ -6,8 +6,8 @@ use crate::extension::shared::{clone_shared, Shared};
 use crate::utility::change_notifier::ChangeNotifierObject;
 use serde::export::PhantomData;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::rc::Rc;
+use std::ops::Deref;
 
 pub mod batch2d;
 pub mod batch_buffer;
@@ -17,6 +17,7 @@ pub mod batch_provider;
 pub mod helpers;
 
 pub type BatchIndex = u32;
+pub const DEFAULT_DEFRAGMENTATION_BORDER: usize = 10000;
 
 pub struct BatchContext<TObject> {
     pub draw_order: BatchIndex,
@@ -29,6 +30,8 @@ pub struct Batch<TObject, TBatchProvider, TIndexBuffer, TVertexBuffer> {
     provider: TBatchProvider,
     contexts: HashMap<*const TObject, Rc<BatchContext<TObject>>>,
     change_manager: BatchChangeManager<TObject>,
+    pub defragmentation_border: usize,
+    need_all_copies: bool,
     _phantom_data0: PhantomData<TIndexBuffer>,
     _phantom_data1: PhantomData<TVertexBuffer>,
 }
@@ -45,6 +48,8 @@ where
             provider,
             contexts: HashMap::new(),
             change_manager: BatchChangeManager::default(),
+            defragmentation_border: DEFAULT_DEFRAGMENTATION_BORDER,
+            need_all_copies: false,
             _phantom_data0: PhantomData,
             _phantom_data1: PhantomData,
         }
@@ -91,16 +96,27 @@ where
     }
 
     pub fn flush(&mut self) {
-        let mut targets = self.change_manager.targets().borrow_mut();
-
         self.provider.open();
-        if !targets.is_empty() {
-            // Receive from client notification
-            for (_, target) in targets.iter_mut() {
-                self.provider.update(target);
+        if self.need_all_copies {
+            let targets = &mut self.contexts;
+            if !targets.is_empty() {
+                for (_, target) in targets.iter_mut() {
+                    self.provider.update(target);
+                }
+            }
+            self.need_all_copies = false;
+        } else {
+            let mut targets = self.change_manager.targets().borrow_mut();
+            if !targets.is_empty() {
+                // Receive from client notification
+                for (_, target) in targets.iter_mut() {
+                    self.provider.update(target);
+                }
             }
         }
         self.provider.close();
+
+        self.change_manager.reset();
     }
 
     pub fn index_size(&self) -> usize {
@@ -126,7 +142,6 @@ where
         vertex_size: usize,
         draw_order: BatchIndex,
     ) -> BatchContext<TObject> {
-        let index_pointer = self.provider.index_buffer_mut().allocate(index_size);
         let vertex_pointers = self
             .provider
             .vertex_buffer_contexts_mut()
@@ -136,7 +151,9 @@ where
                     .buffer
                     .allocate(context.stride as usize * vertex_size)
             })
-            .collect();
+            .collect::<Vec<_>>();
+
+        let index_pointer = self.provider.index_buffer_mut().allocate(index_size);
         BatchContext {
             draw_order,
             object: clone_shared(object),
@@ -149,6 +166,7 @@ where
         self.provider
             .index_buffer_mut()
             .free(&context.index_pointer);
+        let mut fragmentation_size = self.provider.index_buffer().fragmentation_size();
         for (i, vertex_buffer) in self
             .provider
             .vertex_buffer_contexts_mut()
@@ -156,6 +174,15 @@ where
             .enumerate()
         {
             vertex_buffer.buffer.free(&context.vertex_pointers[i]);
+            fragmentation_size += vertex_buffer.buffer.fragmentation_size();
+        }
+
+        if fragmentation_size >= self.defragmentation_border {
+            self.provider.index_buffer_mut().defragmentation();
+            for vertex_buffer in self.provider.vertex_buffer_contexts_mut().iter_mut() {
+                vertex_buffer.buffer.defragmentation();
+            }
+            self.need_all_copies = true;
         }
     }
 }
@@ -173,9 +200,9 @@ mod test {
     use crate::core::graphic::polygon::Polygon;
     use crate::extension::shared::make_shared;
     use crate::math::mesh::square::create_square_normals;
-    use crate::math::mesh::MeshBuilder;
+    use crate::math::mesh::{IndexType, MeshBuilder};
     use crate::utility::test::func::MockFunc;
-    use nalgebra_glm::vec2;
+    use nalgebra_glm::{vec2, vec4};
 
     pub type MockBatch = Batch<Polygon, MockBatchProvider, MockIndexBuffer, MockVertexBuffer>;
 
@@ -364,5 +391,102 @@ mod test {
         let polygon = make_shared(Polygon::new(mesh));
         batch.add(&polygon, 0);
         batch.add(&polygon, 0);
+    }
+
+    #[test]
+    fn test_defragmentation() {
+        let mock = make_shared(MockFunc::new());
+        let mut batch: MockBatch = Batch::new(MockBatchProvider::new(&mock));
+        batch.defragmentation_border = 0;
+
+        let mesh1 = MeshBuilder::new()
+            .normals(create_square_normals())
+            .with_square_and_color(vec2(1.0f32, 2.0f32), vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32))
+            .build()
+            .unwrap();
+        let mesh2 = MeshBuilder::new()
+            .normals(create_square_normals())
+            .with_square_and_color(vec2(1.0f32, 2.0f32), vec4(0.0f32, 1.0f32, 0.0f32, 1.0f32))
+            .build()
+            .unwrap();
+        let mesh3 = MeshBuilder::new()
+            .normals(create_square_normals())
+            .with_square_and_color(vec2(1.0f32, 2.0f32), vec4(0.0f32, 0.0f32, 1.0f32, 1.0f32))
+            .build()
+            .unwrap();
+
+        let p1 = make_shared(Polygon::new(mesh1.clone()));
+        let p2 = make_shared(Polygon::new(mesh2.clone()));
+        let p3 = make_shared(Polygon::new(mesh3.clone()));
+        batch.add(&p1, 0);
+        batch.add(&p2, 0);
+        batch.add(&p3, 0);
+
+        let indices = mesh1.indices.clone();
+        // let colors1 = mesh1
+        //     .colors
+        //     .iter()
+        //     .map(|c| vec![c.x, c.y, c.z, c.w])
+        //     .flatten()
+        //     .collect::<Vec<f32>>();
+        // let colors2 = mesh2
+        //     .colors
+        //     .iter()
+        //     .map(|c| vec![c.x, c.y, c.z, c.w])
+        //     .flatten()
+        //     .collect::<Vec<f32>>();
+        let colors3 = mesh3
+            .colors
+            .iter()
+            .map(|c| vec![c.x, c.y, c.z, c.w])
+            .flatten()
+            .collect::<Vec<f32>>();
+
+        batch.flush();
+        // 6
+        // 12 + 16 + 8 + 12 = 48
+        batch.defragmentation_border = 55;
+        batch.remove(&p1);
+
+        // no defragmentation
+        assert_eq!(batch.provider.index_buffer.last(), 18);
+        assert_eq!(batch.provider.vertex_buffers[0].buffer.last(), 36);
+        assert_eq!(batch.provider.vertex_buffers[1].buffer.last(), 48);
+        assert_eq!(batch.provider.vertex_buffers[2].buffer.last(), 24);
+        assert_eq!(batch.provider.vertex_buffers[3].buffer.last(), 36);
+
+        // use defragmentation
+        batch.defragmentation_border = 108;
+        batch.remove(&p2);
+        assert_eq!(batch.provider.index_buffer.last(), 6);
+        assert_eq!(batch.provider.vertex_buffers[0].buffer.last(), 12);
+        assert_eq!(batch.provider.vertex_buffers[1].buffer.last(), 16);
+        assert_eq!(batch.provider.vertex_buffers[2].buffer.last(), 8);
+        assert_eq!(batch.provider.vertex_buffers[3].buffer.last(), 12);
+
+        batch.flush();
+        {
+            let mut expect: Vec<IndexType> = vec![];
+            expect.extend(&indices);
+            assert_eq!(
+                batch.provider.index_buffer.buffer().indices.borrow()
+                    [0..batch.provider.index_buffer.last()]
+                    .to_vec(),
+                expect
+            );
+        }
+        {
+            let mut expect: Vec<f32> = vec![];
+            expect.extend(&colors3);
+            assert_nearly_eq!(
+                batch.provider.vertex_buffers[1]
+                    .buffer
+                    .buffer()
+                    .vertices
+                    .borrow()[0..batch.provider.vertex_buffers[1].buffer.last()]
+                    .to_vec(),
+                expect
+            );
+        }
     }
 }
