@@ -99,7 +99,7 @@ where
             false,
         ));
 
-        let frames_in_flight = 3;
+        let frames_in_flight = 1;
 
         let mut submission_complete_semaphores = Vec::with_capacity(frames_in_flight);
         let mut submission_complete_fences = Vec::with_capacity(frames_in_flight);
