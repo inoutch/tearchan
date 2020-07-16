@@ -5,9 +5,6 @@ use crate::utility::btree::DuplicatableBTreeMap;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-const DEFRAG_POINTER_SIZE: usize = 20;
-const DEFRAG_FRAGMENT_SIZE: usize = 300;
-
 pub struct BatchBuffer<TBuffer: BufferInterface> {
     buffer: TBuffer,
     buffer_factory: fn(&TBuffer, usize) -> TBuffer,
@@ -94,11 +91,6 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         self.fragmentation_size += pointer.borrow().size;
         self.buffer
             .clear(pointer.borrow().first, pointer.borrow().size);
-        if self.pending_pointers.len() >= DEFRAG_POINTER_SIZE
-            || self.fragmentation_size >= DEFRAG_FRAGMENT_SIZE
-        {
-            self.defragmentation();
-        }
     }
 
     pub fn buffer(&self) -> &TBuffer {
@@ -117,6 +109,10 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         self.last
     }
 
+    pub fn fragmentation_size(&self) -> usize {
+        self.fragmentation_size
+    }
+
     fn reallocate_buffer(&mut self, size: usize) {
         let new_size = size * 2;
         let factory = &self.buffer_factory;
@@ -124,7 +120,7 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
     }
 
     #[allow(clippy::needless_range_loop)]
-    fn defragmentation(&mut self) {
+    pub fn defragmentation(&mut self) {
         let mut cloned_pointers: Vec<_> = self
             .pointers
             .values()
@@ -135,9 +131,11 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         let mut first: usize = 0;
         let mut mapping = self.buffer.open(0, self.last);
         for pointer in cloned_pointers {
-            let from = pointer.borrow().first;
+            let (from, size) = {
+                let p = pointer.borrow();
+                (p.first, p.size)
+            };
             let to = first;
-            let size = pointer.borrow().size;
             let mut buffers = Vec::with_capacity(size);
             // Copy from
             for i in 0..size {
