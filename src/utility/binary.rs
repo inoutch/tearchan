@@ -1,5 +1,8 @@
 use std::ptr;
 
+/// # Safety
+///
+/// The argument of this function must be set to a size within the valid range of the pointer.
 pub unsafe fn get_value_from_ptr<T>(bytes_ptr: *const u8, offset: usize, default: T) -> T
 where
     T: Copy,
@@ -14,6 +17,9 @@ where
     ret
 }
 
+/// # Safety
+///
+/// The argument of this function must be set to a size within the valid range of the pointer.
 pub unsafe fn set_value_to_ptr<T>(bytes_ptr: *mut u8, offset: usize, value: T)
 where
     T: Copy,
