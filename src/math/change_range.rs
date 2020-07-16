@@ -73,6 +73,16 @@ impl ChangeRange {
             end: self.range_end,
         })
     }
+
+    pub fn get_range_or_full(&self) -> Range<usize> {
+        self.get_range().map_or(
+            Range {
+                start: 0,
+                end: self.size,
+            },
+            |x| x,
+        )
+    }
 }
 
 #[cfg(test)]
