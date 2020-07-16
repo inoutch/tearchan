@@ -84,8 +84,8 @@ impl<B: Backend> BufferInterface for IndexBufferCommon<B> {
     fn clear(&self, offset: usize, size: usize) {
         let mut mapping = self.open(offset, size);
         debug_assert!(offset + size <= self.size);
-        unsafe {
-            std::ptr::write_bytes(&mut mapping, 0, size);
+        for i in 0..size {
+            mapping.set(0, i);
         }
         self.close(mapping);
     }
