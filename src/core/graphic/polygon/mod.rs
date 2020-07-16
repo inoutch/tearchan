@@ -187,11 +187,7 @@ impl Polygon {
         offset: usize,
         vertex_offset: IndexType,
     ) {
-        let range = match self.core.index_change_range.get_range() {
-            Some(range) => range,
-            None => return,
-        };
-
+        let range = self.core.index_change_range.get_range_or_full();
         for i in range {
             let index = self.mesh().indices[i];
             buffer.set(index + vertex_offset, i + offset);
@@ -205,28 +201,27 @@ impl Polygon {
         offset: usize,
     ) {
         let change_range = &self.core.position_change_range;
-        if let Some(range) = change_range.get_range() {
-            let matrix = self.provider.transform(&self.core);
-            let mesh_positions = &self.mesh().positions;
+        let range = change_range.get_range_or_full();
+        let matrix = self.provider.transform(&self.core);
+        let mesh_positions = &self.mesh().positions;
 
-            if self.computed_visible() {
-                for i in range {
-                    let mesh_position = &mesh_positions[i as usize];
-                    let m = &matrix;
-                    let v = m * vec4(mesh_position.x, mesh_position.y, mesh_position.z, 1.0f32);
-                    buffer.set(v.x, offset + i * 3);
-                    buffer.set(v.y, offset + i * 3 + 1);
-                    buffer.set(v.z, offset + i * 3 + 2);
-                }
-            } else {
-                for i in range {
-                    buffer.set(0.0f32, offset + i * 3);
-                    buffer.set(0.0f32, offset + i * 3 + 1);
-                    buffer.set(0.0f32, offset + i * 3 + 2);
-                }
+        if self.computed_visible() {
+            for i in range {
+                let mesh_position = &mesh_positions[i as usize];
+                let m = &matrix;
+                let v = m * vec4(mesh_position.x, mesh_position.y, mesh_position.z, 1.0f32);
+                buffer.set(v.x, offset + i * 3);
+                buffer.set(v.y, offset + i * 3 + 1);
+                buffer.set(v.z, offset + i * 3 + 2);
             }
-            self.core.reset_all_position_change_range();
+        } else {
+            for i in range {
+                buffer.set(0.0f32, offset + i * 3);
+                buffer.set(0.0f32, offset + i * 3 + 1);
+                buffer.set(0.0f32, offset + i * 3 + 2);
+            }
         }
+        self.core.reset_all_position_change_range();
     }
 
     pub fn copy_colors_into<TBuffer: BufferMappedMemoryInterface<f32>>(
@@ -235,23 +230,22 @@ impl Polygon {
         offset: usize,
     ) {
         let change_range = &self.core.color_change_range;
-        if let Some(range) = change_range.get_range() {
-            let color = if let Some(x) = self.core.parent() {
-                x.borrow().computed_color()
-            } else {
-                self.computed_color()
-            };
-            let mesh_colors = &self.mesh().colors;
+        let range = change_range.get_range_or_full();
+        let color = if let Some(x) = self.core.parent() {
+            x.borrow().computed_color()
+        } else {
+            self.computed_color()
+        };
+        let mesh_colors = &self.mesh().colors;
 
-            for i in range {
-                let base_color = &mesh_colors[i as usize];
-                buffer.set(color.x * base_color.x, offset + i * 4);
-                buffer.set(color.y * base_color.y, offset + i * 4 + 1);
-                buffer.set(color.z * base_color.z, offset + i * 4 + 2);
-                buffer.set(color.w * base_color.w, offset + i * 4 + 3);
-            }
-            self.core.reset_all_color_change_range();
+        for i in range {
+            let base_color = &mesh_colors[i as usize];
+            buffer.set(color.x * base_color.x, offset + i * 4);
+            buffer.set(color.y * base_color.y, offset + i * 4 + 1);
+            buffer.set(color.z * base_color.z, offset + i * 4 + 2);
+            buffer.set(color.w * base_color.w, offset + i * 4 + 3);
         }
+        self.core.reset_all_color_change_range();
     }
 
     pub fn copy_texcoords_into<TBuffer: BufferMappedMemoryInterface<f32>>(
@@ -260,16 +254,15 @@ impl Polygon {
         offset: usize,
     ) {
         let change_range = &self.core.texcoord_change_range;
-        if let Some(range) = change_range.get_range() {
-            let mesh_texcoords = &self.mesh().texcoords;
+        let range = change_range.get_range_or_full();
+        let mesh_texcoords = &self.mesh().texcoords;
 
-            for i in range {
-                let uv = &mesh_texcoords[i as usize];
-                buffer.set(uv.x, offset + i * 2);
-                buffer.set(uv.y, offset + i * 2 + 1);
-            }
-            self.core.reset_all_texcoord_change_range();
+        for i in range {
+            let uv = &mesh_texcoords[i as usize];
+            buffer.set(uv.x, offset + i * 2);
+            buffer.set(uv.y, offset + i * 2 + 1);
         }
+        self.core.reset_all_texcoord_change_range();
     }
 
     pub fn copy_normals_into<TBuffer: BufferMappedMemoryInterface<f32>>(
@@ -278,19 +271,18 @@ impl Polygon {
         offset: usize,
     ) {
         let change_range = &self.core.normal_change_range;
-        if let Some(range) = change_range.get_range() {
-            let matrix = self.provider.transform(&self.core);
-            let mesh_normals = &self.mesh().normals;
+        let range = change_range.get_range_or_full();
+        let matrix = self.provider.transform(&self.core);
+        let mesh_normals = &self.mesh().normals;
 
-            for i in range {
-                let m = &matrix;
-                let v = m * vec3_to_vec4(&mesh_normals[i as usize]);
-                buffer.set(v.x, offset + i * 3);
-                buffer.set(v.y, offset + i * 3 + 1);
-                buffer.set(v.z, offset + i * 3 + 2);
-            }
-            self.core.reset_all_normal_change_range();
+        for i in range {
+            let m = &matrix;
+            let v = m * vec3_to_vec4(&mesh_normals[i as usize]);
+            buffer.set(v.x, offset + i * 3);
+            buffer.set(v.y, offset + i * 3 + 1);
+            buffer.set(v.z, offset + i * 3 + 2);
         }
+        self.core.reset_all_normal_change_range();
     }
 
     pub fn vertex_size(&self) -> usize {
