@@ -102,7 +102,7 @@ impl Billboard {
             let frame = texture_atlas.frames.first().unwrap();
             vec2(frame.source.w as f32, frame.source.h as f32)
         };
-        let rect_size = 6;
+        let rect_size = 4;
         let provider = BillboardProvider {
             polygon_2d_provider: Polygon2DProvider::new(size),
             origin_change_range: ChangeRange::new(rect_size),
