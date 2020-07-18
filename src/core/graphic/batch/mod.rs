@@ -13,6 +13,7 @@ pub mod batch2d;
 pub mod batch3d;
 pub mod batch_buffer;
 pub mod batch_change_manager;
+pub mod batch_line;
 pub mod batch_pointer;
 pub mod batch_provider;
 pub mod helpers;
