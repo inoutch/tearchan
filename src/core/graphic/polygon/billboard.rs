@@ -5,10 +5,10 @@ use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, Polygon
 use crate::core::graphic::texture::TextureAtlas;
 use crate::extension::shared::Shared;
 use crate::math::change_range::ChangeRange;
-use crate::utility::buffer_interface::BufferInterface;
 use crate::utility::change_notifier::{ChangeNotifier, ChangeNotifierObject};
 use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec2, Vec3};
 use std::any::Any;
+use crate::core::graphic::hal::buffer_interface::BufferMappedMemoryInterface;
 
 pub struct BillboardProvider {
     polygon_2d_provider: Polygon2DProvider,
@@ -113,7 +113,7 @@ impl Billboard {
         }
     }
 
-    pub fn copy_origins_into<TBuffer: BufferInterface<f32>>(
+    pub fn copy_origins_into<TBuffer: BufferMappedMemoryInterface<f32>>(
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
@@ -124,16 +124,14 @@ impl Billboard {
             polygon.provider_as_any_mut().downcast_mut().unwrap();
 
         let change_range = &provider.origin_change_range;
-        if let Some(range) = change_range.get_range() {
-            buffer.update_with_range(range.start * 3 + offset, range.end * 3 + offset);
-            for i in range {
-                buffer.copy(offset + i * 3, position.x);
-                buffer.copy(offset + i * 3 + 1, position.y);
-                buffer.copy(offset + i * 3 + 2, position.z);
-            }
-
-            provider.reset_all_origin_change_range();
+        let range = change_range.get_range_or_full();
+        for i in range {
+            buffer.set(position.x, offset + i * 3);
+            buffer.set(position.y, offset + i * 3 + 1);
+            buffer.set(position.z, offset + i * 3 + 2);
         }
+
+        provider.reset_all_origin_change_range();
     }
 
     #[inline]

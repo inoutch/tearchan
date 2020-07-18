@@ -11,6 +11,7 @@ use std::rc::Rc;
 
 pub mod batch2d;
 pub mod batch3d;
+pub mod batch_billboard;
 pub mod batch_buffer;
 pub mod batch_change_manager;
 pub mod batch_line;
