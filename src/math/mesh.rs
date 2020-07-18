@@ -270,6 +270,7 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
             colors.push(make_vec4_white());
 
             indices.push(indices.len() as IndexType);
+            indices.push(indices.len() as IndexType);
         }
 
         for y in range.start.1..=range.end.1 {
@@ -279,6 +280,7 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
             colors.push(make_vec4_white());
             colors.push(make_vec4_white());
 
+            indices.push(indices.len() as IndexType);
             indices.push(indices.len() as IndexType);
         }
 
