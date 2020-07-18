@@ -113,9 +113,7 @@ pub trait PolygonProvider {
     fn as_any_provider_mut(&mut self) -> &mut dyn Any;
 
     fn request_change(&mut self, core: &mut PolygonCore) {
-        if let Some(notifier) = &mut core.notifier {
-            notifier.request_change();
-        }
+        core.request_change();
     }
 }
 
@@ -545,6 +543,12 @@ impl PolygonCore {
     pub fn update_normals_of_mesh(&mut self, normals: Vec<Vec3>) {
         self.mesh.normals = normals;
         self.update_all_normals();
+    }
+
+    pub fn request_change(&mut self) {
+        if let Some(notifier) = &mut self.notifier {
+            notifier.request_change();
+        }
     }
 }
 

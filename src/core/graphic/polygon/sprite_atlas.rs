@@ -81,16 +81,12 @@ impl<T: 'static + Polygon2DProviderInterface> SpriteAtlasCommon<T> {
             let positions = create_square_positions_from_frame(frame);
             let texcoords =
                 create_square_texcoords_from_frame(self.texture_atlas.size.to_vec2(), frame);
-            self.polygon
-                .polygon()
-                .borrow_mut()
-                .core
-                .update_positions_of_mesh(positions);
-            self.polygon
-                .polygon()
-                .borrow_mut()
-                .core
-                .update_texcoords_of_mesh(texcoords);
+            {
+                let mut polygon = self.polygon.polygon().borrow_mut();
+                polygon.core.update_positions_of_mesh(positions);
+                polygon.core.update_texcoords_of_mesh(texcoords);
+                polygon.core.request_change();
+            }
             self.polygon
                 .set_size::<T>(vec2(frame.source.w as f32, frame.source.h as f32));
         }
