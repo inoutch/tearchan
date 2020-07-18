@@ -824,6 +824,7 @@ pub mod obj {
         debug_assert!(mesh.texcoords.len() % 2 == 0);
         debug_assert!(mesh.normals.len() % 3 == 0);
 
+        let index_offset = positions.len();
         let size = mesh.positions.len() / 3;
         debug_assert_eq!(
             size,
@@ -863,7 +864,7 @@ pub mod obj {
             let end = next_face + mesh.num_face_indices[face_num] as usize;
             let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
             for idx in face_indices {
-                indices.push(*idx);
+                indices.push(*idx + index_offset as IndexType);
             }
             next_face = end;
         }
