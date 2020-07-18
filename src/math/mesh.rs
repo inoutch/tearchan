@@ -775,7 +775,7 @@ pub mod cube {
 pub mod obj {
     use crate::math::mesh::{convert_texcoord_into_rect, IndexType};
     use crate::math::rect::Rect2;
-    use nalgebra_glm::{vec3, vec4, Vec2, Vec3, Vec4};
+    use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 
     pub fn create_bundles_from_mesh(
         positions: &mut Vec<Vec3>,
@@ -825,7 +825,14 @@ pub mod obj {
         debug_assert!(mesh.normals.len() % 3 == 0);
 
         let size = mesh.positions.len() / 3;
-        debug_assert_eq!(size, mesh.texcoords.len() / 2);
+        debug_assert_eq!(
+            size,
+            if mesh.texcoords.is_empty() {
+                size
+            } else {
+                mesh.texcoords.len() / 2
+            }
+        );
         debug_assert_eq!(size, mesh.normals.len() / 3);
 
         for i in 0..size {
@@ -835,11 +842,15 @@ pub mod obj {
                 mesh.positions[i * 3 + 2],
             ));
             colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
-            texcoords.push(convert_texcoord_into_rect(
-                mesh.texcoords[i * 2],
-                1.0f32 - mesh.texcoords[i * 2 + 1], // Need inverse for OBJ
-                texture_rect,
-            ));
+            if mesh.texcoords.is_empty() {
+                texcoords.push(vec2(0.0f32, 0.0f32));
+            } else {
+                texcoords.push(convert_texcoord_into_rect(
+                    mesh.texcoords[i * 2],
+                    1.0f32 - mesh.texcoords[i * 2 + 1], // Need inverse for OBJ
+                    texture_rect,
+                ));
+            }
             normals.push(vec3(
                 mesh.normals[i * 3],
                 mesh.normals[i * 3 + 1],
