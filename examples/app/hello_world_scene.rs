@@ -1,8 +1,5 @@
-use crate::app::billboard_scene::BillboardScene;
 use nalgebra_glm::vec3;
 use tearchan::core::graphic::batch::batch3d::Batch3D;
-use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
-use tearchan::core::graphic::batch::Batch;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
@@ -20,7 +17,7 @@ use winit::event::KeyboardInput;
 
 pub struct HelloWorldScene {
     camera: Camera3D,
-    batch: Batch<Polygon, BatchBufferF32, Batch3D<BatchBufferF32>>,
+    batch: Batch3D,
     shader_program: Standard3DShaderProgram,
     texture: Texture,
     graphic_pipeline: GraphicPipeline,
@@ -50,7 +47,7 @@ impl HelloWorldScene {
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
             let mesh = MeshBuilder::new().with_simple_cube(1.0f32).build().unwrap();
-            let mut batch = Batch3D::new(scene_context.renderer_api);
+            let mut batch = Batch3D::new_batch3d(scene_context.renderer_api);
             let polygon = make_shared(Polygon::new(mesh));
             polygon
                 .borrow_mut()
@@ -91,17 +88,12 @@ impl SceneBase for HelloWorldScene {
         scene_context
             .renderer_api
             .write_descriptor_sets(write_descriptor_sets);
-        scene_context.renderer_api.draw_vertices(
+        scene_context.renderer_api.draw_elements(
             &self.graphic_pipeline,
-            &self
-                .batch
-                .batch_buffers()
-                .iter()
-                .map(|x| x.vertex_buffer())
-                .collect::<Vec<_>>(),
-            self.batch.vertex_count(),
+            self.batch.index_size(),
+            self.batch.index_buffer(),
+            &self.batch.vertex_buffers(),
         );
-        scene_context.transit_scene(BillboardScene::creator(), None);
     }
 
     fn on_touch_start(&mut self, touch: &Touch) {
