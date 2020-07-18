@@ -548,8 +548,8 @@ pub mod cube {
         vec![
             8, 10, 11, // 0
             8, 11, 9, // 3
-            19, 20, 21, // 6
-            20, 19, 18, // 9
+            23, 20, 21, // 6
+            23, 22, 20, // 9
             3, 0, 1, //12
             3, 2, 0, //15
             17, 18, 19, //18
@@ -590,57 +590,57 @@ pub mod cube {
                 rect.origin.z + rect.size.z,
             ), // 7
             // face: 2
-            vec3(rect.origin.x, rect.origin.y, rect.origin.z),
-            vec3(rect.origin.x, rect.origin.y + rect.size.y, rect.origin.z),
-            vec3(rect.origin.x, rect.origin.y, rect.origin.z + rect.size.z),
+            vec3(rect.origin.x, rect.origin.y, rect.origin.z), // 8
+            vec3(rect.origin.x, rect.origin.y + rect.size.y, rect.origin.z), // 9
+            vec3(rect.origin.x, rect.origin.y, rect.origin.z + rect.size.z), // 10
             vec3(
                 rect.origin.x,
                 rect.origin.y + rect.size.y,
                 rect.origin.z + rect.size.z,
-            ),
+            ), // 11
             // face: 3
+            vec3(rect.origin.x, rect.origin.y, rect.origin.z + rect.size.z), // 12
             vec3(
                 rect.origin.x,
                 rect.origin.y + rect.size.y,
                 rect.origin.z + rect.size.z,
-            ), // 6
-            vec3(rect.origin.x, rect.origin.y, rect.origin.z + rect.size.z), // 2
+            ), // 13
             vec3(
                 rect.origin.x + rect.size.x,
                 rect.origin.y,
                 rect.origin.z + rect.size.z,
-            ), // 3
+            ), // 14
             vec3(
                 rect.origin.x + rect.size.x,
                 rect.origin.y + rect.size.y,
                 rect.origin.z + rect.size.z,
-            ), // 7
+            ), // 15
             // face: 4
             vec3(
                 rect.origin.x + rect.size.x,
                 rect.origin.y,
                 rect.origin.z + rect.size.z,
-            ), // 3
+            ), // 16
             vec3(
                 rect.origin.x + rect.size.x,
                 rect.origin.y + rect.size.y,
                 rect.origin.z + rect.size.z,
-            ), // 7
-            vec3(rect.origin.x + rect.size.x, rect.origin.y, rect.origin.z), // 1
+            ), // 17
+            vec3(rect.origin.x + rect.size.x, rect.origin.y, rect.origin.z), // 18
             vec3(
                 rect.origin.x + rect.size.x,
                 rect.origin.y + rect.size.y,
                 rect.origin.z,
-            ), // 5
+            ), // 19
             // face: 5
-            vec3(rect.origin.x, rect.origin.y, rect.origin.z), // 0
-            vec3(rect.origin.x, rect.origin.y + rect.size.y, rect.origin.z), // 4
-            vec3(rect.origin.x + rect.size.x, rect.origin.y, rect.origin.z), // 1
+            vec3(rect.origin.x, rect.origin.y, rect.origin.z), // 20
+            vec3(rect.origin.x, rect.origin.y + rect.size.y, rect.origin.z), // 21
+            vec3(rect.origin.x + rect.size.x, rect.origin.y, rect.origin.z), // 22
             vec3(
                 rect.origin.x + rect.size.x,
                 rect.origin.y + rect.size.y,
                 rect.origin.z,
-            ), // 5
+            ), // 23
         ]
     }
 
