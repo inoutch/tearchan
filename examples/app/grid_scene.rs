@@ -1,9 +1,7 @@
 use gfx_hal::pso::{FrontFace, PolygonMode, Primitive, Rasterizer, State};
 use nalgebra_glm::vec3;
 use std::ops::Range;
-use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
 use tearchan::core::graphic::batch::batch_line::BatchLine;
-use tearchan::core::graphic::batch::Batch;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::GraphicPipeline;
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
@@ -19,7 +17,7 @@ use winit::event::KeyboardInput;
 
 pub struct GridScene {
     camera: Camera3D,
-    batch: Batch<Polygon, BatchBufferF32, BatchLine<BatchBufferF32>>,
+    batch: BatchLine,
     shader_program: GridShaderProgram,
     graphic_pipeline: GraphicPipeline,
 }
@@ -52,7 +50,7 @@ impl GridScene {
                 },
             );
 
-            let mut batch = BatchLine::new(scene_context.renderer_api);
+            let mut batch = BatchLine::new_batch_line(scene_context.renderer_api);
             let mesh = MeshBuilder::new()
                 .with_grid(
                     0.5f32,
@@ -97,15 +95,11 @@ impl SceneBase for GridScene {
         context
             .renderer_api
             .write_descriptor_sets(write_descriptor_sets);
-        context.renderer_api.draw_vertices(
+        context.renderer_api.draw_elements(
             &self.graphic_pipeline,
-            &self
-                .batch
-                .batch_buffers()
-                .iter()
-                .map(|x| x.vertex_buffer())
-                .collect::<Vec<_>>(),
-            self.batch.vertex_count(),
+            self.batch.index_size(),
+            self.batch.index_buffer(),
+            &self.batch.vertex_buffers(),
         );
     }
 
