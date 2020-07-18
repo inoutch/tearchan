@@ -17,7 +17,7 @@ impl<TBuffer> BatchBufferContext<TBuffer> {
 }
 
 pub trait BatchProvider<TObject, TIndexBuffer: BufferInterface, TVertexBuffer: BufferInterface> {
-    fn update(&mut self, context: &Rc<BatchContext<TObject>>);
+    fn update(&mut self, context: &Rc<BatchContext<TObject>>, force: bool);
 
     fn index_buffer(&self) -> &BatchBuffer<TIndexBuffer>;
 
@@ -174,7 +174,7 @@ pub mod test {
     }
 
     impl BatchProvider<Polygon, MockIndexBuffer, MockVertexBuffer> for MockBatchProvider {
-        fn update(&mut self, context: &Rc<BatchContext<Polygon>>) {
+        fn update(&mut self, context: &Rc<BatchContext<Polygon>>, force: bool) {
             // update positions, colors, texcoords, normals, indices
             let mut object = context.object.borrow_mut();
             let index_mapping = match &mut self.index_mapping {
@@ -186,22 +186,27 @@ pub mod test {
                 context.index_pointer.borrow().first,
                 (context.vertex_pointers[0].borrow().first / self.vertex_buffers[0].stride)
                     as IndexType,
+                force,
             );
             object.copy_positions_into(
                 &mut self.vertex_mappings[0],
                 context.vertex_pointers[0].borrow().first,
+                force,
             );
             object.copy_colors_into(
                 &mut self.vertex_mappings[1],
                 context.vertex_pointers[1].borrow().first,
+                force,
             );
             object.copy_texcoords_into(
                 &mut self.vertex_mappings[2],
                 context.vertex_pointers[2].borrow().first,
+                force,
             );
             object.copy_normals_into(
                 &mut self.vertex_mappings[3],
                 context.vertex_pointers[3].borrow().first,
+                force,
             );
         }
 

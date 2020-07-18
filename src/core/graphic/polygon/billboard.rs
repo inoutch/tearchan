@@ -1,4 +1,5 @@
 use crate::core::graphic::batch::batch_change_manager::BatchChangeNotifier;
+use crate::core::graphic::hal::buffer_interface::BufferMappedMemoryInterface;
 use crate::core::graphic::polygon::polygon_2d::{Polygon2DProvider, Polygon2DProviderInterface};
 use crate::core::graphic::polygon::sprite_atlas::{SpriteAtlas, SpriteAtlasCommon};
 use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, PolygonProvider};
@@ -8,7 +9,6 @@ use crate::math::change_range::ChangeRange;
 use crate::utility::change_notifier::{ChangeNotifier, ChangeNotifierObject};
 use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec2, Vec3};
 use std::any::Any;
-use crate::core::graphic::hal::buffer_interface::BufferMappedMemoryInterface;
 
 pub struct BillboardProvider {
     polygon_2d_provider: Polygon2DProvider,
@@ -117,6 +117,7 @@ impl Billboard {
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
+        force: bool,
     ) {
         let position = { self.polygon.polygon().borrow().position().to_owned() };
         let mut polygon = self.polygon.polygon().borrow_mut();
@@ -124,7 +125,13 @@ impl Billboard {
             polygon.provider_as_any_mut().downcast_mut().unwrap();
 
         let change_range = &provider.origin_change_range;
-        let range = change_range.get_range_or_full();
+        let range = match force {
+            true => change_range.get_range_or_full(),
+            false => match change_range.get_range() {
+                Some(range) => range,
+                None => return,
+            },
+        };
         for i in range {
             buffer.set(position.x, offset + i * 3);
             buffer.set(position.y, offset + i * 3 + 1);

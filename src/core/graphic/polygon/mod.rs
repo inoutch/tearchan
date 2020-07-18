@@ -186,8 +186,15 @@ impl Polygon {
         buffer: &mut TBuffer,
         offset: usize,
         vertex_offset: IndexType,
+        force: bool,
     ) {
-        let range = self.core.index_change_range.get_range_or_full();
+        let range = match force {
+            true => self.core.index_change_range.get_range_or_full(),
+            false => match self.core.index_change_range.get_range() {
+                Some(range) => range,
+                None => return,
+            },
+        };
         for i in range {
             let index = self.mesh().indices[i];
             buffer.set(index + vertex_offset, i + offset);
@@ -199,9 +206,16 @@ impl Polygon {
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
+        force: bool,
     ) {
         let change_range = &self.core.position_change_range;
-        let range = change_range.get_range_or_full();
+        let range = match force {
+            true => change_range.get_range_or_full(),
+            false => match change_range.get_range() {
+                Some(range) => range,
+                None => return,
+            },
+        };
         let matrix = self.provider.transform(&self.core);
         let mesh_positions = &self.mesh().positions;
 
@@ -228,9 +242,16 @@ impl Polygon {
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
+        force: bool,
     ) {
         let change_range = &self.core.color_change_range;
-        let range = change_range.get_range_or_full();
+        let range = match force {
+            true => change_range.get_range_or_full(),
+            false => match change_range.get_range() {
+                Some(range) => range,
+                None => return,
+            },
+        };
         let color = if let Some(x) = self.core.parent() {
             x.borrow().computed_color()
         } else {
@@ -252,9 +273,16 @@ impl Polygon {
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
+        force: bool,
     ) {
         let change_range = &self.core.texcoord_change_range;
-        let range = change_range.get_range_or_full();
+        let range = match force {
+            true => change_range.get_range_or_full(),
+            false => match change_range.get_range() {
+                Some(range) => range,
+                None => return,
+            },
+        };
         let mesh_texcoords = &self.mesh().texcoords;
 
         for i in range {
@@ -269,9 +297,17 @@ impl Polygon {
         &mut self,
         buffer: &mut TBuffer,
         offset: usize,
+        force: bool,
     ) {
         let change_range = &self.core.normal_change_range;
-        let range = change_range.get_range_or_full();
+        let range = match force {
+            true => change_range.get_range_or_full(),
+            false => match change_range.get_range() {
+                Some(range) => range,
+                None => return,
+            },
+        };
+
         let matrix = self.provider.transform(&self.core);
         let mesh_normals = &self.mesh().normals;
 

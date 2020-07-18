@@ -104,7 +104,7 @@ where
             let targets = &mut self.contexts;
             if !targets.is_empty() {
                 for (_, target) in targets.iter_mut() {
-                    self.provider.update(target);
+                    self.provider.update(target, self.need_all_copies);
                 }
             }
             self.need_all_copies = false;
@@ -113,7 +113,7 @@ where
             if !targets.is_empty() {
                 // Receive from client notification
                 for (_, target) in targets.iter_mut() {
-                    self.provider.update(target);
+                    self.provider.update(target, self.need_all_copies);
                 }
             }
         }

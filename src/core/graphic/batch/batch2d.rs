@@ -43,7 +43,7 @@ impl Batch2DProvider {
 }
 
 impl BatchProvider<Polygon, IndexBuffer, VertexBuffer> for Batch2DProvider {
-    fn update(&mut self, context: &Rc<BatchContext<Polygon>>) {
+    fn update(&mut self, context: &Rc<BatchContext<Polygon>>, force: bool) {
         debug_assert_eq!(
             self.vertex_buffers.len(),
             3,
@@ -67,18 +67,22 @@ impl BatchProvider<Polygon, IndexBuffer, VertexBuffer> for Batch2DProvider {
             index_mapping,
             context.index_pointer.borrow().first,
             vertex_offset as IndexType,
+            force,
         );
         object.copy_positions_into(
             &mut self.vertex_mappings[0],
             context.vertex_pointers[0].borrow().first,
+            force,
         );
         object.copy_colors_into(
             &mut self.vertex_mappings[1],
             context.vertex_pointers[1].borrow().first,
+            force,
         );
         object.copy_texcoords_into(
             &mut self.vertex_mappings[2],
             context.vertex_pointers[2].borrow().first,
+            force,
         );
     }
 

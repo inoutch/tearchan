@@ -44,7 +44,7 @@ impl BatchBillboardProvider {
 }
 
 impl BatchProvider<Billboard, IndexBuffer, VertexBuffer> for BatchBillboardProvider {
-    fn update(&mut self, context: &Rc<BatchContext<Billboard>>) {
+    fn update(&mut self, context: &Rc<BatchContext<Billboard>>, force: bool) {
         debug_assert_eq!(
             self.vertex_buffers.len(),
             4,
@@ -70,23 +70,28 @@ impl BatchProvider<Billboard, IndexBuffer, VertexBuffer> for BatchBillboardProvi
                 index_mapping,
                 context.index_pointer.borrow().first,
                 vertex_offset as IndexType,
+                force,
             );
             polygon.copy_positions_into(
                 &mut self.vertex_mappings[0],
                 context.vertex_pointers[0].borrow().first,
+                force,
             );
             polygon.copy_colors_into(
                 &mut self.vertex_mappings[1],
                 context.vertex_pointers[1].borrow().first,
+                force,
             );
             polygon.copy_texcoords_into(
                 &mut self.vertex_mappings[2],
                 context.vertex_pointers[2].borrow().first,
+                force,
             );
         }
         object.copy_origins_into(
             &mut self.vertex_mappings[3],
             context.vertex_pointers[3].borrow().first,
+            force,
         );
     }
 
