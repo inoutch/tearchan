@@ -6,10 +6,11 @@ use crate::extension::shared::{clone_shared, Shared};
 use crate::utility::change_notifier::ChangeNotifierObject;
 use serde::export::PhantomData;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::ops::Deref;
+use std::rc::Rc;
 
 pub mod batch2d;
+pub mod batch3d;
 pub mod batch_buffer;
 pub mod batch_change_manager;
 pub mod batch_pointer;
