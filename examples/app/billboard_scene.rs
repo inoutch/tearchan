@@ -1,10 +1,9 @@
+use crate::app::texture_bundle::generate_texture_bundle;
 use gfx_hal::pso::{FrontFace, PolygonMode, Primitive, Rasterizer, State};
 use nalgebra_glm::vec3;
 use std::ops::Range;
 use tearchan::core::graphic::batch::batch_billboard::BatchBillboard;
-use tearchan::core::graphic::batch::batch_buffer_f32::BatchBufferF32;
 use tearchan::core::graphic::batch::batch_line::BatchLine;
-use tearchan::core::graphic::batch::Batch;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
@@ -20,15 +19,14 @@ use tearchan::core::scene::touch::Touch;
 use tearchan::extension::shared::make_shared;
 use tearchan::math::mesh::MeshBuilder;
 use winit::event::KeyboardInput;
-use crate::app::texture_bundle::generate_texture_bundle;
 
 pub struct BillboardScene {
     camera: Camera3D,
     camera_radian: f32,
-    grid_batch: Batch<Polygon, BatchBufferF32, BatchLine<BatchBufferF32>>,
+    grid_batch: BatchLine,
     grid_shader_program: GridShaderProgram,
     grid_graphic_pipeline: GraphicPipeline,
-    billboard_batch: Batch<Billboard, BatchBufferF32, BatchBillboard<BatchBufferF32>>,
+    billboard_batch: BatchBillboard,
     billboard_shader_program: BillboardShaderProgram,
     billboard_graphic_pipeline: GraphicPipeline,
     billboard_texture: Texture,
@@ -70,7 +68,7 @@ impl BillboardScene {
             },
         );
 
-        let mut grid_batch = BatchLine::new(ctx.renderer_api);
+        let mut grid_batch = BatchLine::new_batch_line(ctx.renderer_api);
         let mesh = MeshBuilder::new()
             .with_grid(
                 0.5f32,
@@ -95,7 +93,7 @@ impl BillboardScene {
             .renderer_api
             .create_texture(&image, TextureConfig::default());
 
-        let mut billboard_batch = BatchBillboard::new(ctx.renderer_api);
+        let mut billboard_batch = BatchBillboard::new_batch_billboard(ctx.renderer_api);
         let billboard_shader_program = BillboardShaderProgram::new(ctx.renderer_api, camera.base());
         let billboard_graphic_pipeline = ctx.renderer_api.create_graphic_pipeline(
             billboard_shader_program.shader(),
@@ -151,15 +149,11 @@ impl SceneBase for BillboardScene {
 
         ctx.renderer_api
             .write_descriptor_sets(write_descriptor_sets);
-        ctx.renderer_api.draw_vertices(
+        ctx.renderer_api.draw_elements(
             &self.grid_graphic_pipeline,
-            &self
-                .grid_batch
-                .batch_buffers()
-                .iter()
-                .map(|x| x.vertex_buffer())
-                .collect::<Vec<_>>(),
-            self.grid_batch.vertex_count(),
+            self.grid_batch.index_size(),
+            self.grid_batch.index_buffer(),
+            &self.grid_batch.vertex_buffers(),
         );
 
         self.billboard_shader_program.prepare(self.camera.base());
@@ -171,15 +165,11 @@ impl SceneBase for BillboardScene {
 
         ctx.renderer_api
             .write_descriptor_sets(write_descriptor_sets);
-        ctx.renderer_api.draw_vertices(
+        ctx.renderer_api.draw_elements(
             &self.billboard_graphic_pipeline,
-            &self
-                .billboard_batch
-                .batch_buffers()
-                .iter()
-                .map(|x| x.vertex_buffer())
-                .collect::<Vec<_>>(),
-            self.billboard_batch.vertex_count(),
+            self.billboard_batch.index_size(),
+            self.billboard_batch.index_buffer(),
+            &self.billboard_batch.vertex_buffers(),
         );
     }
 
