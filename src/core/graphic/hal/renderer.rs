@@ -199,6 +199,7 @@ where
 
         self.properties.display_size.viewport.rect.w = extent.width as _;
         self.properties.display_size.viewport.rect.h = extent.height as _;
+        self.properties.display_size.screen = vec2(extent.width as _, extent.height as _);
 
         unsafe {
             self.context
@@ -267,9 +268,7 @@ where
                 Ok((image, _)) => image,
                 Err(_) => {
                     self.recreate_swapchain();
-                    let mut context = ResizeContext {
-                        display_size: &self.properties.display_size,
-                    };
+                    let mut context = self.create_resize_context();
                     resize_callback(&mut context);
                     return;
                 }
@@ -366,6 +365,12 @@ where
 
     pub fn set_dimensions(&mut self, dimensions: Extent2D) {
         self.properties.display_size.device = vec2(dimensions.width as _, dimensions.height as _);
+    }
+
+    pub fn create_resize_context(&self) -> ResizeContext {
+        ResizeContext {
+            display_size: &self.properties.display_size,
+        }
     }
 }
 
@@ -546,6 +551,7 @@ fn create_render_pass<B: Backend>(
     unsafe { device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[]) }.unwrap()
 }
 
+#[derive(Clone)]
 pub struct DisplaySize {
     pub screen: Vec2,
     pub device: Vec2,

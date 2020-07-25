@@ -77,6 +77,8 @@ impl Engine {
                         height: dims.height,
                     });
                     renderer.recreate_swapchain();
+                    let mut context = renderer.create_resize_context();
+                    scene_manager.borrow_mut().resize(&mut context);
                 }
                 _ => {
                     scene_manager.borrow_mut().event(&event);
