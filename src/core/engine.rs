@@ -71,10 +71,10 @@ impl Engine {
                     *control_flow = winit::event_loop::ControlFlow::Exit
                 }
                 winit::event::WindowEvent::Resized(dims) => {
-                    renderer.dimensions = Extent2D {
+                    renderer.set_dimensions(Extent2D {
                         width: dims.width,
                         height: dims.height,
-                    };
+                    });
                     renderer.recreate_swapchain();
                 }
                 _ => {

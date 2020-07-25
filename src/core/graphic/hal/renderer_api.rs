@@ -13,17 +13,15 @@ use crate::math::mesh::IndexType;
 use gfx_hal::buffer::{IndexBufferView, SubRange};
 use gfx_hal::command::{ClearColor, ClearDepthStencil, ClearValue, CommandBuffer, SubpassContents};
 use gfx_hal::device::Device;
-use gfx_hal::window::Extent2D;
 use nalgebra_glm::{vec2, Vec2};
 use std::ops::Deref;
 
 pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
     context: &'a mut RendererApiContext<B>,
-    static_context: &'a RendererApiProperties,
+    static_properties: &'a RendererApiProperties,
     command_pool: &'a mut B::CommandPool,
     command_buffer: &'a mut B::CommandBuffer,
     frame_buffer: &'a B::Framebuffer,
-    viewport: &'a gfx_hal::pso::Viewport,
     screen_size: Vec2,
     window_size: Vec2,
 }
@@ -31,22 +29,25 @@ pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
 impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     pub fn new(
         context: &'a mut RendererApiContext<B>,
-        static_context: &'a RendererApiProperties,
+        static_properties: &'a RendererApiProperties,
         command_pool: &'a mut B::CommandPool,
         command_buffer: &'a mut B::CommandBuffer,
         frame_buffer: &'a B::Framebuffer,
-        dimensions: &'a Extent2D,
-        viewport: &'a gfx_hal::pso::Viewport,
     ) -> RendererApiCommon<'a, B> {
-        let screen_size = vec2(viewport.rect.w as f32, viewport.rect.h as f32);
-        let window_size = vec2(dimensions.width as f32, dimensions.height as f32);
+        let screen_size = vec2(
+            static_properties.viewport.rect.w as f32,
+            static_properties.viewport.rect.h as f32,
+        );
+        let window_size = vec2(
+            static_properties.dimensions.width as f32,
+            static_properties.dimensions.height as f32,
+        );
         RendererApiCommon {
             context,
-            static_context,
+            static_properties,
             command_pool,
             command_buffer,
             frame_buffer,
-            viewport,
             screen_size,
             window_size,
         }
@@ -55,7 +56,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     pub fn create_vertex_buffer(&self, vertices: &[f32]) -> VertexBufferCommon<B> {
         VertexBufferCommon::new(
             &self.context.device,
-            &self.static_context.memory_types,
+            &self.static_properties.memory_types,
             vertices,
         )
     }
@@ -63,7 +64,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     pub fn create_index_buffer(&self, indices: &[IndexType]) -> IndexBufferCommon<B> {
         IndexBufferCommon::new(
             &self.context.device,
-            &self.static_context.memory_types,
+            &self.static_properties.memory_types,
             indices,
         )
     }
@@ -71,7 +72,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
     pub fn create_uniform_buffer<T>(&self, data_source: &[T]) -> UniformBufferCommon<B, T> {
         UniformBufferCommon::new(
             &self.context.device,
-            &self.static_context.memory_types,
+            &self.static_properties.memory_types,
             data_source,
         )
     }
@@ -96,8 +97,8 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
             &self.context.device,
             self.command_pool,
             &mut self.context.queue_group,
-            &self.static_context.memory_types,
-            &self.static_context.limits,
+            &self.static_properties.memory_types,
+            &self.static_properties.limits,
             image,
             config,
         )
@@ -141,7 +142,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
                 self.command_buffer.begin_render_pass(
                     self.context.first_render_pass.deref(),
                     self.frame_buffer,
-                    self.viewport.rect,
+                    self.static_properties.viewport.rect,
                     &[
                         gfx_hal::command::ClearValue {
                             color: gfx_hal::command::ClearColor {
@@ -162,7 +163,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
                 self.command_buffer.begin_render_pass(
                     self.context.render_pass.deref(),
                     self.frame_buffer,
-                    self.viewport.rect,
+                    self.static_properties.viewport.rect,
                     &[],
                     gfx_hal::command::SubpassContents::Inline,
                 );
@@ -227,7 +228,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
             self.command_buffer.begin_render_pass(
                 render_pass,
                 self.frame_buffer,
-                self.viewport.rect,
+                self.static_properties.viewport.rect,
                 &clear_values,
                 SubpassContents::Inline,
             );

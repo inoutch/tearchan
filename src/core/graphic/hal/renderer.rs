@@ -17,23 +17,24 @@ use std::mem::ManuallyDrop;
 use std::rc::Rc;
 
 pub struct Renderer<B: gfx_hal::Backend> {
+    // private gfx-hal instances
     instance: Option<B::Instance>,
     surface: ManuallyDrop<B::Surface>,
     adapter: Adapter<B>,
-    surface_format: gfx_hal::format::Format,
-    pub dimensions: Extent2D,
-    viewport: Viewport,
     cmd_pools: Vec<B::CommandPool>,
     cmd_buffers: Vec<B::CommandBuffer>,
     submission_complete_semaphores: Vec<B::Semaphore>,
     submission_complete_fences: Vec<B::Fence>,
-    frames_in_flight: usize,
-    frame: u64,
-    context: RendererApiContext<B>,
-    properties: RendererApiProperties,
     depth_image: ManuallyDrop<B::Image>,
     depth_memory: ManuallyDrop<B::Memory>,
     depth_image_view: ManuallyDrop<B::ImageView>,
+    // private gfx-hal properties
+    surface_format: gfx_hal::format::Format,
+    frames_in_flight: usize,
+    frame: u64,
+    // public properties
+    context: RendererApiContext<B>,
+    properties: RendererApiProperties,
 }
 
 impl<B> Renderer<B>
@@ -48,10 +49,6 @@ where
     ) -> Renderer<B> {
         let memory_types = adapter.physical_device.memory_properties().memory_types;
         let limits = adapter.physical_device.limits();
-        let properties = RendererApiProperties {
-            memory_types,
-            limits,
-        };
 
         // Build a new device and associated command queues
         let family = find_queue_family(&adapter, &surface);
@@ -83,7 +80,7 @@ where
         };
 
         let (depth_image, depth_memory, depth_image_view, depth_stencil_format) =
-            create_depth_resources::<B>(&device, extent, &properties.memory_types);
+            create_depth_resources::<B>(&device, extent, &memory_types);
 
         let first_render_pass = ManuallyDrop::new(create_render_pass::<B>(
             &device,
@@ -139,10 +136,30 @@ where
             depth: 0.0..1.0,
         };
 
+        let properties = RendererApiProperties {
+            memory_types,
+            limits,
+            viewport,
+            dimensions: default_dimensions,
+        };
+
         Renderer {
+            // private gfx-hal instances
             instance,
             surface: ManuallyDrop::new(surface),
             adapter,
+            cmd_pools,
+            cmd_buffers,
+            submission_complete_semaphores,
+            submission_complete_fences,
+            depth_image: ManuallyDrop::new(depth_image),
+            depth_memory: ManuallyDrop::new(depth_memory),
+            depth_image_view: ManuallyDrop::new(depth_image_view),
+            // private gfx-hal properties
+            surface_format,
+            frames_in_flight,
+            frame: 0,
+            // public properties
             context: RendererApiContext {
                 device: Rc::new(device),
                 queue_group,
@@ -152,25 +169,14 @@ where
                 clear_color: vec4(0.0f32, 0.0f32, 0.0f32, 1.0f32),
                 clear_depth: 0.0f32,
             },
-            surface_format,
-            dimensions: default_dimensions,
-            viewport,
-            frames_in_flight,
-            submission_complete_semaphores,
-            submission_complete_fences,
-            cmd_pools,
-            cmd_buffers,
-            frame: 0,
             properties,
-            depth_image: ManuallyDrop::new(depth_image),
-            depth_memory: ManuallyDrop::new(depth_memory),
-            depth_image_view: ManuallyDrop::new(depth_image_view),
         }
     }
 
     pub fn recreate_swapchain(&mut self) {
         let caps = self.surface.capabilities(&self.adapter.physical_device);
-        let swap_config = SwapchainConfig::from_caps(&caps, self.surface_format, self.dimensions);
+        let swap_config =
+            SwapchainConfig::from_caps(&caps, self.surface_format, self.properties.dimensions);
         let extent = swap_config.extent;
 
         unsafe {
@@ -179,8 +185,8 @@ where
                 .expect("Can't create swapchain");
         }
 
-        self.viewport.rect.w = extent.width as _;
-        self.viewport.rect.h = extent.height as _;
+        self.properties.viewport.rect.w = extent.width as _;
+        self.properties.viewport.rect.h = extent.height as _;
 
         unsafe {
             self.context
@@ -261,8 +267,8 @@ where
                     &self.context.render_pass,
                     attachments,
                     gfx_hal::image::Extent {
-                        width: self.dimensions.width,
-                        height: self.dimensions.height,
+                        width: self.properties.dimensions.width,
+                        height: self.properties.dimensions.height,
                         depth: 1,
                     },
                 )
@@ -291,15 +297,15 @@ where
                 0,
                 &[Viewport {
                     rect: Rect {
-                        x: self.viewport.rect.x,
-                        y: self.viewport.rect.y + self.viewport.rect.h,
-                        w: self.viewport.rect.w,
-                        h: -self.viewport.rect.h,
+                        x: self.properties.viewport.rect.x,
+                        y: self.properties.viewport.rect.y + self.properties.viewport.rect.h,
+                        w: self.properties.viewport.rect.w,
+                        h: -self.properties.viewport.rect.h,
                     },
-                    depth: self.viewport.depth.clone(),
+                    depth: self.properties.viewport.depth.clone(),
                 }],
             );
-            cmd_buffer.set_scissors(0, &[self.viewport.rect]);
+            cmd_buffer.set_scissors(0, &[self.properties.viewport.rect]);
 
             let mut api = RendererApiCommon::new(
                 &mut self.context,
@@ -307,8 +313,6 @@ where
                 &mut self.cmd_pools[frame_idx],
                 cmd_buffer,
                 &framebuffer,
-                &self.dimensions,
-                &self.viewport,
             );
             callback(&mut api);
 
@@ -340,6 +344,10 @@ where
 
         // Increment our frame
         self.frame += 1;
+    }
+
+    pub fn set_dimensions(&mut self, dimensions: Extent2D) {
+        self.properties.dimensions = dimensions;
     }
 }
 
@@ -407,6 +415,8 @@ pub struct RendererApiContext<B: Backend> {
 pub struct RendererApiProperties {
     pub memory_types: Vec<MemoryType>,
     pub limits: Limits,
+    pub dimensions: Extent2D,
+    pub viewport: Viewport,
 }
 
 fn create_depth_resources<B: Backend>(
