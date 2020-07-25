@@ -307,6 +307,7 @@ where
                 &mut self.cmd_pools[frame_idx],
                 cmd_buffer,
                 &framebuffer,
+                &self.dimensions,
                 &self.viewport,
             );
             callback(&mut api);
