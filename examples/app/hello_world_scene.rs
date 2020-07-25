@@ -3,6 +3,7 @@ use tearchan::core::graphic::batch::batch3d::Batch3D;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
+use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::image::Image;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
@@ -26,8 +27,8 @@ pub struct HelloWorldScene {
 
 impl HelloWorldScene {
     pub fn creator() -> SceneCreator {
-        |scene_context, _| {
-            let screen_size = scene_context.renderer_api.screen_size();
+        |context, _| {
+            let screen_size = &context.renderer_api.display_size().screen;
             let image = Image::new_empty();
 
             let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
@@ -36,18 +37,17 @@ impl HelloWorldScene {
             camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
             camera.update();
 
-            let texture = scene_context
+            let texture = context
                 .renderer_api
                 .create_texture(&image, TextureConfig::default());
 
-            let shader_program =
-                Standard3DShaderProgram::new(scene_context.renderer_api, camera.base());
-            let graphic_pipeline = scene_context
+            let shader_program = Standard3DShaderProgram::new(context.renderer_api, camera.base());
+            let graphic_pipeline = context
                 .renderer_api
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
             let mesh = MeshBuilder::new().with_simple_cube(1.0f32).build().unwrap();
-            let mut batch = Batch3D::new_batch3d(scene_context.renderer_api);
+            let mut batch = Batch3D::new_batch3d(context.renderer_api);
             let polygon = make_shared(Polygon::new(mesh));
             polygon
                 .borrow_mut()
@@ -119,4 +119,6 @@ impl SceneBase for HelloWorldScene {
     fn on_key_up(&mut self, input: &KeyboardInput) {
         println!("onKeyUp: {:?}", input.virtual_keycode);
     }
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }

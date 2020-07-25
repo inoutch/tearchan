@@ -5,6 +5,7 @@ use tearchan::core::graphic::batch::batch_line::BatchLine;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::GraphicPipeline;
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
+use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
 use tearchan::core::graphic::shader::grid_shader_program::GridShaderProgram;
 use tearchan::core::scene::scene_base::SceneBase;
@@ -24,8 +25,8 @@ pub struct GridScene {
 
 impl GridScene {
     pub fn creator() -> SceneCreator {
-        |scene_context, _| {
-            let screen_size = scene_context.renderer_api.screen_size();
+        |context, _| {
+            let screen_size = &context.renderer_api.display_size().screen;
 
             let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
             camera.position = vec3(0.0f32, 2.0f32, 4.0f32);
@@ -33,8 +34,8 @@ impl GridScene {
             camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
             camera.update();
 
-            let shader_program = GridShaderProgram::new(scene_context.renderer_api, camera.base());
-            let graphic_pipeline = scene_context.renderer_api.create_graphic_pipeline(
+            let shader_program = GridShaderProgram::new(context.renderer_api, camera.base());
+            let graphic_pipeline = context.renderer_api.create_graphic_pipeline(
                 shader_program.shader(),
                 GraphicPipelineConfig {
                     rasterizer: Rasterizer {
@@ -50,7 +51,7 @@ impl GridScene {
                 },
             );
 
-            let mut batch = BatchLine::new_batch_line(scene_context.renderer_api);
+            let mut batch = BatchLine::new_batch_line(context.renderer_api);
             let mesh = MeshBuilder::new()
                 .with_grid(
                     0.5f32,
@@ -114,4 +115,6 @@ impl SceneBase for GridScene {
     fn on_key_down(&mut self, _input: &KeyboardInput) {}
 
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }

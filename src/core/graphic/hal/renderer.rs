@@ -10,7 +10,7 @@ use gfx_hal::pso::{Rect, Viewport};
 use gfx_hal::queue::{CommandQueue, QueueFamily, QueueGroup, Submission};
 use gfx_hal::window::{Extent2D, PresentationSurface, Surface, SwapchainConfig};
 use gfx_hal::{Backend, Instance, Limits};
-use nalgebra_glm::{vec4, Vec4};
+use nalgebra_glm::{vec2, vec4, Vec2, Vec4};
 use std::borrow::Borrow;
 use std::iter;
 use std::mem::ManuallyDrop;
@@ -139,8 +139,14 @@ where
         let properties = RendererApiProperties {
             memory_types,
             limits,
-            viewport,
-            dimensions: default_dimensions,
+            display_size: DisplaySize {
+                screen: vec2(viewport.rect.w as _, viewport.rect.h as _),
+                device: vec2(
+                    default_dimensions.width as _,
+                    default_dimensions.height as _,
+                ),
+                viewport,
+            },
         };
 
         Renderer {
@@ -175,8 +181,14 @@ where
 
     pub fn recreate_swapchain(&mut self) {
         let caps = self.surface.capabilities(&self.adapter.physical_device);
-        let swap_config =
-            SwapchainConfig::from_caps(&caps, self.surface_format, self.properties.dimensions);
+        let swap_config = SwapchainConfig::from_caps(
+            &caps,
+            self.surface_format,
+            Extent2D {
+                width: self.properties.display_size.device.x as _,
+                height: self.properties.display_size.device.y as _,
+            },
+        );
         let extent = swap_config.extent;
 
         unsafe {
@@ -185,8 +197,8 @@ where
                 .expect("Can't create swapchain");
         }
 
-        self.properties.viewport.rect.w = extent.width as _;
-        self.properties.viewport.rect.h = extent.height as _;
+        self.properties.display_size.viewport.rect.w = extent.width as _;
+        self.properties.display_size.viewport.rect.h = extent.height as _;
 
         unsafe {
             self.context
@@ -242,9 +254,10 @@ where
         self.depth_image_view = ManuallyDrop::new(depth_image_view);
     }
 
-    pub fn render<F>(&mut self, mut callback: F)
+    pub fn render<F1, F2>(&mut self, mut render_callback: F1, mut resize_callback: F2)
     where
-        F: FnMut(&mut RendererApiCommon<B>),
+        F1: FnMut(&mut RendererApiCommon<B>),
+        F2: FnMut(&mut ResizeContext),
     {
         self.context.use_first_render_pass = true;
 
@@ -254,6 +267,10 @@ where
                 Ok((image, _)) => image,
                 Err(_) => {
                     self.recreate_swapchain();
+                    let mut context = ResizeContext {
+                        display_size: &self.properties.display_size,
+                    };
+                    resize_callback(&mut context);
                     return;
                 }
             }
@@ -267,8 +284,8 @@ where
                     &self.context.render_pass,
                     attachments,
                     gfx_hal::image::Extent {
-                        width: self.properties.dimensions.width,
-                        height: self.properties.dimensions.height,
+                        width: self.properties.display_size.device.x as _,
+                        height: self.properties.display_size.device.y as _,
                         depth: 1,
                     },
                 )
@@ -297,15 +314,16 @@ where
                 0,
                 &[Viewport {
                     rect: Rect {
-                        x: self.properties.viewport.rect.x,
-                        y: self.properties.viewport.rect.y + self.properties.viewport.rect.h,
-                        w: self.properties.viewport.rect.w,
-                        h: -self.properties.viewport.rect.h,
+                        x: self.properties.display_size.viewport.rect.x,
+                        y: self.properties.display_size.viewport.rect.y
+                            + self.properties.display_size.viewport.rect.h,
+                        w: self.properties.display_size.viewport.rect.w,
+                        h: -self.properties.display_size.viewport.rect.h,
                     },
-                    depth: self.properties.viewport.depth.clone(),
+                    depth: self.properties.display_size.viewport.depth.clone(),
                 }],
             );
-            cmd_buffer.set_scissors(0, &[self.properties.viewport.rect]);
+            cmd_buffer.set_scissors(0, &[self.properties.display_size.viewport.rect]);
 
             let mut api = RendererApiCommon::new(
                 &mut self.context,
@@ -314,7 +332,7 @@ where
                 cmd_buffer,
                 &framebuffer,
             );
-            callback(&mut api);
+            render_callback(&mut api);
 
             cmd_buffer.finish();
 
@@ -347,7 +365,7 @@ where
     }
 
     pub fn set_dimensions(&mut self, dimensions: Extent2D) {
-        self.properties.dimensions = dimensions;
+        self.properties.display_size.device = vec2(dimensions.width as _, dimensions.height as _);
     }
 }
 
@@ -415,8 +433,7 @@ pub struct RendererApiContext<B: Backend> {
 pub struct RendererApiProperties {
     pub memory_types: Vec<MemoryType>,
     pub limits: Limits,
-    pub dimensions: Extent2D,
-    pub viewport: Viewport,
+    pub display_size: DisplaySize,
 }
 
 fn create_depth_resources<B: Backend>(
@@ -527,4 +544,14 @@ fn create_render_pass<B: Backend>(
     };
 
     unsafe { device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[]) }.unwrap()
+}
+
+pub struct DisplaySize {
+    pub screen: Vec2,
+    pub device: Vec2,
+    pub viewport: Viewport,
+}
+
+pub struct ResizeContext<'a> {
+    pub display_size: &'a DisplaySize,
 }

@@ -1,11 +1,12 @@
 use crate::app::texture_bundle::generate_texture_bundle;
-use nalgebra_glm::{vec3, Vec3};
+use nalgebra_glm::{vec3, Vec2, Vec3};
 use std::collections::HashMap;
 use tearchan::core::graphic::animation::animator::{AnimationData, AnimationGroup, Animator};
 use tearchan::core::graphic::batch::batch2d::Batch2D;
 use tearchan::core::graphic::camera_2d::Camera2D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
+use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::polygon::sprite_atlas::SpriteAtlas;
 use tearchan::core::graphic::polygon::PolygonCommon;
@@ -37,8 +38,8 @@ pub struct SpriteScene {
 impl SpriteScene {
     pub fn creator() -> SceneCreator {
         |ctx, _| {
-            let screen_size = ctx.renderer_api.screen_size().to_owned();
-            let camera = Camera2D::new(screen_size);
+            let screen_size: Vec2 = ctx.renderer_api.display_size().screen.clone_owned();
+            let camera = Camera2D::new(screen_size.clone_owned());
 
             let mut batch = Batch2D::new_batch2d(ctx.renderer_api);
             let (texture_atlas, image) = generate_texture_bundle();
@@ -169,4 +170,6 @@ impl SceneBase for SpriteScene {
             },
         }
     }
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }

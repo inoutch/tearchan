@@ -1,6 +1,6 @@
 use crate::core::graphic::hal::graphic_pipeline::{GraphicPipelineCommon, GraphicPipelineConfig};
 use crate::core::graphic::hal::index_buffer::IndexBufferCommon;
-use crate::core::graphic::hal::renderer::{RendererApiContext, RendererApiProperties};
+use crate::core::graphic::hal::renderer::{DisplaySize, RendererApiContext, RendererApiProperties};
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
 use crate::core::graphic::hal::shader::ShaderCommon;
@@ -13,7 +13,6 @@ use crate::math::mesh::IndexType;
 use gfx_hal::buffer::{IndexBufferView, SubRange};
 use gfx_hal::command::{ClearColor, ClearDepthStencil, ClearValue, CommandBuffer, SubpassContents};
 use gfx_hal::device::Device;
-use nalgebra_glm::{vec2, Vec2};
 use std::ops::Deref;
 
 pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
@@ -22,8 +21,6 @@ pub struct RendererApiCommon<'a, B: gfx_hal::Backend> {
     command_pool: &'a mut B::CommandPool,
     command_buffer: &'a mut B::CommandBuffer,
     frame_buffer: &'a B::Framebuffer,
-    screen_size: Vec2,
-    window_size: Vec2,
 }
 
 impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
@@ -34,22 +31,12 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         command_buffer: &'a mut B::CommandBuffer,
         frame_buffer: &'a B::Framebuffer,
     ) -> RendererApiCommon<'a, B> {
-        let screen_size = vec2(
-            static_properties.viewport.rect.w as f32,
-            static_properties.viewport.rect.h as f32,
-        );
-        let window_size = vec2(
-            static_properties.dimensions.width as f32,
-            static_properties.dimensions.height as f32,
-        );
         RendererApiCommon {
             context,
             static_properties,
             command_pool,
             command_buffer,
             frame_buffer,
-            screen_size,
-            window_size,
         }
     }
 
@@ -142,7 +129,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
                 self.command_buffer.begin_render_pass(
                     self.context.first_render_pass.deref(),
                     self.frame_buffer,
-                    self.static_properties.viewport.rect,
+                    self.static_properties.display_size.viewport.rect,
                     &[
                         gfx_hal::command::ClearValue {
                             color: gfx_hal::command::ClearColor {
@@ -163,7 +150,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
                 self.command_buffer.begin_render_pass(
                     self.context.render_pass.deref(),
                     self.frame_buffer,
-                    self.static_properties.viewport.rect,
+                    self.static_properties.display_size.viewport.rect,
                     &[],
                     gfx_hal::command::SubpassContents::Inline,
                 );
@@ -228,7 +215,7 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
             self.command_buffer.begin_render_pass(
                 render_pass,
                 self.frame_buffer,
-                self.static_properties.viewport.rect,
+                self.static_properties.display_size.viewport.rect,
                 &clear_values,
                 SubpassContents::Inline,
             );
@@ -238,12 +225,8 @@ impl<'a, B: gfx_hal::Backend> RendererApiCommon<'a, B> {
         }
     }
 
-    pub fn screen_size(&self) -> &Vec2 {
-        &self.screen_size
-    }
-
-    pub fn window_size(&self) -> &Vec2 {
-        &self.window_size
+    pub fn display_size(&self) -> &DisplaySize {
+        &self.static_properties.display_size
     }
 
     pub fn write_descriptor_sets(&self, write_descriptor_sets: WriteDescriptorSetsCommon<B>) {

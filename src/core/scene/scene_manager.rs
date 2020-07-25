@@ -1,5 +1,6 @@
 use crate::core::file::file_api::FileApi;
 use crate::core::graphic::hal::backend::RendererApi;
+use crate::core::graphic::hal::renderer::ResizeContext;
 use crate::core::scene::scene_base::SceneBase;
 use crate::core::scene::scene_context::{SceneContext, SceneContextCommand, SceneOption};
 use crate::core::scene::scene_creator::SceneCreator;
@@ -48,6 +49,10 @@ impl SceneManager {
         }
 
         self.current_scene.update(&mut scene_context, delta);
+    }
+
+    pub fn resize(&mut self, context: &mut ResizeContext) {
+        self.current_scene.on_resize(context);
     }
 
     pub fn event(&mut self, event: &WindowEvent) {
@@ -158,4 +163,6 @@ impl SceneBase for DummyScene {
     fn on_key_down(&mut self, _input: &KeyboardInput) {}
 
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }

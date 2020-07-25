@@ -7,6 +7,7 @@ use tearchan::core::graphic::batch::batch_line::BatchLine;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
+use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::polygon::billboard::Billboard;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
@@ -38,7 +39,7 @@ impl BillboardScene {
     }
 
     pub fn new(ctx: &mut SceneContext) -> Self {
-        let screen_size = ctx.renderer_api.screen_size();
+        let screen_size = &ctx.renderer_api.display_size().screen;
 
         let camera_radian = 0.0f32;
         let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
@@ -184,4 +185,6 @@ impl SceneBase for BillboardScene {
     fn on_key_down(&mut self, _input: &KeyboardInput) {}
 
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }

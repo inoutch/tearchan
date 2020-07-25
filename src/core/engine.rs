@@ -5,6 +5,7 @@ use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
 use crate::core::screen::ScreenMode;
 use gfx_hal::window::Extent2D;
+use std::cell::RefCell;
 use std::time::Instant;
 use winit::event_loop::EventLoop;
 use winit::monitor::MonitorHandle;
@@ -60,7 +61,7 @@ impl Engine {
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
         let adapter = adapters.remove(0);
         let mut renderer = Renderer::new(instance, adapter, surface, window_size);
-        let mut scene_manager = self.scene_manager;
+        let scene_manager = RefCell::new(self.scene_manager);
         let mut file_api = FileApi::new(self.config.resource_path, self.config.writable_path);
 
         let mut prev_time = std::time::Instant::now();
@@ -78,18 +79,23 @@ impl Engine {
                     renderer.recreate_swapchain();
                 }
                 _ => {
-                    scene_manager.event(&event);
+                    scene_manager.borrow_mut().event(&event);
                 }
             },
             winit::event::Event::RedrawRequested(_) => {
                 let now = std::time::Instant::now();
-                renderer.render(|renderer_api| {
-                    scene_manager.render(
-                        (now - prev_time).as_secs_f32(),
-                        renderer_api,
-                        &mut file_api,
-                    );
-                });
+                renderer.render(
+                    |renderer_api| {
+                        scene_manager.borrow_mut().render(
+                            (now - prev_time).as_secs_f32(),
+                            renderer_api,
+                            &mut file_api,
+                        );
+                    },
+                    |context| {
+                        scene_manager.borrow_mut().resize(context);
+                    },
+                );
                 prev_time = now;
             }
             winit::event::Event::MainEventsCleared => {

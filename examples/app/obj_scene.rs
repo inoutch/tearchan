@@ -5,6 +5,7 @@ use tearchan::core::graphic::batch::batch3d::Batch3D;
 use tearchan::core::graphic::camera_3d::Camera3D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
+use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::image::Image;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
@@ -29,7 +30,7 @@ pub struct ObjScene {
 impl ObjScene {
     pub fn creator() -> SceneCreator {
         |ctx, _| {
-            let screen_size = ctx.renderer_api.screen_size();
+            let screen_size = &ctx.renderer_api.display_size().screen;
             let image = Image::new_empty();
 
             let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
@@ -67,7 +68,9 @@ impl ObjScene {
             polygon
                 .borrow_mut()
                 .set_rotation_axis(vec3(0.0f32, 1.0f32, 0.0f32));
-            polygon.borrow_mut().set_color(vec4(1.0f32, 0.5f32, 0.5f32, 1.0f32));
+            polygon
+                .borrow_mut()
+                .set_color(vec4(1.0f32, 0.5f32, 0.5f32, 1.0f32));
             batch.add(&polygon, 0);
 
             Box::new(ObjScene {
@@ -126,4 +129,6 @@ impl SceneBase for ObjScene {
     fn on_key_down(&mut self, _input: &KeyboardInput) {}
 
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }

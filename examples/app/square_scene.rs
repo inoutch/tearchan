@@ -6,6 +6,7 @@ use tearchan::core::graphic::batch::batch2d::Batch2D;
 use tearchan::core::graphic::camera_2d::Camera2D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
+use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::hal::texture::TextureConfig;
 use tearchan::core::graphic::image::Image;
 use tearchan::core::graphic::polygon::{Polygon, PolygonCommon};
@@ -30,24 +31,23 @@ pub struct SquareScene {
 
 impl SquareScene {
     pub fn creator() -> SceneCreator {
-        |scene_context, _| {
-            let screen_size = scene_context.renderer_api.screen_size().clone_owned();
+        |context, _| {
+            let screen_size = context.renderer_api.display_size().screen.clone_owned();
             let image = Image::new_empty();
 
             let mut camera = Camera2D::new(screen_size.clone_owned());
             camera.update();
 
-            let texture = scene_context
+            let texture = context
                 .renderer_api
                 .create_texture(&image, TextureConfig::default());
 
-            let shader_program =
-                Standard2DShaderProgram::new(scene_context.renderer_api, camera.base());
-            let graphic_pipeline = scene_context
+            let shader_program = Standard2DShaderProgram::new(context.renderer_api, camera.base());
+            let graphic_pipeline = context
                 .renderer_api
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
-            let mut batch = Batch2D::new_batch2d(scene_context.renderer_api);
+            let mut batch = Batch2D::new_batch2d(context.renderer_api);
             {
                 let mesh = MeshBuilder::new()
                     .with_square(vec2(100.0f32, 100.0f32))
@@ -160,4 +160,6 @@ impl SceneBase for SquareScene {
     }
 
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
+
+    fn on_resize(&mut self, _context: &mut ResizeContext) {}
 }
