@@ -179,6 +179,11 @@ impl Polygon {
         self.provider.transform_for_child(&self.core)
     }
 
+    #[inline]
+    pub fn transform(&self) -> Mat4 {
+        self.provider.transform(&self.core)
+    }
+
     pub fn copy_indices_into<TBuffer: BufferMappedMemoryInterface<IndexType>>(
         &mut self,
         buffer: &mut TBuffer,
