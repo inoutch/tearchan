@@ -127,7 +127,19 @@ impl Polygon2D {
         }
     }
 
+    pub fn size<T: 'static + Polygon2DProviderInterface>(&self) -> Vec2 {
+        let mut polygon = self.polygon.borrow_mut();
+        let provider: &T = polygon.provider_as_any_mut().downcast_ref().unwrap();
+        provider.size().clone_owned()
+    }
+
     pub fn polygon(&self) -> &Shared<Polygon> {
         &self.polygon
+    }
+}
+
+impl Polygon {
+    pub fn polygon_provider_2d<T: 'static + Polygon2DProviderInterface>(&self) -> &T {
+        self.provider_as_any().downcast_ref().unwrap()
     }
 }
