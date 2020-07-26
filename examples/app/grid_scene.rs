@@ -26,7 +26,7 @@ pub struct GridScene {
 impl GridScene {
     pub fn creator() -> SceneCreator {
         |context, _| {
-            let screen_size = &context.renderer_api.display_size().screen;
+            let screen_size = &context.graphics.display_size().logical;
 
             let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
             camera.position = vec3(0.0f32, 2.0f32, 4.0f32);
@@ -34,8 +34,8 @@ impl GridScene {
             camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
             camera.update();
 
-            let shader_program = GridShaderProgram::new(context.renderer_api, camera.base());
-            let graphic_pipeline = context.renderer_api.create_graphic_pipeline(
+            let shader_program = GridShaderProgram::new(context.graphics, camera.base());
+            let graphic_pipeline = context.graphics.create_graphic_pipeline(
                 shader_program.shader(),
                 GraphicPipelineConfig {
                     rasterizer: Rasterizer {
@@ -51,7 +51,7 @@ impl GridScene {
                 },
             );
 
-            let mut batch = BatchLine::new_batch_line(context.renderer_api);
+            let mut batch = BatchLine::new_batch_line(context.graphics);
             let mesh = MeshBuilder::new()
                 .with_grid(
                     0.5f32,
@@ -94,9 +94,9 @@ impl SceneBase for GridScene {
             .create_write_descriptor_sets(descriptor_set);
 
         context
-            .renderer_api
+            .graphics
             .write_descriptor_sets(write_descriptor_sets);
-        context.renderer_api.draw_elements(
+        context.graphics.draw_elements(
             &self.graphic_pipeline,
             self.batch.index_size(),
             self.batch.index_buffer(),

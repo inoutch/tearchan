@@ -1,5 +1,5 @@
 use crate::core::engine_config::{EngineConfig, StartupConfig};
-use crate::core::file::file_api::FileApi;
+use crate::core::file::File;
 use crate::core::graphic::hal::instance::create_backend;
 use crate::core::graphic::hal::renderer::Renderer;
 use crate::core::scene::scene_manager::SceneManager;
@@ -61,8 +61,8 @@ impl Engine {
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
         let adapter = adapters.remove(0);
         let mut renderer = Renderer::new(instance, adapter, surface, window_size);
+        let mut file = File::new(self.config.resource_path, self.config.writable_path);
         let scene_manager = RefCell::new(self.scene_manager);
-        let mut file_api = FileApi::new(self.config.resource_path, self.config.writable_path);
 
         let mut prev_time = std::time::Instant::now();
         let timer_length = std::time::Duration::from_millis(1000 / 60);
@@ -91,7 +91,7 @@ impl Engine {
                         scene_manager.borrow_mut().render(
                             (now - prev_time).as_secs_f32(),
                             renderer_api,
-                            &mut file_api,
+                            &mut file,
                         );
                     },
                     |context| {

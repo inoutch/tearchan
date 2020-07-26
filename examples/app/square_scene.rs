@@ -32,22 +32,22 @@ pub struct SquareScene {
 impl SquareScene {
     pub fn creator() -> SceneCreator {
         |context, _| {
-            let screen_size = context.renderer_api.display_size().screen.clone_owned();
+            let screen_size = context.graphics.display_size().logical.clone_owned();
             let image = Image::new_empty();
 
             let mut camera = Camera2D::new(screen_size.clone_owned());
             camera.update();
 
             let texture = context
-                .renderer_api
+                .graphics
                 .create_texture(&image, TextureConfig::default());
 
-            let shader_program = Standard2DShaderProgram::new(context.renderer_api, camera.base());
+            let shader_program = Standard2DShaderProgram::new(context.graphics, camera.base());
             let graphic_pipeline = context
-                .renderer_api
+                .graphics
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
-            let mut batch = Batch2D::new_batch2d(context.renderer_api);
+            let mut batch = Batch2D::new_batch2d(context.graphics);
             {
                 let mesh = MeshBuilder::new()
                     .with_square(vec2(100.0f32, 100.0f32))
@@ -101,9 +101,9 @@ impl SceneBase for SquareScene {
             .create_write_descriptor_sets(descriptor_set, &self.texture);
 
         scene_context
-            .renderer_api
+            .graphics
             .write_descriptor_sets(write_descriptor_sets);
-        scene_context.renderer_api.draw_elements(
+        scene_context.graphics.draw_elements(
             &self.graphic_pipeline,
             self.batch.index_size(),
             self.batch.index_buffer(),
@@ -161,5 +161,7 @@ impl SceneBase for SquareScene {
 
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
 
-    fn on_resize(&mut self, _context: &mut ResizeContext) {}
+    fn on_resize(&mut self, context: &mut ResizeContext) {
+        self.camera = Camera2D::new(context.display_size.logical.clone_owned());
+    }
 }

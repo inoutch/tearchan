@@ -1,6 +1,6 @@
 use crate::core::graphic::camera::CameraBase;
 use crate::core::graphic::hal::backend::{
-    DescriptorSet, RendererApi, Shader, Texture, UniformBuffer, WriteDescriptorSets,
+    DescriptorSet, Graphics, Shader, Texture, UniformBuffer, WriteDescriptorSets,
 };
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
@@ -39,7 +39,7 @@ pub struct BillboardShaderProgram {
 }
 
 impl BillboardShaderProgram {
-    pub fn new(api: &RendererApi, camera: &CameraBase) -> Self {
+    pub fn new(api: &Graphics, camera: &CameraBase) -> Self {
         BillboardShaderProgram::new_with_shader_source(
             api,
             camera,
@@ -51,7 +51,7 @@ impl BillboardShaderProgram {
         )
     }
 
-    pub fn new_with_alpha(api: &RendererApi, camera: &CameraBase) -> Self {
+    pub fn new_with_alpha(api: &Graphics, camera: &CameraBase) -> Self {
         BillboardShaderProgram::new_with_shader_source(
             api,
             camera,
@@ -64,7 +64,7 @@ impl BillboardShaderProgram {
     }
 
     fn new_with_shader_source(
-        api: &RendererApi,
+        api: &Graphics,
         camera: &CameraBase,
         shader_source: ShaderSource,
     ) -> Self {

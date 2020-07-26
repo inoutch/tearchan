@@ -4,7 +4,7 @@ use crate::core::graphic::batch::batch_provider::{
 };
 use crate::core::graphic::batch::helpers::{create_index_batch_buffer, create_vertex_batch_buffer};
 use crate::core::graphic::batch::{Batch, BatchContext};
-use crate::core::graphic::hal::backend::{IndexBuffer, RendererApi, VertexBuffer};
+use crate::core::graphic::hal::backend::{IndexBuffer, Graphics, VertexBuffer};
 use crate::core::graphic::hal::index_buffer::IndexBufferMappedMemory;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferMappedMemory;
 use crate::core::graphic::polygon::billboard::Billboard;
@@ -15,7 +15,7 @@ use std::rc::Rc;
 pub type BatchBillboard = Batch<Billboard, BatchBillboardProvider, IndexBuffer, VertexBuffer>;
 
 impl BatchBillboard {
-    pub fn new_batch_billboard(api: &RendererApi) -> BatchBillboard {
+    pub fn new_batch_billboard(api: &Graphics) -> BatchBillboard {
         Batch::new(BatchBillboardProvider::new(api))
     }
 }
@@ -28,7 +28,7 @@ pub struct BatchBillboardProvider {
 }
 
 impl BatchBillboardProvider {
-    pub fn new(api: &RendererApi) -> BatchBillboardProvider {
+    pub fn new(api: &Graphics) -> BatchBillboardProvider {
         BatchBillboardProvider {
             index_buffer: create_index_batch_buffer(api),
             index_mapping: None,

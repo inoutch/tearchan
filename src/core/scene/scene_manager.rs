@@ -1,5 +1,5 @@
-use crate::core::file::file_api::FileApi;
-use crate::core::graphic::hal::backend::RendererApi;
+use crate::core::file::File;
+use crate::core::graphic::hal::backend::Graphics;
 use crate::core::graphic::hal::renderer::ResizeContext;
 use crate::core::scene::scene_base::SceneBase;
 use crate::core::scene::scene_context::{SceneContext, SceneContextCommand, SceneOption};
@@ -27,24 +27,25 @@ impl SceneManager {
         }
     }
 
-    pub fn render(&mut self, delta: f32, renderer_api: &mut RendererApi, file_api: &mut FileApi) {
-        while !self.commands.is_empty() {
-            if let Some(command) = self.commands.pop() {
-                match command {
-                    SceneContextCommand::TransitScene {
-                        scene_creator,
-                        option,
-                    } => {
-                        self.scene_creator = Some((scene_creator, option));
-                    }
+    pub fn render(&mut self, delta: f32, graphics: &mut Graphics, file: &mut File) {
+        loop {
+            let command = match self.commands.pop() {
+                None => break,
+                Some(command) => command,
+            };
+            match command {
+                SceneContextCommand::TransitScene {
+                    scene_creator,
+                    option,
+                } => {
+                    self.scene_creator = Some((scene_creator, option));
                 }
             }
         }
 
-        let mut scene_context = SceneContext::new(renderer_api, file_api, &mut self.commands);
-        let scene_creator = std::mem::replace(&mut self.scene_creator, None);
-        if let Some(x) = scene_creator {
-            self.current_scene = x.0(&mut scene_context, x.1);
+        let mut scene_context = SceneContext::new(graphics, file, &mut self.commands);
+        if let Some((scene_creator, options)) = std::mem::replace(&mut self.scene_creator, None) {
+            self.current_scene = scene_creator(&mut scene_context, options);
             self.scene_creator = None;
         }
 

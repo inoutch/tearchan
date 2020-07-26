@@ -1,6 +1,6 @@
 use crate::core::graphic::camera::CameraBase;
 use crate::core::graphic::hal::backend::{
-    DescriptorSet, RendererApi, Shader, UniformBuffer, WriteDescriptorSets,
+    DescriptorSet, Graphics, Shader, UniformBuffer, WriteDescriptorSets,
 };
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
@@ -12,7 +12,7 @@ pub struct GridShaderProgram {
 }
 
 impl GridShaderProgram {
-    pub fn new(api: &RendererApi, camera: &CameraBase) -> Self {
+    pub fn new(api: &Graphics, camera: &CameraBase) -> Self {
         let shader_source = ShaderSource::new(
             include_bytes!("../../../../target/data/shaders/grid.vert"),
             include_bytes!("../../../../target/data/shaders/grid.frag"),

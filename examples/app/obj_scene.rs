@@ -30,7 +30,7 @@ pub struct ObjScene {
 impl ObjScene {
     pub fn creator() -> SceneCreator {
         |ctx, _| {
-            let screen_size = &ctx.renderer_api.display_size().screen;
+            let screen_size = &ctx.graphics.display_size().logical;
             let image = Image::new_empty();
 
             let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
@@ -40,12 +40,12 @@ impl ObjScene {
             camera.update();
 
             let texture = ctx
-                .renderer_api
+                .graphics
                 .create_texture(&image, TextureConfig::default());
 
-            let shader_program = Standard3DShaderProgram::new(ctx.renderer_api, camera.base());
+            let shader_program = Standard3DShaderProgram::new(ctx.graphics, camera.base());
             let graphic_pipeline = ctx
-                .renderer_api
+                .graphics
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
             let monkey_obj = include_str!("../data/obj/monkey.obj");
@@ -63,7 +63,7 @@ impl ObjScene {
             .unwrap();
 
             let mesh = MeshBuilder::new().with_model(&models[0]).build().unwrap();
-            let mut batch = Batch3D::new_batch3d(ctx.renderer_api);
+            let mut batch = Batch3D::new_batch3d(ctx.graphics);
             let polygon = make_shared(Polygon::new(mesh));
             polygon
                 .borrow_mut()
@@ -108,9 +108,9 @@ impl SceneBase for ObjScene {
             .shader_program
             .create_write_descriptor_sets(descriptor_set, &self.texture);
 
-        ctx.renderer_api
+        ctx.graphics
             .write_descriptor_sets(write_descriptor_sets);
-        ctx.renderer_api.draw_elements(
+        ctx.graphics.draw_elements(
             &self.graphic_pipeline,
             self.batch.index_size(),
             self.batch.index_buffer(),

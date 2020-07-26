@@ -1,6 +1,6 @@
 use crate::core::graphic::camera::CameraBase;
 use crate::core::graphic::hal::backend::{
-    DescriptorSet, RendererApi, Shader, Texture, UniformBuffer, WriteDescriptorSets,
+    DescriptorSet, Graphics, Shader, Texture, UniformBuffer, WriteDescriptorSets,
 };
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
@@ -15,7 +15,7 @@ pub struct Standard3DShaderProgram {
 }
 
 impl Standard3DShaderProgram {
-    pub fn new(api: &RendererApi, camera: &CameraBase) -> Self {
+    pub fn new(api: &Graphics, camera: &CameraBase) -> Self {
         let shader_source = ShaderSource::new(
             include_bytes!("../../../../target/data/shaders/standard_3d.vert"),
             include_bytes!("../../../../target/data/shaders/standard_3d.frag"),

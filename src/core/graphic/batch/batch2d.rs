@@ -4,7 +4,7 @@ use crate::core::graphic::batch::batch_provider::{
 };
 use crate::core::graphic::batch::helpers::{create_index_batch_buffer, create_vertex_batch_buffer};
 use crate::core::graphic::batch::{Batch, BatchContext};
-use crate::core::graphic::hal::backend::{IndexBuffer, RendererApi, VertexBuffer};
+use crate::core::graphic::hal::backend::{IndexBuffer, Graphics, VertexBuffer};
 use crate::core::graphic::hal::index_buffer::IndexBufferMappedMemory;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferMappedMemory;
 use crate::core::graphic::polygon::Polygon;
@@ -22,13 +22,13 @@ pub struct Batch2DProvider {
 }
 
 impl Batch2D {
-    pub fn new_batch2d(api: &RendererApi) -> Batch2D {
+    pub fn new_batch2d(api: &Graphics) -> Batch2D {
         Batch::new(Batch2DProvider::new(api))
     }
 }
 
 impl Batch2DProvider {
-    pub fn new(api: &RendererApi) -> Self {
+    pub fn new(api: &Graphics) -> Self {
         Batch2DProvider {
             index_buffer: create_index_batch_buffer(api),
             index_mapping: None,

@@ -1,16 +1,18 @@
-use crate::core::graphic::hal::renderer_api::RendererApiCommon;
-use gfx_hal::adapter::{Adapter, MemoryType, PhysicalDevice};
+use crate::core::graphic::hal::graphics::{GraphicsCommon, GraphicsContext};
+use crate::core::graphic::hal::helper::{
+    create_depth_resources, create_render_pass, find_queue_family,
+};
+use gfx_hal::adapter::{Adapter, PhysicalDevice};
 use gfx_hal::command::{CommandBuffer, CommandBufferFlags, Level};
 use gfx_hal::device::Device;
-use gfx_hal::format::{ChannelType, Format, Swizzle};
-use gfx_hal::image::Layout;
-use gfx_hal::pass::{Attachment, AttachmentLoadOp, AttachmentOps, AttachmentStoreOp};
+use gfx_hal::format::ChannelType;
+use gfx_hal::image::Extent;
 use gfx_hal::pool::{CommandPool, CommandPoolCreateFlags};
 use gfx_hal::pso::{Rect, Viewport};
-use gfx_hal::queue::{CommandQueue, QueueFamily, QueueGroup, Submission};
+use gfx_hal::queue::{CommandQueue, Submission};
 use gfx_hal::window::{Extent2D, PresentationSurface, Surface, SwapchainConfig};
-use gfx_hal::{Backend, Instance, Limits};
-use nalgebra_glm::{vec2, vec4, Vec2, Vec4};
+use gfx_hal::Instance;
+use nalgebra_glm::{vec2, vec4, Vec2};
 use std::borrow::Borrow;
 use std::iter;
 use std::mem::ManuallyDrop;
@@ -33,8 +35,8 @@ pub struct Renderer<B: gfx_hal::Backend> {
     frames_in_flight: usize,
     frame: u64,
     // public properties
-    context: RendererApiContext<B>,
-    properties: RendererApiProperties,
+    context: GraphicsContext<B>,
+    actual_viewports: [Viewport; 1],
 }
 
 impl<B> Renderer<B>
@@ -49,6 +51,7 @@ where
     ) -> Renderer<B> {
         let memory_types = adapter.physical_device.memory_properties().memory_types;
         let limits = adapter.physical_device.limits();
+        let frames_in_flight = 1;
 
         // Build a new device and associated command queues
         let family = find_queue_family(&adapter, &surface);
@@ -96,8 +99,6 @@ where
             false,
         ));
 
-        let frames_in_flight = 1;
-
         let mut submission_complete_semaphores = Vec::with_capacity(frames_in_flight);
         let mut submission_complete_fences = Vec::with_capacity(frames_in_flight);
         let mut cmd_pools = Vec::with_capacity(frames_in_flight);
@@ -135,19 +136,7 @@ where
             },
             depth: 0.0..1.0,
         };
-
-        let properties = RendererApiProperties {
-            memory_types,
-            limits,
-            display_size: DisplaySize {
-                screen: vec2(viewport.rect.w as _, viewport.rect.h as _),
-                device: vec2(
-                    default_dimensions.width as _,
-                    default_dimensions.height as _,
-                ),
-                viewport,
-            },
-        };
+        let actual_viewports = [viewport_up_side_down(&viewport)];
 
         Renderer {
             // private gfx-hal instances
@@ -166,7 +155,7 @@ where
             frames_in_flight,
             frame: 0,
             // public properties
-            context: RendererApiContext {
+            context: GraphicsContext {
                 device: Rc::new(device),
                 queue_group,
                 render_pass,
@@ -174,8 +163,18 @@ where
                 use_first_render_pass: true,
                 clear_color: vec4(0.0f32, 0.0f32, 0.0f32, 1.0f32),
                 clear_depth: 0.0f32,
+                memory_types,
+                limits,
+                display_size: DisplaySize {
+                    logical: vec2(viewport.rect.w as _, viewport.rect.h as _),
+                    physical: vec2(
+                        default_dimensions.width as _,
+                        default_dimensions.height as _,
+                    ),
+                    viewport,
+                },
             },
-            properties,
+            actual_viewports,
         }
     }
 
@@ -185,8 +184,8 @@ where
             &caps,
             self.surface_format,
             Extent2D {
-                width: self.properties.display_size.device.x as _,
-                height: self.properties.display_size.device.y as _,
+                width: self.context.display_size.physical.x as _,
+                height: self.context.display_size.physical.y as _,
             },
         );
         let extent = swap_config.extent;
@@ -197,9 +196,10 @@ where
                 .expect("Can't create swapchain");
         }
 
-        self.properties.display_size.viewport.rect.w = extent.width as _;
-        self.properties.display_size.viewport.rect.h = extent.height as _;
-        self.properties.display_size.screen = vec2(extent.width as _, extent.height as _);
+        self.context.display_size.viewport.rect.w = extent.width as _;
+        self.context.display_size.viewport.rect.h = extent.height as _;
+        self.actual_viewports = [viewport_up_side_down(&self.context.display_size.viewport)];
+        self.context.display_size.logical = vec2(extent.width as _, extent.height as _);
 
         unsafe {
             self.context
@@ -228,11 +228,7 @@ where
         }
 
         let (depth_image, depth_memory, depth_image_view, depth_stencil_format) =
-            create_depth_resources::<B>(
-                &self.context.device,
-                extent,
-                &self.properties.memory_types,
-            );
+            create_depth_resources::<B>(&self.context.device, extent, &self.context.memory_types);
 
         let first_render_pass = ManuallyDrop::new(create_render_pass::<B>(
             &self.context.device,
@@ -257,11 +253,10 @@ where
 
     pub fn render<F1, F2>(&mut self, mut render_callback: F1, mut resize_callback: F2)
     where
-        F1: FnMut(&mut RendererApiCommon<B>),
+        F1: FnMut(&mut GraphicsCommon<B>),
         F2: FnMut(&mut ResizeContext),
     {
         self.context.use_first_render_pass = true;
-
         let frame_idx = self.frame as usize % self.frames_in_flight;
         let surface_image = unsafe {
             match self.surface.acquire_image(!0) {
@@ -282,9 +277,9 @@ where
                 .create_framebuffer(
                     &self.context.render_pass,
                     attachments,
-                    gfx_hal::image::Extent {
-                        width: self.properties.display_size.device.x as _,
-                        height: self.properties.display_size.device.y as _,
+                    Extent {
+                        width: self.context.display_size.physical.x as _,
+                        height: self.context.display_size.physical.y as _,
                         depth: 1,
                     },
                 )
@@ -309,24 +304,11 @@ where
         unsafe {
             cmd_buffer.begin_primary(CommandBufferFlags::ONE_TIME_SUBMIT);
 
-            cmd_buffer.set_viewports(
-                0,
-                &[Viewport {
-                    rect: Rect {
-                        x: self.properties.display_size.viewport.rect.x,
-                        y: self.properties.display_size.viewport.rect.y
-                            + self.properties.display_size.viewport.rect.h,
-                        w: self.properties.display_size.viewport.rect.w,
-                        h: -self.properties.display_size.viewport.rect.h,
-                    },
-                    depth: self.properties.display_size.viewport.depth.clone(),
-                }],
-            );
-            cmd_buffer.set_scissors(0, &[self.properties.display_size.viewport.rect]);
+            cmd_buffer.set_viewports(0, &self.actual_viewports);
+            cmd_buffer.set_scissors(0, &[self.context.display_size.viewport.rect]);
 
-            let mut api = RendererApiCommon::new(
+            let mut api = GraphicsCommon::new(
                 &mut self.context,
-                &self.properties,
                 &mut self.cmd_pools[frame_idx],
                 cmd_buffer,
                 &framebuffer,
@@ -364,12 +346,12 @@ where
     }
 
     pub fn set_dimensions(&mut self, dimensions: Extent2D) {
-        self.properties.display_size.device = vec2(dimensions.width as _, dimensions.height as _);
+        self.context.display_size.physical = vec2(dimensions.width as _, dimensions.height as _);
     }
 
     pub fn create_resize_context(&self) -> ResizeContext {
         ResizeContext {
-            display_size: &self.properties.display_size,
+            display_size: &self.context.display_size,
         }
     }
 }
@@ -383,14 +365,14 @@ where
         assert!(result.is_ok(), "failed device to wait idle");
 
         unsafe {
-            for p in self.cmd_pools.drain(..) {
-                self.context.device.destroy_command_pool(p);
+            for cmd_pool in self.cmd_pools.drain(..) {
+                self.context.device.destroy_command_pool(cmd_pool);
             }
-            for s in self.submission_complete_semaphores.drain(..) {
-                self.context.device.destroy_semaphore(s);
+            for semaphore in self.submission_complete_semaphores.drain(..) {
+                self.context.device.destroy_semaphore(semaphore);
             }
-            for f in self.submission_complete_fences.drain(..) {
-                self.context.device.destroy_fence(f);
+            for fence in self.submission_complete_fences.drain(..) {
+                self.context.device.destroy_fence(fence);
             }
             self.context
                 .device
@@ -425,139 +407,25 @@ where
     }
 }
 
-pub struct RendererApiContext<B: Backend> {
-    pub device: Rc<B::Device>,
-    pub queue_group: QueueGroup<B>,
-    pub first_render_pass: ManuallyDrop<B::RenderPass>,
-    pub render_pass: ManuallyDrop<B::RenderPass>,
-    pub use_first_render_pass: bool,
-    pub clear_color: Vec4,
-    pub clear_depth: f32,
-}
-
-pub struct RendererApiProperties {
-    pub memory_types: Vec<MemoryType>,
-    pub limits: Limits,
-    pub display_size: DisplaySize,
-}
-
-fn create_depth_resources<B: Backend>(
-    device: &B::Device,
-    extent: gfx_hal::window::Extent2D,
-    memory_types: &[MemoryType],
-) -> (B::Image, B::Memory, B::ImageView, gfx_hal::format::Format) {
-    let width = extent.width;
-    let height = extent.height;
-    let depth_stencil_format = gfx_hal::format::Format::D32SfloatS8Uint;
-    let color_range = gfx_hal::image::SubresourceRange {
-        aspects: gfx_hal::format::Aspects::COLOR,
-        levels: 0..1,
-        layers: 0..1,
-    };
-    let kind = gfx_hal::image::Kind::D2(
-        width as gfx_hal::image::Size,
-        height as gfx_hal::image::Size,
-        1,
-        1,
-    );
-
-    let mut image = unsafe {
-        device.create_image(
-            kind,
-            1,
-            depth_stencil_format,
-            gfx_hal::image::Tiling::Optimal,
-            gfx_hal::image::Usage::DEPTH_STENCIL_ATTACHMENT,
-            gfx_hal::image::ViewCapabilities::empty(),
-        )
-    }
-    .unwrap();
-    let image_req = unsafe { device.get_image_requirements(&image) };
-
-    let device_type = memory_types
-        .iter()
-        .enumerate()
-        .position(|(id, memory_type)| {
-            image_req.type_mask & (1 << id) as u64 != 0
-                && memory_type
-                    .properties
-                    .contains(gfx_hal::memory::Properties::DEVICE_LOCAL)
-        })
-        .unwrap()
-        .into();
-    let image_memory = unsafe { device.allocate_memory(device_type, image_req.size) }.unwrap();
-    unsafe { device.bind_image_memory(&image_memory, 0, &mut image) }.unwrap();
-    let image_view = unsafe {
-        device.create_image_view(
-            &image,
-            gfx_hal::image::ViewKind::D2,
-            depth_stencil_format,
-            Swizzle::NO,
-            color_range,
-        )
-    }
-    .unwrap();
-
-    (image, image_memory, image_view, depth_stencil_format)
-}
-
-fn find_queue_family<'a, B: Backend>(
-    adapter: &'a Adapter<B>,
-    surface: &B::Surface,
-) -> &'a B::QueueFamily {
-    adapter
-        .queue_families
-        .iter()
-        .find(|family| {
-            surface.supports_queue_family(family) && family.queue_type().supports_graphics()
-        })
-        .unwrap()
-}
-
-fn create_render_pass<B: Backend>(
-    device: &B::Device,
-    surface_format: &Format,
-    depth_stencil_format: &Format,
-    first: bool,
-) -> B::RenderPass {
-    let load_op = if first {
-        AttachmentLoadOp::Clear
-    } else {
-        AttachmentLoadOp::Load
-    };
-
-    let attachment = Attachment {
-        format: Some(*surface_format),
-        samples: 1,
-        ops: AttachmentOps::new(load_op, AttachmentStoreOp::Store),
-        stencil_ops: AttachmentOps::DONT_CARE,
-        layouts: Layout::Undefined..Layout::Present,
-    };
-    let depth_attachment = Attachment {
-        format: Some(*depth_stencil_format),
-        samples: 1,
-        ops: AttachmentOps::new(load_op, AttachmentStoreOp::Store),
-        stencil_ops: AttachmentOps::DONT_CARE,
-        layouts: Layout::Undefined..Layout::DepthStencilAttachmentOptimal,
-    };
-    let subpass = gfx_hal::pass::SubpassDesc {
-        colors: &[(0, gfx_hal::image::Layout::ColorAttachmentOptimal)],
-        depth_stencil: Some(&(1, gfx_hal::image::Layout::DepthStencilAttachmentOptimal)),
-        inputs: &[],
-        resolves: &[],
-        preserves: &[],
-    };
-
-    unsafe { device.create_render_pass(&[attachment, depth_attachment], &[subpass], &[]) }.unwrap()
-}
-
 #[derive(Clone)]
 pub struct DisplaySize {
-    pub screen: Vec2,
-    pub device: Vec2,
+    pub logical: Vec2,
+    pub physical: Vec2,
     pub viewport: Viewport,
 }
 
 pub struct ResizeContext<'a> {
     pub display_size: &'a DisplaySize,
+}
+
+fn viewport_up_side_down(viewport: &Viewport) -> Viewport {
+    Viewport {
+        rect: Rect {
+            x: viewport.rect.x,
+            y: viewport.rect.y + viewport.rect.h,
+            w: viewport.rect.w,
+            h: -viewport.rect.h,
+        },
+        depth: viewport.depth.clone(),
+    }
 }

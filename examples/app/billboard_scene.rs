@@ -39,7 +39,7 @@ impl BillboardScene {
     }
 
     pub fn new(ctx: &mut SceneContext) -> Self {
-        let screen_size = &ctx.renderer_api.display_size().screen;
+        let screen_size = &ctx.graphics.display_size().logical;
 
         let camera_radian = 0.0f32;
         let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
@@ -52,8 +52,8 @@ impl BillboardScene {
         camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
         camera.update();
 
-        let grid_shader_program = GridShaderProgram::new(ctx.renderer_api, camera.base());
-        let grid_graphic_pipeline = ctx.renderer_api.create_graphic_pipeline(
+        let grid_shader_program = GridShaderProgram::new(ctx.graphics, camera.base());
+        let grid_graphic_pipeline = ctx.graphics.create_graphic_pipeline(
             grid_shader_program.shader(),
             GraphicPipelineConfig {
                 rasterizer: Rasterizer {
@@ -69,7 +69,7 @@ impl BillboardScene {
             },
         );
 
-        let mut grid_batch = BatchLine::new_batch_line(ctx.renderer_api);
+        let mut grid_batch = BatchLine::new_batch_line(ctx.graphics);
         let mesh = MeshBuilder::new()
             .with_grid(
                 0.5f32,
@@ -91,12 +91,12 @@ impl BillboardScene {
 
         let (texture_atlas, image) = generate_texture_bundle();
         let billboard_texture = ctx
-            .renderer_api
+            .graphics
             .create_texture(&image, TextureConfig::default());
 
-        let mut billboard_batch = BatchBillboard::new_batch_billboard(ctx.renderer_api);
-        let billboard_shader_program = BillboardShaderProgram::new(ctx.renderer_api, camera.base());
-        let billboard_graphic_pipeline = ctx.renderer_api.create_graphic_pipeline(
+        let mut billboard_batch = BatchBillboard::new_batch_billboard(ctx.graphics);
+        let billboard_shader_program = BillboardShaderProgram::new(ctx.graphics, camera.base());
+        let billboard_graphic_pipeline = ctx.graphics.create_graphic_pipeline(
             billboard_shader_program.shader(),
             GraphicPipelineConfig::default(),
         );
@@ -148,9 +148,9 @@ impl SceneBase for BillboardScene {
             .grid_shader_program
             .create_write_descriptor_sets(descriptor_set);
 
-        ctx.renderer_api
+        ctx.graphics
             .write_descriptor_sets(write_descriptor_sets);
-        ctx.renderer_api.draw_elements(
+        ctx.graphics.draw_elements(
             &self.grid_graphic_pipeline,
             self.grid_batch.index_size(),
             self.grid_batch.index_buffer(),
@@ -164,9 +164,9 @@ impl SceneBase for BillboardScene {
             .billboard_shader_program
             .create_write_descriptor_sets(descriptor_set, &self.billboard_texture);
 
-        ctx.renderer_api
+        ctx.graphics
             .write_descriptor_sets(write_descriptor_sets);
-        ctx.renderer_api.draw_elements(
+        ctx.graphics.draw_elements(
             &self.billboard_graphic_pipeline,
             self.billboard_batch.index_size(),
             self.billboard_batch.index_buffer(),

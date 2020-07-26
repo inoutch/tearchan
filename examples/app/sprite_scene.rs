@@ -38,13 +38,13 @@ pub struct SpriteScene {
 impl SpriteScene {
     pub fn creator() -> SceneCreator {
         |ctx, _| {
-            let screen_size: Vec2 = ctx.renderer_api.display_size().screen.clone_owned();
+            let screen_size: Vec2 = ctx.graphics.display_size().logical.clone_owned();
             let camera = Camera2D::new(screen_size.clone_owned());
 
-            let mut batch = Batch2D::new_batch2d(ctx.renderer_api);
+            let mut batch = Batch2D::new_batch2d(ctx.graphics);
             let (texture_atlas, image) = generate_texture_bundle();
             let texture = ctx
-                .renderer_api
+                .graphics
                 .create_texture(&image, TextureConfig::default());
             let sprite1 = SpriteAtlas::new(texture_atlas.clone());
             sprite1.polygon().borrow_mut().set_position(vec3(
@@ -82,9 +82,9 @@ impl SpriteScene {
             batch.add(sprite2.polygon(), 0);
             batch.add(sprite1.polygon(), 0);
 
-            let shader_program = Standard2DShaderProgram::new(ctx.renderer_api, camera.base());
+            let shader_program = Standard2DShaderProgram::new(ctx.graphics, camera.base());
             let graphic_pipeline = ctx
-                .renderer_api
+                .graphics
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
             Box::new(SpriteScene {
                 camera,
@@ -122,9 +122,9 @@ impl SceneBase for SpriteScene {
             .shader_program
             .create_write_descriptor_sets(descriptor_set, &self.texture);
 
-        ctx.renderer_api
+        ctx.graphics
             .write_descriptor_sets(write_descriptor_sets);
-        ctx.renderer_api.draw_elements(
+        ctx.graphics.draw_elements(
             &self.graphic_pipeline,
             self.batch.index_size(),
             self.batch.index_buffer(),

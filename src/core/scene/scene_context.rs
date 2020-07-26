@@ -1,5 +1,5 @@
-use crate::core::file::file_api::FileApi;
-use crate::core::graphic::hal::backend::RendererApi;
+use crate::core::file::File;
+use crate::core::graphic::hal::backend::Graphics;
 use crate::core::scene::scene_creator::SceneCreator;
 use std::any::Any;
 
@@ -8,8 +8,8 @@ pub trait SceneOption {
 }
 
 pub struct SceneContext<'a, 'b> {
-    pub renderer_api: &'a mut RendererApi<'b>,
-    pub file_api: &'a mut FileApi,
+    pub graphics: &'a mut Graphics<'b>,
+    pub file: &'a mut File,
     commands: &'a mut Vec<SceneContextCommand>,
 }
 
@@ -22,13 +22,13 @@ pub enum SceneContextCommand {
 
 impl<'a, 'b> SceneContext<'a, 'b> {
     pub fn new(
-        renderer_api: &'a mut RendererApi<'b>,
-        file_api: &'a mut FileApi,
+        graphics: &'a mut Graphics<'b>,
+        file: &'a mut File,
         commands: &'a mut Vec<SceneContextCommand>,
     ) -> SceneContext<'a, 'b> {
         SceneContext {
-            renderer_api,
-            file_api,
+            graphics,
+            file,
             commands,
         }
     }

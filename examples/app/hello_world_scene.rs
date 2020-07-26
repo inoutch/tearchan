@@ -28,7 +28,7 @@ pub struct HelloWorldScene {
 impl HelloWorldScene {
     pub fn creator() -> SceneCreator {
         |context, _| {
-            let screen_size = &context.renderer_api.display_size().screen;
+            let screen_size = &context.graphics.display_size().logical;
             let image = Image::new_empty();
 
             let mut camera = Camera3D::default_with_aspect(screen_size.x / screen_size.y);
@@ -38,16 +38,16 @@ impl HelloWorldScene {
             camera.update();
 
             let texture = context
-                .renderer_api
+                .graphics
                 .create_texture(&image, TextureConfig::default());
 
-            let shader_program = Standard3DShaderProgram::new(context.renderer_api, camera.base());
+            let shader_program = Standard3DShaderProgram::new(context.graphics, camera.base());
             let graphic_pipeline = context
-                .renderer_api
+                .graphics
                 .create_graphic_pipeline(shader_program.shader(), GraphicPipelineConfig::default());
 
             let mesh = MeshBuilder::new().with_simple_cube(1.0f32).build().unwrap();
-            let mut batch = Batch3D::new_batch3d(context.renderer_api);
+            let mut batch = Batch3D::new_batch3d(context.graphics);
             let polygon = make_shared(Polygon::new(mesh));
             polygon
                 .borrow_mut()
@@ -86,9 +86,9 @@ impl SceneBase for HelloWorldScene {
             .create_write_descriptor_sets(descriptor_set, &self.texture);
 
         scene_context
-            .renderer_api
+            .graphics
             .write_descriptor_sets(write_descriptor_sets);
-        scene_context.renderer_api.draw_elements(
+        scene_context.graphics.draw_elements(
             &self.graphic_pipeline,
             self.batch.index_size(),
             self.batch.index_buffer(),

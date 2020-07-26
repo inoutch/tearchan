@@ -1,7 +1,7 @@
 use crate::core::graphic::batch::batch_buffer::BatchBuffer;
 use crate::core::graphic::hal::buffer_interface::{BufferInterface, BufferMappedMemoryInterface};
 use crate::core::graphic::hal::index_buffer::IndexBufferCommon;
-use crate::core::graphic::hal::renderer_api::RendererApiCommon;
+use crate::core::graphic::hal::graphics::GraphicsCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
 use gfx_hal::Backend;
 
@@ -9,7 +9,7 @@ const DEFAULT_INDEX_BUFFER_SIZE: usize = 1000;
 const DEFAULT_VERTEX_BUFFER_SIZE: usize = 1000;
 
 pub fn create_index_batch_buffer<B: Backend>(
-    api: &RendererApiCommon<B>,
+    api: &GraphicsCommon<B>,
 ) -> BatchBuffer<IndexBufferCommon<B>> {
     // TODO: Improve performance
     BatchBuffer::new(
@@ -32,7 +32,7 @@ pub fn create_index_batch_buffer<B: Backend>(
 }
 
 pub fn create_vertex_batch_buffer<B: Backend>(
-    api: &RendererApiCommon<B>,
+    api: &GraphicsCommon<B>,
 ) -> BatchBuffer<VertexBufferCommon<B>> {
     // TODO: Improve performance
     BatchBuffer::new(
