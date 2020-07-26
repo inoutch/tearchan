@@ -86,7 +86,6 @@ impl BillboardProvider {
         offset: usize,
         force: bool,
     ) {
-        println!("copy_origins_into");
         let position = core.position();
         let range = match force {
             true => self.origin_change_range.get_range_or_full(),
