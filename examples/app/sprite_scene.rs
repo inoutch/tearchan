@@ -8,7 +8,7 @@ use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
 use tearchan::core::graphic::hal::graphic_pipeline::GraphicPipelineConfig;
 use tearchan::core::graphic::hal::renderer::ResizeContext;
 use tearchan::core::graphic::hal::texture::TextureConfig;
-use tearchan::core::graphic::polygon::sprite_atlas::SpriteAtlas;
+use tearchan::core::graphic::polygon::sprite_atlas::{SpriteAtlas, SpriteAtlasInterface};
 use tearchan::core::graphic::polygon::PolygonCommon;
 use tearchan::core::graphic::shader::standard_2d_shader_program::Standard2DShaderProgram;
 use tearchan::core::scene::scene_base::SceneBase;

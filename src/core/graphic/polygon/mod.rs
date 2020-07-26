@@ -1,12 +1,11 @@
 use crate::core::graphic::batch::batch_change_manager::BatchChangeNotifier;
 use crate::core::graphic::hal::buffer_interface::BufferMappedMemoryInterface;
-use crate::extension::shared::{Shared, WeakShared};
+use crate::extension::shared::{make_shared, Shared, WeakShared};
 use crate::math::change_range::ChangeRange;
 use crate::math::mesh::{IndexType, Mesh};
 use crate::math::vec::{make_vec3_fill, make_vec3_zero, make_vec4_white};
 use crate::utility::change_notifier::{ChangeNotifier, ChangeNotifierObject};
 use nalgebra_glm::{rotate, scale, translate, vec3, vec3_to_vec4, vec4, Mat4, Vec2, Vec3, Vec4};
-use std::any::Any;
 use std::cell::RefCell;
 use std::option::Option::Some;
 use std::rc::Rc;
@@ -110,10 +109,28 @@ pub trait PolygonProvider {
 
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4;
 
-    fn as_any_provider_mut(&mut self) -> &mut dyn Any;
-
     fn request_change(&mut self, core: &mut PolygonCore) {
         core.request_change();
+    }
+
+    #[inline]
+    fn update_positions_of_mesh(&mut self, core: &mut PolygonCore, positions: Vec<Vec3>) {
+        core.update_positions_of_mesh(positions);
+    }
+
+    #[inline]
+    fn update_colors_of_mesh(&mut self, core: &mut PolygonCore, colors: Vec<Vec4>) {
+        core.update_colors_of_mesh(colors);
+    }
+
+    #[inline]
+    fn update_texcoords_of_mesh(&mut self, core: &mut PolygonCore, texcoords: Vec<Vec2>) {
+        core.update_texcoords_of_mesh(texcoords);
+    }
+
+    #[inline]
+    fn update_normals_of_mesh(&mut self, core: &mut PolygonCore, normals: Vec<Vec3>) {
+        core.update_normals_of_mesh(normals);
     }
 }
 
@@ -138,15 +155,15 @@ pub trait PolygonCommon {
 
 pub struct Polygon {
     core: PolygonCore,
-    provider: Box<dyn PolygonProvider>,
+    provider: Shared<dyn PolygonProvider>,
 }
 
 impl Polygon {
     pub fn new(mesh: Mesh) -> Polygon {
-        Polygon::new_with_provider(Box::new(PolygonDefaultProvider {}), mesh)
+        Polygon::new_with_provider(make_shared(PolygonDefaultProvider {}), mesh)
     }
 
-    pub fn new_with_provider(provider: Box<dyn PolygonProvider>, mesh: Mesh) -> Polygon {
+    pub fn new_with_provider(provider: Shared<dyn PolygonProvider>, mesh: Mesh) -> Polygon {
         let index_change_range = ChangeRange::new(mesh.indices.len());
         let position_change_range = ChangeRange::new(mesh.positions.len());
         let color_change_range = ChangeRange::new(mesh.colors.len());
@@ -176,12 +193,12 @@ impl Polygon {
 
     #[inline]
     pub fn transform_for_child(&self) -> Mat4 {
-        self.provider.transform_for_child(&self.core)
+        self.provider.borrow().transform_for_child(&self.core)
     }
 
     #[inline]
     pub fn transform(&self) -> Mat4 {
-        self.provider.transform(&self.core)
+        self.provider.borrow().transform(&self.core)
     }
 
     pub fn copy_indices_into<TBuffer: BufferMappedMemoryInterface<IndexType>>(
@@ -219,7 +236,7 @@ impl Polygon {
                 None => return,
             },
         };
-        let matrix = self.provider.transform(&self.core);
+        let matrix = self.provider.borrow().transform(&self.core);
         let mesh_positions = &self.mesh().positions;
 
         if self.computed_visible() {
@@ -311,7 +328,7 @@ impl Polygon {
             },
         };
 
-        let matrix = self.provider.transform(&self.core);
+        let matrix = self.provider.borrow().transform(&self.core);
         let mesh_normals = &self.mesh().normals;
 
         for i in range {
@@ -331,14 +348,6 @@ impl Polygon {
     pub fn index_size(&self) -> usize {
         self.mesh().indices.len()
     }
-
-    pub fn provider_as_any(&self) -> &dyn Any {
-        &self.provider
-    }
-
-    pub fn provider_as_any_mut(&mut self) -> &mut dyn Any {
-        self.provider.as_any_provider_mut()
-    }
 }
 
 impl ChangeNotifierObject<BatchChangeNotifier<Polygon>> for Polygon {
@@ -357,79 +366,87 @@ impl PolygonCommon for Polygon {
 
     #[inline]
     fn position(&self) -> &Vec3 {
-        self.provider.position(&self.core)
+        self.provider.borrow().position(&self.core)
     }
 
     #[inline]
     fn set_position(&mut self, position: Vec3) -> bool {
-        self.provider.set_position(&mut self.core, position)
+        self.provider
+            .borrow_mut()
+            .set_position(&mut self.core, position)
     }
 
     #[inline]
     fn color(&self) -> &Vec4 {
-        self.provider.color(&self.core)
+        self.provider.borrow().color(&self.core)
     }
 
     #[inline]
     fn set_color(&mut self, color: Vec4) -> bool {
-        self.provider.set_color(&mut self.core, color)
+        self.provider.borrow_mut().set_color(&mut self.core, color)
     }
 
     #[inline]
     fn computed_color(&self) -> Vec4 {
-        self.provider.computed_color(&self.core)
+        self.provider.borrow().computed_color(&self.core)
     }
 
     #[inline]
     fn scale(&self) -> &Vec3 {
-        self.provider.scale(&self.core)
+        self.provider.borrow_mut().scale(&self.core)
     }
 
     #[inline]
     fn set_scale(&mut self, scale: Vec3) -> bool {
-        self.provider.set_scale(&mut self.core, scale)
+        self.provider.borrow_mut().set_scale(&mut self.core, scale)
     }
 
     #[inline]
     fn rotation_axis(&self) -> &Vec3 {
-        self.provider.rotation_axis(&self.core)
+        self.provider.borrow().rotation_axis(&self.core)
     }
 
     #[inline]
     fn set_rotation_axis(&mut self, rotation_axis: Vec3) -> bool {
         self.provider
+            .borrow_mut()
             .set_rotation_axis(&mut self.core, rotation_axis)
     }
 
     #[inline]
     fn rotation_radian(&self) -> f32 {
-        self.provider.rotation_radian(&self.core)
+        self.provider.borrow().rotation_radian(&self.core)
     }
 
     #[inline]
     fn set_rotation_radian(&mut self, rotation_radian: f32) -> bool {
         self.provider
+            .borrow_mut()
             .set_rotation_radian(&mut self.core, rotation_radian)
     }
 
     #[inline]
     fn visible(&self) -> bool {
-        self.provider.visible(&self.core)
+        self.provider.borrow().visible(&self.core)
     }
 
     #[inline]
     fn set_visible(&mut self, visible: bool) -> bool {
-        self.provider.set_visible(&mut self.core, visible)
+        self.provider
+            .borrow_mut()
+            .set_visible(&mut self.core, visible)
     }
 
     #[inline]
     fn computed_visible(&self) -> bool {
-        self.provider.computed_visible(&self.core)
+        self.provider.borrow().computed_visible(&self.core)
     }
 
     #[inline]
     fn add_child(&mut self, polygon: &Shared<Polygon>) {
-        self.provider.add_child(&mut self.core, polygon);
+        self.provider
+            .borrow_mut()
+            .add_child(&mut self.core, polygon);
     }
 }
 
@@ -700,10 +717,6 @@ impl PolygonProvider for PolygonDefaultProvider {
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4 {
         core.transform_for_children(self)
     }
-
-    fn as_any_provider_mut(&mut self) -> &mut dyn Any {
-        self
-    }
 }
 
 #[cfg(test)]
@@ -714,7 +727,6 @@ mod test {
     use crate::utility::change_notifier::ChangeNotifier;
     use crate::utility::test::func::MockFunc;
     use nalgebra_glm::{vec2, vec3, vec4, Mat4, Vec3, Vec4};
-    use std::any::Any;
 
     struct MockPolygonProvider {
         mock: Shared<MockFunc>,
@@ -820,10 +832,6 @@ mod test {
             core.transform_for_children(self)
         }
 
-        fn as_any_provider_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-
         fn request_change(&mut self, core: &mut PolygonCore<Polygon>) {
             self.mock
                 .borrow_mut()
@@ -846,7 +854,7 @@ mod test {
             .build()
             .unwrap();
 
-        let polygon = Polygon::new_with_provider(Box::new(provider), mesh);
+        let polygon = Polygon::new_with_provider(make_shared(provider), mesh);
         assert_eq!(polygon.position(), &vec3(0.0f32, 0.0f32, 0.0f32));
         assert_eq!(polygon.color(), &vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
         assert_eq!(polygon.scale(), &vec3(1.0f32, 1.0f32, 1.0f32));
@@ -868,12 +876,15 @@ mod test {
             .build()
             .unwrap();
         let polygon = Polygon::new_with_provider(
-            Box::new(MockPolygonProvider {
+            make_shared(MockPolygonProvider {
                 mock: Shared::clone(&mock),
             }),
             mesh,
         );
-        assert_eq!(polygon.provider.transform(&polygon.core), Mat4::identity());
+        assert_eq!(
+            polygon.provider.borrow().transform(&polygon.core),
+            Mat4::identity()
+        );
     }
 
     #[test]
@@ -920,7 +931,6 @@ mod test {
         range = polygon.core.position_change_range.get_range();
         assert_eq!(range, Some(Range { start: 0, end: 6 }));
     }*/
-
     /*#[test]
     fn test_color() {
         let mesh = MeshBuilder::new()
@@ -947,7 +957,6 @@ mod test {
             expected_colors.as_slice()
         );
     }*/
-
     /*#[test]
     fn test_texcoord() {
         let mesh = MeshBuilder::new()
@@ -989,14 +998,14 @@ mod test {
             .build()
             .unwrap();
         let mut parent_polygon = Polygon::new_with_provider(
-            Box::new(MockPolygonProvider {
+            make_shared(MockPolygonProvider {
                 mock: Shared::clone(&mock),
             }),
             mesh.clone(),
         );
 
         let child_polygon = make_shared(Polygon::new_with_provider(
-            Box::new(MockPolygonProvider {
+            make_shared(MockPolygonProvider {
                 mock: Shared::clone(&mock),
             }),
             mesh,

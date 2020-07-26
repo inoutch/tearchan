@@ -1,17 +1,28 @@
 use crate::core::graphic::batch::batch_change_manager::BatchChangeNotifier;
 use crate::core::graphic::hal::buffer_interface::BufferMappedMemoryInterface;
-use crate::core::graphic::polygon::polygon_2d::{Polygon2DProvider, Polygon2DProviderInterface};
-use crate::core::graphic::polygon::sprite_atlas::{SpriteAtlas, SpriteAtlasCommon};
+use crate::core::graphic::polygon::polygon_2d::{
+    Polygon2DInterface, Polygon2DProvider, Polygon2DProviderInterface,
+};
+use crate::core::graphic::polygon::sprite_atlas::{SpriteAtlasInterface, SpriteAtlasProvider};
 use crate::core::graphic::polygon::{Polygon, PolygonCommon, PolygonCore, PolygonProvider};
 use crate::core::graphic::texture::TextureAtlas;
-use crate::extension::shared::Shared;
+use crate::extension::shared::{clone_shared, make_shared, Shared};
 use crate::math::change_range::ChangeRange;
+use crate::math::mesh::MeshBuilder;
 use crate::utility::change_notifier::{ChangeNotifier, ChangeNotifierObject};
 use nalgebra_glm::{rotate, scale, translate, vec2, Mat4, Vec2, Vec3};
-use std::any::Any;
+
+pub trait BillboardInterface {
+    fn copy_origins_into<TBuffer: BufferMappedMemoryInterface<f32>>(
+        &mut self,
+        buffer: &mut TBuffer,
+        offset: usize,
+        force: bool,
+    );
+}
 
 pub struct BillboardProvider {
-    polygon_2d_provider: Polygon2DProvider,
+    provider: SpriteAtlasProvider<Polygon2DProvider>,
     origin_change_range: ChangeRange,
     notifier: Option<BatchChangeNotifier<Billboard>>,
 }
@@ -31,43 +42,24 @@ impl PolygonProvider for BillboardProvider {
     fn transform(&self, core: &PolygonCore) -> Mat4 {
         translate(
             &self.billboard_transform(core),
-            &self.polygon_2d_provider.transform_anchor_point(),
+            &self.provider.inner_provider().transform_anchor_point(),
         )
     }
 
     fn transform_for_child(&self, core: &PolygonCore) -> Mat4 {
         translate(
             &Mat4::identity(),
-            &self.polygon_2d_provider.transform_anchor_point_for_child(),
+            &self
+                .provider
+                .inner_provider()
+                .transform_anchor_point_for_child(),
         ) * self.transform(core)
-    }
-
-    fn as_any_provider_mut(&mut self) -> &mut dyn Any {
-        self
     }
 
     fn request_change(&mut self, _core: &mut PolygonCore) {
         if let Some(notifier) = &mut self.notifier {
             notifier.request_change();
         }
-    }
-}
-
-impl Polygon2DProviderInterface for BillboardProvider {
-    fn anchor_point(&self) -> &Vec2 {
-        self.polygon_2d_provider.anchor_point()
-    }
-
-    fn size(&self) -> &Vec2 {
-        self.polygon_2d_provider.size()
-    }
-
-    fn set_anchor_point(&mut self, anchor_point: Vec2) {
-        self.polygon_2d_provider.set_anchor_point(anchor_point)
-    }
-
-    fn set_size(&mut self, size: Vec2) {
-        self.polygon_2d_provider.set_size(size)
     }
 }
 
@@ -87,47 +79,18 @@ impl BillboardProvider {
         current
     }
 
-    fn reset_all_origin_change_range(&mut self) {
-        self.origin_change_range.reset();
-    }
-}
-
-pub struct Billboard {
-    polygon: SpriteAtlasCommon<BillboardProvider>,
-}
-
-impl Billboard {
-    pub fn new(texture_atlas: TextureAtlas) -> Self {
-        let size = {
-            let frame = texture_atlas.frames.first().unwrap();
-            vec2(frame.source.w as f32, frame.source.h as f32)
-        };
-        let rect_size = 4;
-        let provider = BillboardProvider {
-            polygon_2d_provider: Polygon2DProvider::new(size),
-            origin_change_range: ChangeRange::new(rect_size),
-            notifier: None,
-        };
-        Billboard {
-            polygon: SpriteAtlas::new_with_provider(Box::new(provider), texture_atlas),
-        }
-    }
-
-    pub fn copy_origins_into<TBuffer: BufferMappedMemoryInterface<f32>>(
+    fn copy_origins_into<TBuffer: BufferMappedMemoryInterface<f32>>(
         &mut self,
+        core: &mut PolygonCore,
         buffer: &mut TBuffer,
         offset: usize,
         force: bool,
     ) {
-        let position = { self.polygon.polygon().borrow().position().to_owned() };
-        let mut polygon = self.polygon.polygon().borrow_mut();
-        let provider: &mut BillboardProvider =
-            polygon.provider_as_any_mut().downcast_mut().unwrap();
-
-        let change_range = &provider.origin_change_range;
+        println!("copy_origins_into");
+        let position = core.position();
         let range = match force {
-            true => change_range.get_range_or_full(),
-            false => match change_range.get_range() {
+            true => self.origin_change_range.get_range_or_full(),
+            false => match self.origin_change_range.get_range() {
                 Some(range) => range,
                 None => return,
             },
@@ -138,55 +101,114 @@ impl Billboard {
             buffer.set(position.z, offset + i * 3 + 2);
         }
 
-        provider.reset_all_origin_change_range();
+        self.origin_change_range.reset();
+    }
+}
+
+pub struct Billboard {
+    polygon: Shared<Polygon>,
+    provider: Shared<BillboardProvider>,
+}
+
+impl Billboard {
+    pub fn new(texture_atlas: TextureAtlas) -> Self {
+        let rect_size = 4;
+        let frame = texture_atlas
+            .frames
+            .first()
+            .expect("There must be at least one or more frames");
+        let mesh = MeshBuilder::new()
+            .with_frame(texture_atlas.size.to_vec2(), frame)
+            .build()
+            .unwrap();
+
+        let polygon_2d_provider =
+            Polygon2DProvider::new(vec2(frame.source.w as f32, frame.source.h as f32));
+        let sprite_atlas_provider = SpriteAtlasProvider::new(polygon_2d_provider, texture_atlas);
+        let provider = make_shared(BillboardProvider {
+            provider: sprite_atlas_provider,
+            origin_change_range: ChangeRange::new(rect_size),
+            notifier: None,
+        });
+        let cloned_provider = clone_shared(&provider);
+
+        Billboard {
+            polygon: make_shared(Polygon::new_with_provider(provider, mesh)),
+            provider: cloned_provider,
+        }
+    }
+
+    pub fn copy_origins_into<TBuffer: BufferMappedMemoryInterface<f32>>(
+        &mut self,
+        buffer: &mut TBuffer,
+        offset: usize,
+        force: bool,
+    ) {
+        let mut polygon = self.polygon.borrow_mut();
+        self.provider
+            .borrow_mut()
+            .copy_origins_into(&mut polygon.core, buffer, offset, force);
     }
 
     #[inline]
     pub fn polygon(&self) -> &Shared<Polygon> {
-        &self.polygon.polygon()
-    }
-
-    #[inline]
-    pub fn sprite_atlas(&self) -> &SpriteAtlasCommon<BillboardProvider> {
         &self.polygon
     }
+}
 
-    #[inline]
-    pub fn sprite_atlas_mut(&mut self) -> &mut SpriteAtlasCommon<BillboardProvider> {
-        &mut self.polygon
+impl Polygon2DInterface for Billboard {
+    fn set_anchor_point(&mut self, anchor_point: Vec2) {
+        let mut polygon = self.polygon.borrow_mut();
+        self.provider
+            .borrow_mut()
+            .provider
+            .inner_provider_mut()
+            .set_anchor_point(&mut polygon.core, anchor_point);
     }
 
-    pub fn set_anchor_point(&mut self, anchor_point: Vec2) {
-        let is_changed = {
-            let mut polygon = self.polygon.polygon2d_mut().polygon().borrow_mut();
-            let provider: &mut BillboardProvider =
-                polygon.provider_as_any_mut().downcast_mut().unwrap();
-            if provider.polygon_2d_provider.anchor_point == anchor_point {
-                false
-            } else {
-                provider.polygon_2d_provider.anchor_point = anchor_point;
-                true
-            }
-        };
+    fn set_size(&mut self, size: Vec2) {
+        let mut polygon = self.polygon.borrow_mut();
+        self.provider
+            .borrow_mut()
+            .provider
+            .inner_provider_mut()
+            .set_size(&mut polygon.core, size);
+    }
 
-        if is_changed {
-            self.polygon
-                .polygon2d_mut()
-                .polygon()
-                .borrow_mut()
-                .core
-                .update_all_positions();
-        }
+    fn size(&self) -> Vec2 {
+        let polygon = self.polygon.borrow();
+        self.provider
+            .borrow()
+            .provider
+            .inner_provider()
+            .size(&polygon.core)
+            .clone_owned()
+    }
+}
+
+impl SpriteAtlasInterface for Billboard {
+    fn set_atlas(&mut self, index: usize) {
+        let mut polygon = self.polygon.borrow_mut();
+        self.provider
+            .borrow_mut()
+            .provider
+            .set_atlas(&mut polygon.core, index);
+    }
+
+    fn set_atlas_with_key(&mut self, key: &str) {
+        let mut polygon = self.polygon.borrow_mut();
+        self.provider
+            .borrow_mut()
+            .provider
+            .set_atlas_with_key(&mut polygon.core, key);
     }
 }
 
 impl ChangeNotifierObject<BatchChangeNotifier<Billboard>> for Billboard {
     fn set_change_notifier(&mut self, notifier: BatchChangeNotifier<Billboard>) {
-        let mut polygon = self.polygon.polygon2d_mut().polygon().borrow_mut();
-        let provider: &mut BillboardProvider =
-            polygon.provider_as_any_mut().downcast_mut().unwrap();
-        let mut n = notifier;
-        n.request_change();
-        provider.notifier = Some(n);
+        let mut polygon = self.polygon.borrow_mut();
+        let mut provider = self.provider.borrow_mut();
+        provider.notifier = Some(notifier);
+        provider.request_change(&mut polygon.core);
     }
 }
