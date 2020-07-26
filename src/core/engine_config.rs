@@ -38,6 +38,7 @@ pub struct EngineConfig {
 #[cfg(test)]
 mod test {
     use crate::core::engine_config::StartupConfigBuilder;
+    use crate::core::graphic::hal::renderer::ResizeContext;
     use crate::core::scene::scene_base::SceneBase;
     use crate::core::scene::scene_context::SceneContext;
     use crate::core::scene::touch::Touch;
@@ -70,6 +71,10 @@ mod test {
         }
 
         fn on_key_up(&mut self, _input: &KeyboardInput) {
+            unimplemented!()
+        }
+
+        fn on_resize(&mut self, _context: &mut ResizeContext) {
             unimplemented!()
         }
     }
