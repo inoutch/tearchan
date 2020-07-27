@@ -163,5 +163,6 @@ impl SceneBase for SquareScene {
 
     fn on_resize(&mut self, context: &mut ResizeContext) {
         self.camera = Camera2D::new(context.display_size.logical.clone_owned());
+        self.screen_size = context.display_size.logical.clone_owned();
     }
 }
