@@ -1,6 +1,6 @@
 use crate::core::scene::scene_creator::SceneCreator;
 use crate::core::scene::scene_manager::DummyScene;
-use crate::core::screen::ScreenMode;
+use crate::core::screen::{ScreenMode, ScreenResolutionMode};
 use nalgebra_glm::Vec2;
 
 #[derive(Builder)]
@@ -9,9 +9,11 @@ pub struct StartupConfig {
     pub application_name: String,
     pub screen_mode: ScreenMode,
     pub screen_size: Option<Vec2>,
+    pub screen_resolution_mode: ScreenResolutionMode,
     pub scene_creator: SceneCreator,
     pub resource_path: Option<String>,
     pub writable_path: Option<String>,
+    pub fps: u64,
 }
 
 impl Default for StartupConfig {
@@ -20,9 +22,11 @@ impl Default for StartupConfig {
             application_name: "default".to_string(),
             screen_mode: ScreenMode::FullScreenWindow,
             screen_size: None,
+            screen_resolution_mode: ScreenResolutionMode::Auto,
             scene_creator: |_, _| Box::new(DummyScene {}),
             resource_path: None,
             writable_path: None,
+            fps: 60,
         }
     }
 }
@@ -31,8 +35,10 @@ pub struct EngineConfig {
     pub application_name: String,
     pub screen_mode: ScreenMode,
     pub screen_size: Option<Vec2>,
+    pub screen_resolution_mode: ScreenResolutionMode,
     pub resource_path: Option<String>,
     pub writable_path: Option<String>,
+    pub fps: u64,
 }
 
 #[cfg(test)]

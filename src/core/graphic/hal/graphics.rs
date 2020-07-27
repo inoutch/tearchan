@@ -1,6 +1,5 @@
 use crate::core::graphic::hal::graphic_pipeline::{GraphicPipelineCommon, GraphicPipelineConfig};
 use crate::core::graphic::hal::index_buffer::IndexBufferCommon;
-use crate::core::graphic::hal::renderer::DisplaySize;
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
 use crate::core::graphic::hal::shader::ShaderCommon;
@@ -9,6 +8,7 @@ use crate::core::graphic::hal::uniform_buffer::UniformBufferCommon;
 use crate::core::graphic::hal::vertex_buffer::VertexBufferCommon;
 use crate::core::graphic::hal::write_descriptor_sets::WriteDescriptorSetsCommon;
 use crate::core::graphic::image::Image;
+use crate::core::screen::DisplaySize;
 use crate::math::mesh::IndexType;
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::buffer::{IndexBufferView, SubRange};

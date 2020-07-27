@@ -7,9 +7,13 @@ use crate::core::screen::ScreenMode;
 use gfx_hal::window::Extent2D;
 use std::cell::RefCell;
 use std::time::Instant;
+use winit::dpi::{LogicalSize, Size};
 use winit::event_loop::EventLoop;
 use winit::monitor::MonitorHandle;
 use winit::window::Fullscreen;
+
+const WINDOW_MIN_SIZE_WIDTH: f64 = 64.0f64;
+const WINDOW_MIN_SIZE_HEIGHT: f64 = 64.0f64;
 
 pub struct Engine {
     config: EngineConfig,
@@ -23,8 +27,10 @@ impl Engine {
                 application_name: config.application_name,
                 screen_mode: config.screen_mode,
                 screen_size: config.screen_size,
+                screen_resolution_mode: config.screen_resolution_mode,
                 resource_path: config.resource_path,
                 writable_path: config.writable_path,
+                fps: config.fps,
             },
             scene_manager: SceneManager::new(config.scene_creator),
         }
@@ -43,8 +49,9 @@ impl Engine {
         };
 
         let mut window_builder = winit::window::WindowBuilder::new()
-            .with_min_inner_size(winit::dpi::Size::Logical(winit::dpi::LogicalSize::new(
-                64.0, 64.0,
+            .with_min_inner_size(Size::Logical(LogicalSize::new(
+                WINDOW_MIN_SIZE_WIDTH,
+                WINDOW_MIN_SIZE_HEIGHT,
             )))
             .with_title(self.config.application_name.to_string());
         window_builder = match &self.config.screen_mode {
@@ -52,20 +59,27 @@ impl Engine {
                 window_builder.with_fullscreen(Some(Fullscreen::Borderless(monitor)))
             }
             ScreenMode::Windowed { resolutions } => {
+                assert!(
+                    !resolutions.is_empty(),
+                    "In fullscreen mode, it must have at least one resolution"
+                );
                 window_builder.with_inner_size(winit::dpi::Size::Physical(
                     winit::dpi::PhysicalSize::new(resolutions[0].width, resolutions[0].height),
                 ))
             }
         };
 
+        let screen_resolution_mode = self.config.screen_resolution_mode.clone();
         let (window, instance, mut adapters, surface) = create_backend(window_builder, &event_loop);
         let adapter = adapters.remove(0);
         let mut renderer = Renderer::new(instance, adapter, surface, window_size);
+        renderer.display_size_mut().update(&screen_resolution_mode);
+
         let mut file = File::new(self.config.resource_path, self.config.writable_path);
         let scene_manager = RefCell::new(self.scene_manager);
 
         let mut prev_time = std::time::Instant::now();
-        let timer_length = std::time::Duration::from_millis(1000 / 60);
+        let timer_length = std::time::Duration::from_millis(1000 / self.config.fps);
         event_loop.run(move |event, _, control_flow| match event {
             winit::event::Event::WindowEvent { event, .. } => match event {
                 winit::event::WindowEvent::CloseRequested => {
@@ -77,6 +91,7 @@ impl Engine {
                         height: dims.height,
                     });
                     renderer.recreate_swapchain();
+                    renderer.display_size_mut().update(&screen_resolution_mode);
                     let mut context = renderer.create_resize_context();
                     scene_manager.borrow_mut().resize(&mut context);
                 }

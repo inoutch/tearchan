@@ -2,6 +2,7 @@ use crate::core::graphic::hal::graphics::{GraphicsCommon, GraphicsContext};
 use crate::core::graphic::hal::helper::{
     create_depth_resources, create_render_pass, find_queue_family,
 };
+use crate::core::screen::DisplaySize;
 use gfx_hal::adapter::{Adapter, PhysicalDevice};
 use gfx_hal::command::{CommandBuffer, CommandBufferFlags, Level};
 use gfx_hal::device::Device;
@@ -12,7 +13,7 @@ use gfx_hal::pso::{Rect, Viewport};
 use gfx_hal::queue::{CommandQueue, Submission};
 use gfx_hal::window::{Extent2D, PresentationSurface, Surface, SwapchainConfig};
 use gfx_hal::Instance;
-use nalgebra_glm::{vec2, vec4, Vec2};
+use nalgebra_glm::{vec2, vec4};
 use std::borrow::Borrow;
 use std::iter;
 use std::mem::ManuallyDrop;
@@ -354,6 +355,10 @@ where
             display_size: &self.context.display_size,
         }
     }
+
+    pub fn display_size_mut(&mut self) -> &mut DisplaySize {
+        &mut self.context.display_size
+    }
 }
 
 impl<B> Drop for Renderer<B>
@@ -405,13 +410,6 @@ where
             }
         }
     }
-}
-
-#[derive(Clone)]
-pub struct DisplaySize {
-    pub logical: Vec2,
-    pub physical: Vec2,
-    pub viewport: Viewport,
 }
 
 pub struct ResizeContext<'a> {
