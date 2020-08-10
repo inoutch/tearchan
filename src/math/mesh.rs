@@ -10,7 +10,7 @@ use crate::math::mesh::square::{
     create_square_texcoords_from_frame,
 };
 use crate::math::rect::{rect2, rect3, Rect2, Rect3};
-use crate::math::vec::make_vec4_white;
+use crate::math::vec::{make_vec2_zero, make_vec4_white};
 use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use std::ops::Range;
 
@@ -138,7 +138,7 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
     ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
         MeshBuilder {
             indices: create_square_indices(),
-            positions: create_square_positions_from_frame(frame),
+            positions: create_square_positions_from_frame(&make_vec2_zero(), frame),
             texcoords: create_square_texcoords_from_frame(texture_size, frame),
             colors: create_square_colors(make_vec4_white()),
             normals: create_square_normals(),
@@ -407,6 +407,31 @@ pub mod square {
         vec![0, 3, 2, 0, 1, 3]
     }
 
+    pub fn create_square_indices_with_offset(offset: IndexType) -> Vec<IndexType> {
+        // Index order →x ↑y
+        // i2 --------- i1,5
+        // |          /  |
+        // |       /     |
+        // |    /        |
+        // | /           |
+        // i0,3 ------- i2,4
+        // Position order
+        // p2 --------- p3
+        // |          /  |
+        // |       /     |
+        // |    /        |
+        // | /           |
+        // p0 --------- p1
+        vec![
+            offset,
+            offset + 3,
+            offset + 2,
+            offset,
+            offset + 1,
+            offset + 3,
+        ]
+    }
+
     pub fn create_square_positions(rect: &Rect2<f32>) -> Vec<Vec3> {
         // Position order →x ↑y
         // p2 --------- p3
@@ -456,13 +481,30 @@ pub mod square {
         ];
     }
 
-    pub fn create_square_positions_from_frame(frame: &TextureFrame) -> Vec<Vec3> {
+    pub fn create_square_positions_from_frame(origin: &Vec2, frame: &TextureFrame) -> Vec<Vec3> {
         let sx = frame.source.x as f32;
         let sy = frame.source.y as f32;
         let sw = frame.rect.w as f32;
         let sh = frame.rect.h as f32;
         create_square_positions(&Rect2 {
-            origin: vec2(sx, sy),
+            origin: vec2(sx + origin.x, sy + origin.y),
+            size: vec2(sw, sh),
+        })
+    }
+
+    pub fn create_square_positions_from_frame_with_ratio(
+        origin: &Vec2,
+        frame: &TextureFrame,
+        ratio: &Vec2,
+    ) -> Vec<Vec3> {
+        let mw = frame.source.w as f32 * ratio.x;
+        let mh = frame.source.h as f32 * ratio.y;
+        let sx = (frame.source.x as f32).min(mw);
+        let sy = (frame.source.y as f32).min(mh);
+        let sw = (frame.rect.w as f32).min(mw - sx);
+        let sh = (frame.rect.h as f32).min(mh - sy);
+        create_square_positions(&Rect2 {
+            origin: vec2(sx + origin.x, sy + origin.y),
             size: vec2(sw, sh),
         })
     }
@@ -475,6 +517,18 @@ pub mod square {
         let fy = frame.rect.y as f32 / texture_size.y;
         let fw = frame.rect.w as f32 / texture_size.x;
         let fh = frame.rect.h as f32 / texture_size.y;
+        create_square_texcoords(&rect2(fx, fy, fw, fh))
+    }
+
+    pub fn create_square_texcoords_from_frame_with_ratio(
+        texture_size: Vec2,
+        frame: &TextureFrame,
+        ratio: &Vec2,
+    ) -> Vec<Vec2> {
+        let fx = frame.rect.x as f32 / texture_size.x;
+        let fy = frame.rect.y as f32 / texture_size.y;
+        let fw = frame.rect.w as f32 / texture_size.x * ratio.x;
+        let fh = frame.rect.h as f32 / texture_size.y * ratio.y;
         create_square_texcoords(&rect2(fx, fy, fw, fh))
     }
 

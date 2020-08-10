@@ -13,6 +13,7 @@ use std::rc::Rc;
 pub mod billboard;
 pub mod polygon_2d;
 pub mod sprite_atlas;
+pub mod sprite_atlas_window;
 
 pub trait PolygonProvider {
     fn position<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {

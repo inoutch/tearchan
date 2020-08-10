@@ -8,6 +8,7 @@ use crate::math::mesh::square::{
     create_square_positions_from_frame, create_square_texcoords_from_frame,
 };
 use crate::math::mesh::MeshBuilder;
+use crate::math::vec::make_vec2_zero;
 use nalgebra_glm::{vec2, Mat4, Vec2};
 use std::collections::HashMap;
 
@@ -73,7 +74,7 @@ where
 {
     pub fn set_atlas(&mut self, core: &mut PolygonCore, index: usize) {
         if let Some(frame) = self.texture_atlas.frames.get(index) {
-            let positions = create_square_positions_from_frame(frame);
+            let positions = create_square_positions_from_frame(&make_vec2_zero(), frame);
             let texcoords =
                 create_square_texcoords_from_frame(self.texture_atlas.size.to_vec2(), frame);
             {
@@ -162,6 +163,10 @@ impl Polygon2DInterface for SpriteAtlas {
 
     fn size(&self) -> Vec2 {
         let polygon = self.polygon.borrow();
-        self.provider.borrow_mut().inner_provider().size(&polygon.core).clone_owned()
+        self.provider
+            .borrow_mut()
+            .inner_provider()
+            .size(&polygon.core)
+            .clone_owned()
     }
 }
