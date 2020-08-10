@@ -91,3 +91,52 @@ pub fn generate_texture_bundle() -> (TextureAtlas, Image) {
     );
     (texture_atlas, image)
 }
+
+pub fn generate_window_texture_bundle() -> (TextureAtlas, Image) {
+    let config = TexturePackerConfig {
+        max_width: 1024,
+        max_height: 1024,
+        allow_rotation: false,
+        texture_outlines: false,
+        border_padding: 2,
+        ..Default::default()
+    };
+
+    let mut binary_array: Vec<(&'static [u8], &'static str)> = vec![];
+    binary_array.push((include_bytes!("../data/img/window_0.png"), "window_0.png"));
+    binary_array.push((include_bytes!("../data/img/window_1.png"), "window_1.png"));
+    binary_array.push((include_bytes!("../data/img/window_2.png"), "window_2.png"));
+    binary_array.push((include_bytes!("../data/img/window_3.png"), "window_3.png"));
+    binary_array.push((include_bytes!("../data/img/window_4.png"), "window_4.png"));
+    binary_array.push((include_bytes!("../data/img/window_5.png"), "window_5.png"));
+    binary_array.push((include_bytes!("../data/img/window_6.png"), "window_6.png"));
+    binary_array.push((include_bytes!("../data/img/window_7.png"), "window_7.png"));
+    binary_array.push((include_bytes!("../data/img/window_8.png"), "window_8.png"));
+
+    let mut packer = TexturePacker::new_skyline(config);
+    for (binary, name) in binary_array {
+        packer
+            .pack_own(
+                name.to_string(),
+                ImageImporter::import_from_memory(binary).unwrap(),
+            )
+            .unwrap();
+    }
+
+    let texture_atlas = TextureAtlas::new(
+        "window.png".to_string(),
+        Size::new(packer.width(), packer.height()),
+        packer
+            .get_frames()
+            .iter()
+            .map(|(_, frame)| TextureFrame::from(frame.clone()))
+            .collect(),
+    );
+    let dynamic_image = ImageExporter::export(&packer).unwrap();
+    let image = Image::new(
+        dynamic_image.to_rgba().to_vec(),
+        vec2(packer.width(), packer.height()),
+    );
+
+    (texture_atlas, image)
+}
