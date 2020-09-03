@@ -12,3 +12,7 @@ pub fn make_shared<T>(v: T) -> Shared<T> {
 pub fn clone_shared<T>(v: &Shared<T>) -> Shared<T> {
     Rc::clone(v)
 }
+
+pub fn make_weak_shared<T>(v: &Shared<T>) -> WeakShared<T> {
+    Rc::downgrade(v)
+}
