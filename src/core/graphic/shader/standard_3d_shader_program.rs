@@ -115,7 +115,7 @@ impl Standard3DShaderProgram {
     }
 }
 
-fn create_3d_attributes() -> Vec<Attribute> {
+pub fn create_3d_attributes() -> Vec<Attribute> {
     vec![
         Attribute {
             attribute_desc: gfx_hal::pso::AttributeDesc {
