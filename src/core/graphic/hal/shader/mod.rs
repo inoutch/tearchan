@@ -1,8 +1,10 @@
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::shader_source::ShaderSource;
 use gfx_hal::device::Device;
+use gfx_hal::pso::{EntryPoint, Specialization};
 use gfx_hal::Backend;
 use std::mem::ManuallyDrop;
+use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 pub mod attribute;
@@ -49,21 +51,19 @@ impl<B: Backend> ShaderCommon<B> {
         &self.descriptor_set_layout_bindings
     }
 
-    pub fn create_entries(&self) -> gfx_hal::pso::GraphicsShaderSet<B> {
-        gfx_hal::pso::GraphicsShaderSet {
-            vertex: gfx_hal::pso::EntryPoint::<B> {
-                entry: ENTRY_NAME,
-                module: &self.vs_module,
-                specialization: gfx_hal::pso::Specialization::default(),
-            },
-            hull: None,
-            domain: None,
-            geometry: None,
-            fragment: Some(gfx_hal::pso::EntryPoint::<B> {
-                entry: ENTRY_NAME,
-                module: &self.fs_module,
-                specialization: gfx_hal::pso::Specialization::default(),
-            }),
+    pub fn vs_entry(&self) -> EntryPoint<B> {
+        EntryPoint {
+            entry: ENTRY_NAME,
+            module: self.vs_module.deref(),
+            specialization: Specialization::default(),
+        }
+    }
+
+    pub fn fs_entry(&self) -> EntryPoint<B> {
+        EntryPoint {
+            entry: ENTRY_NAME,
+            module: self.fs_module.deref(),
+            specialization: Specialization::default(),
         }
     }
 }

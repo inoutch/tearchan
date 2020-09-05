@@ -7,13 +7,13 @@ pub struct ShaderSource {
 
 impl ShaderSource {
     pub fn new(vert_binaries: &[u8], frag_binaries: &[u8]) -> Option<ShaderSource> {
-        let spirv_vert_source = match gfx_hal::pso::read_spirv(Cursor::new(vert_binaries)) {
+        let spirv_vert_source = match gfx_auxil::read_spirv(Cursor::new(vert_binaries)) {
             Ok(x) => x,
             Err(_) => {
                 return None;
             }
         };
-        let spirv_frag_source = match gfx_hal::pso::read_spirv(Cursor::new(frag_binaries)) {
+        let spirv_frag_source = match gfx_auxil::read_spirv(Cursor::new(frag_binaries)) {
             Ok(x) => x,
             Err(_) => {
                 return None;

@@ -134,7 +134,7 @@ fn create_index_buffer<B: Backend>(
         .iter()
         .enumerate()
         .position(|(idx, mem_type)| {
-            buffer_req.type_mask & (1 << idx) as u64 != 0
+            buffer_req.type_mask & (1 << idx) as u32 != 0
                 && mem_type
                     .properties
                     .contains(memory::Properties::CPU_VISIBLE)

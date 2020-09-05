@@ -2,7 +2,10 @@ use crate::core::graphic::hal::descriptor_set::DescriptorSetCommon;
 use crate::core::graphic::hal::shader::attribute::Attribute;
 use crate::core::graphic::hal::shader::ShaderCommon;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{Comparison, DepthTest, DescriptorPool, Primitive, Rasterizer};
+use gfx_hal::pso::{
+    Comparison, DepthTest, DescriptorPool, GraphicsPipelineDesc, InputAssemblerDesc, Primitive,
+    PrimitiveAssemblerDesc, Rasterizer,
+};
 use gfx_hal::Backend;
 use std::borrow::Borrow;
 use std::mem::ManuallyDrop;
@@ -70,15 +73,38 @@ impl<B: Backend> GraphicPipelineCommon<B> {
             index: 0,
             main_pass: render_pass,
         };
-        let mut pipeline_desc = gfx_hal::pso::GraphicsPipelineDesc::new(
-            shader.create_entries(),
-            config.primitive,
+        // let mut pipeline_desc = GraphicsPipelineDesc::new(
+        //     shader.create_entries(),
+        //     config.primitive,
+        //     config.rasterizer,
+        //     &pipeline_layout,
+        //     subpass,
+        // );
+        let vertex_buffers = convert_to_input_attribute_descriptions(shader.borrow_attributes());
+        let attributes = shader
+            .borrow_attributes()
+            .iter()
+            .map(|x| x.attribute_desc)
+            .collect::<Vec<_>>();
+
+        let mut pipeline_desc = GraphicsPipelineDesc::new(
+            PrimitiveAssemblerDesc::Vertex {
+                buffers: &vertex_buffers,
+                attributes: &attributes,
+                input_assembler: InputAssemblerDesc {
+                    primitive: config.primitive,
+                    with_adjacency: false,
+                    restart_index: None,
+                },
+                vertex: shader.vs_entry(),
+                geometry: None,
+                tessellation: None,
+            },
             config.rasterizer,
+            Some(shader.fs_entry()),
             &pipeline_layout,
             subpass,
         );
-        pipeline_desc.vertex_buffers =
-            convert_to_input_attribute_descriptions(shader.borrow_attributes());
 
         pipeline_desc
             .blender
@@ -93,10 +119,6 @@ impl<B: Backend> GraphicPipelineCommon<B> {
             write: true,
         });
         pipeline_desc.depth_stencil.depth_bounds = true;
-
-        shader.borrow_attributes().iter().for_each(|x| {
-            pipeline_desc.attributes.push(x.attribute_desc);
-        });
 
         let pipeline = unsafe {
             device

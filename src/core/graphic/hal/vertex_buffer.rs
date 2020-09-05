@@ -137,7 +137,7 @@ fn create_vertex_buffer<B: Backend>(
         .iter()
         .enumerate()
         .position(|(id, mem_type)| {
-            buffer_req.type_mask & (1 << id) as u64 != 0
+            buffer_req.type_mask & (1 << id) as u32 != 0
                 && mem_type
                     .properties
                     .contains(memory::Properties::CPU_VISIBLE)

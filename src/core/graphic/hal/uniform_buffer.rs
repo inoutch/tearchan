@@ -27,7 +27,7 @@ impl<B: Backend, T> UniformBufferCommon<B, T> {
             .iter()
             .enumerate()
             .position(|(id, mem_type)| {
-                buffer_req.type_mask & (1 << id) as u64 != 0
+                buffer_req.type_mask & (1 << id) as u32 != 0
                     && mem_type
                         .properties
                         .contains(gfx_hal::memory::Properties::CPU_VISIBLE)

@@ -3,7 +3,7 @@ use gfx_hal::adapter::MemoryType;
 use gfx_hal::command::CommandBuffer;
 use gfx_hal::device::Device;
 use gfx_hal::format::Swizzle;
-use gfx_hal::image::{Filter, WrapMode};
+use gfx_hal::image::{Filter, SubresourceRange, WrapMode};
 use gfx_hal::memory::Segment;
 use gfx_hal::pool::CommandPool;
 use gfx_hal::queue::{CommandQueue, QueueGroup};
@@ -11,12 +11,6 @@ use gfx_hal::{Backend, Limits};
 use nalgebra_glm::{vec2, TVec2};
 use std::mem::ManuallyDrop;
 use std::rc::{Rc, Weak};
-
-const COLOR_RANGE: gfx_hal::image::SubresourceRange = gfx_hal::image::SubresourceRange {
-    aspects: gfx_hal::format::Aspects::COLOR,
-    levels: 0..1,
-    layers: 0..1,
-};
 
 #[derive(Clone)]
 pub struct TextureConfig {
@@ -79,7 +73,7 @@ impl<B: Backend> TextureCommon<B> {
             .iter()
             .enumerate()
             .position(|(id, mem_type)| {
-                buffer_req.type_mask & (1 << id) as u64 != 0
+                buffer_req.type_mask & (1 << id) as u32 != 0
                     && mem_type
                         .properties
                         .contains(gfx_hal::memory::Properties::CPU_VISIBLE)
@@ -133,7 +127,7 @@ impl<B: Backend> TextureCommon<B> {
             .iter()
             .enumerate()
             .position(|(id, memory_type)| {
-                image_req.type_mask & (1 << id) as u64 != 0
+                image_req.type_mask & (1 << id) as u32 != 0
                     && memory_type
                         .properties
                         .contains(gfx_hal::memory::Properties::DEVICE_LOCAL)
@@ -151,7 +145,7 @@ impl<B: Backend> TextureCommon<B> {
                     gfx_hal::image::ViewKind::D2,
                     gfx_hal::format::Format::Rgba8Srgb,
                     Swizzle::NO,
-                    COLOR_RANGE.clone(),
+                    color_range(),
                 )
             }
             .unwrap(),
@@ -184,7 +178,7 @@ impl<B: Backend> TextureCommon<B> {
                     ),
                 target: &*image,
                 families: None,
-                range: COLOR_RANGE.clone(),
+                range: color_range(),
             };
 
             cmd_buffer.pipeline_barrier(
@@ -226,7 +220,7 @@ impl<B: Backend> TextureCommon<B> {
                     ),
                 target: &*image,
                 families: None,
-                range: COLOR_RANGE.clone(),
+                range: color_range(),
             };
             cmd_buffer.pipeline_barrier(
                 gfx_hal::pso::PipelineStage::TRANSFER..gfx_hal::pso::PipelineStage::FRAGMENT_SHADER,
@@ -281,5 +275,12 @@ impl<B: Backend> Drop for TextureCommon<B> {
                 device.destroy_image(ManuallyDrop::into_inner(std::ptr::read(&self.image)));
             }
         }
+    }
+}
+
+pub fn color_range() -> SubresourceRange {
+    SubresourceRange {
+        aspects: gfx_hal::format::Aspects::COLOR,
+        ..Default::default()
     }
 }

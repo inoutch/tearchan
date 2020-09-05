@@ -67,8 +67,7 @@ pub fn create_depth_resources<B: Backend>(
     let depth_stencil_format = gfx_hal::format::Format::D32SfloatS8Uint;
     let color_range = gfx_hal::image::SubresourceRange {
         aspects: gfx_hal::format::Aspects::COLOR,
-        levels: 0..1,
-        layers: 0..1,
+        ..Default::default()
     };
     let kind = gfx_hal::image::Kind::D2(
         width as gfx_hal::image::Size,
@@ -94,7 +93,7 @@ pub fn create_depth_resources<B: Backend>(
         .iter()
         .enumerate()
         .position(|(id, memory_type)| {
-            image_req.type_mask & (1 << id) as u64 != 0
+            image_req.type_mask & (1 << id) as u32 != 0
                 && memory_type
                     .properties
                     .contains(gfx_hal::memory::Properties::DEVICE_LOCAL)

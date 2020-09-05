@@ -329,7 +329,7 @@ where
             );
 
             // present frame
-            let result = self.context.queue_group.queues[0].present_surface(
+            let result = self.context.queue_group.queues[0].present(
                 &mut self.surface,
                 surface_image,
                 Some(&self.submission_complete_semaphores[frame_idx]),
