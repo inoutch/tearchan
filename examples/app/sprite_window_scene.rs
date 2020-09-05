@@ -1,6 +1,6 @@
 use crate::app::texture_bundle::generate_window_texture_bundle;
 use gfx_hal::image::Filter;
-use nalgebra_glm::{vec2, vec3, Vec2};
+use nalgebra_glm::{vec2, vec3};
 use tearchan::core::graphic::batch::batch2d::Batch2D;
 use tearchan::core::graphic::camera_2d::Camera2D;
 use tearchan::core::graphic::hal::backend::{GraphicPipeline, Texture};
@@ -38,8 +38,8 @@ impl SpriteWindowScene {
                 },
             );
 
-            let screen_size: Vec2 = ctx.graphics.display_size().logical.clone_owned();
-            let camera = Camera2D::new(screen_size.clone_owned());
+            let screen_size = &ctx.graphics.display_size().logical;
+            let camera = Camera2D::new(screen_size);
 
             let shader_program = Standard2DShaderProgram::new(ctx.graphics, camera.base());
             let graphic_pipeline = ctx

@@ -1,5 +1,5 @@
 use crate::app::texture_bundle::generate_texture_bundle;
-use nalgebra_glm::{vec3, Vec2, Vec3};
+use nalgebra_glm::{vec3, Vec3};
 use std::collections::HashMap;
 use tearchan::core::graphic::animation::animator::{AnimationData, AnimationGroup, Animator};
 use tearchan::core::graphic::batch::batch2d::Batch2D;
@@ -38,8 +38,7 @@ pub struct SpriteScene {
 impl SpriteScene {
     pub fn creator() -> SceneCreator {
         |ctx, _| {
-            let screen_size: Vec2 = ctx.graphics.display_size().logical.clone_owned();
-            let camera = Camera2D::new(screen_size.clone_owned());
+            let camera = Camera2D::new(&ctx.graphics.display_size().logical);
 
             let mut batch = Batch2D::new_batch2d(ctx.graphics);
             let (texture_atlas, image) = generate_texture_bundle();
@@ -48,8 +47,8 @@ impl SpriteScene {
                 .create_texture(&image, TextureConfig::default());
             let sprite1 = SpriteAtlas::new(texture_atlas.clone());
             sprite1.polygon().borrow_mut().set_position(vec3(
-                screen_size.x / 2.0f32 - 100.0f32,
-                screen_size.y / 2.0f32,
+                ctx.graphics.display_size().logical.x / 2.0f32 - 100.0f32,
+                ctx.graphics.display_size().logical.y / 2.0f32,
                 0.0f32,
             ));
             let mut groups: HashMap<AnimationState, AnimationGroup<&'static str>> = HashMap::new();
@@ -74,8 +73,8 @@ impl SpriteScene {
 
             let sprite2 = SpriteAtlas::new(texture_atlas);
             sprite2.polygon().borrow_mut().set_position(vec3(
-                screen_size.x / 2.0f32 + 100.0f32,
-                screen_size.y / 2.0f32,
+                ctx.graphics.display_size().logical.x / 2.0f32 + 100.0f32,
+                ctx.graphics.display_size().logical.y / 2.0f32,
                 0.0f32,
             ));
 
@@ -122,8 +121,7 @@ impl SceneBase for SpriteScene {
             .shader_program
             .create_write_descriptor_sets(descriptor_set, &self.texture);
 
-        ctx.graphics
-            .write_descriptor_sets(write_descriptor_sets);
+        ctx.graphics.write_descriptor_sets(write_descriptor_sets);
         ctx.graphics.draw_elements(
             &self.graphic_pipeline,
             self.batch.index_size(),

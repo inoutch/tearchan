@@ -32,10 +32,9 @@ pub struct SquareScene {
 impl SquareScene {
     pub fn creator() -> SceneCreator {
         |context, _| {
-            let screen_size = context.graphics.display_size().logical.clone_owned();
             let image = Image::new_empty();
 
-            let mut camera = Camera2D::new(screen_size.clone_owned());
+            let mut camera = Camera2D::new(&context.graphics.display_size().logical);
             camera.update();
 
             let texture = context
@@ -55,8 +54,8 @@ impl SquareScene {
                     .unwrap();
                 let polygon = make_shared(Polygon::new(mesh));
                 polygon.borrow_mut().set_position(vec3(
-                    screen_size.x / 2.0f32,
-                    screen_size.y / 2.0f32,
+                    context.graphics.display_size().logical.x / 2.0f32,
+                    context.graphics.display_size().logical.y / 2.0f32,
                     0.0f32,
                 ));
                 batch.add(&polygon, 0);
@@ -68,8 +67,8 @@ impl SquareScene {
                     .unwrap();
                 let polygon = make_shared(Polygon::new(mesh));
                 polygon.borrow_mut().set_position(vec3(
-                    screen_size.x / 2.0f32 - 100.0f32,
-                    screen_size.y / 2.0f32 - 100.0f32,
+                    context.graphics.display_size().logical.x / 2.0f32 - 100.0f32,
+                    context.graphics.display_size().logical.y / 2.0f32 - 100.0f32,
                     0.0f32,
                 ));
                 batch.add(&polygon, 0);
@@ -82,7 +81,7 @@ impl SquareScene {
                 graphic_pipeline,
                 texture,
                 polygons: vec![],
-                screen_size,
+                screen_size: context.graphics.display_size().logical.clone_owned(),
             })
         }
     }
@@ -162,7 +161,7 @@ impl SceneBase for SquareScene {
     fn on_key_up(&mut self, _input: &KeyboardInput) {}
 
     fn on_resize(&mut self, context: &mut ResizeContext) {
-        self.camera = Camera2D::new(context.display_size.logical.clone_owned());
+        self.camera = Camera2D::new(&context.display_size.logical);
         self.screen_size = context.display_size.logical.clone_owned();
     }
 }
