@@ -14,6 +14,7 @@ pub mod billboard;
 pub mod polygon_2d;
 pub mod sprite_atlas;
 pub mod sprite_atlas_window;
+pub mod text_label;
 
 pub trait PolygonProvider {
     fn position<'a>(&self, core: &'a PolygonCore) -> &'a Vec3 {
@@ -349,6 +350,14 @@ impl Polygon {
     pub fn index_size(&self) -> usize {
         self.mesh().indices.len()
     }
+
+    pub fn reset_all_changes(&mut self) {
+        self.core.update_all_indices();
+        self.core.update_all_positions();
+        self.core.update_all_colors();
+        self.core.update_all_texcoords();
+        self.core.update_all_normals();
+    }
 }
 
 impl ChangeNotifierObject<BatchChangeNotifier<Polygon>> for Polygon {
@@ -356,6 +365,10 @@ impl ChangeNotifierObject<BatchChangeNotifier<Polygon>> for Polygon {
         let mut n = notifier;
         n.request_change();
         self.core.notifier = Some(n);
+    }
+
+    fn clear_change_notifier(&mut self) {
+        self.core.notifier = None;
     }
 }
 
@@ -489,6 +502,10 @@ impl PolygonCore {
     #[inline]
     pub fn transform_for_children(&self, provider: &dyn PolygonProvider) -> Mat4 {
         provider.transform(self)
+    }
+
+    pub fn update_all_indices(&mut self) {
+        self.index_change_range.update_all();
     }
 
     pub fn update_all_positions(&mut self) {

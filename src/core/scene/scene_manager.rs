@@ -65,7 +65,9 @@ impl SceneManager {
             WindowEvent::DroppedFile(_) => {}
             WindowEvent::HoveredFile(_) => {}
             WindowEvent::HoveredFileCancelled => {}
-            WindowEvent::ReceivedCharacter(_) => {}
+            WindowEvent::ReceivedCharacter(character) => {
+                self.current_scene.on_character(character);
+            }
             WindowEvent::Focused(_) => {}
             WindowEvent::KeyboardInput { input, .. } => match input.state {
                 ElementState::Pressed => {

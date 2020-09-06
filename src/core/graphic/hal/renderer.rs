@@ -336,7 +336,7 @@ where
             );
 
             self.context.device.destroy_framebuffer(framebuffer);
-
+            self.context.device.wait_idle().unwrap();
             if result.is_err() {
                 self.recreate_swapchain();
             }

@@ -1,5 +1,5 @@
 use image::ImageResult;
-use nalgebra_glm::{vec2, TVec2};
+use nalgebra_glm::{vec2, TVec2, TVec4};
 use std::io::Cursor;
 
 pub struct Image {
@@ -50,6 +50,15 @@ impl Image {
     pub fn row(&self, y: usize) -> &[u8] {
         let width = self.size.x;
         &self.image[y * (width as usize) * self.stride..(y + 1) * (width as usize) * self.stride]
+    }
+
+    pub fn set_color(&mut self, point: &TVec2<usize>, color: &TVec4<u8>) {
+        let width = self.size.x;
+        let index = (point.y * (width as usize) + point.x) * self.stride;
+        self.image[index] = color.x;
+        self.image[index + 1] = color.y;
+        self.image[index + 2] = color.z;
+        self.image[index + 3] = color.w;
     }
 }
 

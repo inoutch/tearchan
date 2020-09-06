@@ -210,4 +210,9 @@ impl ChangeNotifierObject<BatchChangeNotifier<Billboard>> for Billboard {
         provider.notifier = Some(notifier);
         provider.request_change(&mut polygon.core);
     }
+
+    fn clear_change_notifier(&mut self) {
+        let mut provider = self.provider.borrow_mut();
+        provider.notifier = None;
+    }
 }

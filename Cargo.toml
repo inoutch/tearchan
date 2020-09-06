@@ -25,6 +25,7 @@ serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_json = "1.0.53"
 tobj = "2.0.1"
 texture_packer = "0.21.1"
+rusttype = "0.9.2"
 
 [dependencies.gfx-backend-gl]
 version = "0.5.1"

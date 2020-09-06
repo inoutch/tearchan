@@ -77,17 +77,20 @@ where
         let notifier = self.change_manager.create_notifier(&context);
 
         self.contexts.insert(key, context);
-
         object.borrow_mut().set_change_notifier(notifier);
     }
 
-    pub fn remove(&mut self, object: &Shared<TObject>) {
+    pub fn remove(&mut self, object: &Shared<TObject>)
+    where
+        TObject: ChangeNotifierObject<BatchChangeNotifier<TObject>>,
+    {
         let context = match self.contexts.remove(&get_object_key(object)) {
             Some(context) => context,
             None => return,
         };
         self.free(&context);
         self.change_manager.remove(&context);
+        object.borrow_mut().clear_change_notifier();
     }
 
     pub fn provider(&self) -> &TBatchProvider {

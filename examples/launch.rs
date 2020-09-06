@@ -3,7 +3,7 @@ use std::env;
 use tearchan::core::engine::Engine;
 use tearchan::core::engine_config::StartupConfigBuilder;
 use tearchan::core::screen::ScreenMode;
-use crate::app::square_scene::SquareScene;
+use crate::app::text_scene::TextScene;
 
 pub mod app;
 
@@ -19,7 +19,7 @@ fn main() {
                 height: 800,
             }],
         })
-        .scene_creator(SquareScene::creator())
+        .scene_creator(TextScene::creator())
         .build()
         .unwrap();
 
