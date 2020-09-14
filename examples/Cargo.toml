@@ -1,0 +1,13 @@
+[package]
+name = "tearchan-examples"
+version = "0.0.1"
+publish = false
+workspace = ".."
+edition = "2018"
+
+[[bin]]
+name = "cube"
+path = "cube/main.rs"
+
+[dependencies]
+tearchan = { path = ".." }
