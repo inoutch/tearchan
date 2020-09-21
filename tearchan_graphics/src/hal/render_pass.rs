@@ -1,4 +1,4 @@
-use crate::hal::render_bundle::RenderBundle;
+use crate::hal::render_bundle::RenderBundleCommon;
 use gfx_hal::device::Device;
 use gfx_hal::format::Format;
 use gfx_hal::image::{Extent, Layout};
@@ -8,28 +8,29 @@ use nalgebra_glm::TVec2;
 use std::mem::ManuallyDrop;
 
 pub struct RenderPass<B: Backend> {
-    render_bundle: RenderBundle<B>,
+    render_bundle: RenderBundleCommon<B>,
     render_pass: ManuallyDrop<B::RenderPass>,
 }
 
 impl<B: Backend> RenderPass<B> {
     pub fn from_formats(
-        render_bundle: &RenderBundle<B>,
-        load_op: AttachmentLoadOp,
+        render_bundle: &RenderBundleCommon<B>,
+        color_load_op: AttachmentLoadOp,
+        depth_load_op: AttachmentLoadOp,
         color_format: Option<Format>,
         depth_stencil_format: Option<Format>,
     ) -> RenderPass<B> {
         let attachment = Attachment {
             format: color_format,
             samples: 1,
-            ops: AttachmentOps::new(load_op, AttachmentStoreOp::Store),
+            ops: AttachmentOps::new(color_load_op, AttachmentStoreOp::Store),
             stencil_ops: AttachmentOps::DONT_CARE,
             layouts: Layout::Undefined..Layout::Present,
         };
         let depth_attachment = Attachment {
             format: depth_stencil_format,
             samples: 1,
-            ops: AttachmentOps::new(load_op, AttachmentStoreOp::Store),
+            ops: AttachmentOps::new(depth_load_op, AttachmentStoreOp::Store),
             stencil_ops: AttachmentOps::DONT_CARE,
             layouts: Layout::Undefined..Layout::DepthStencilAttachmentOptimal,
         };

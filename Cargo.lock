@@ -859,6 +859,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "intertrait"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d9578379642ca20c09a50fca1f3725973f85cbe97c1c95484d2f2ef03b9ed2"
+dependencies = [
+ "intertrait-macros",
+ "linkme",
+ "once_cell",
+]
+
+[[package]]
+name = "intertrait-macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edcd598472aef1b4757a561542738aecc80598224eba75a2d9c5294bc3334b1e"
+dependencies = [
+ "proc-macro2 1.0.21",
+ "quote 1.0.7",
+ "syn",
+ "uuid",
+]
+
+[[package]]
 name = "io-surface"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -986,6 +1009,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cc7ad3d82c845bdb5dde34ffdcc7a5fb4d2996e1e1ee0f19c33bc80e15196b9"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "linkme"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf4905c62a68908f2fc41ae63b52fe57ad47d154ba404126b85e73d41bd2c974"
+dependencies = [
+ "linkme-impl",
+]
+
+[[package]]
+name = "linkme-impl"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46ec32551b60388ecb60b0b1f9419b0eca6349bb6e60907e57fb4f3524803cc4"
+dependencies = [
+ "proc-macro2 1.0.21",
+ "quote 1.0.7",
+ "syn",
 ]
 
 [[package]]
@@ -1390,6 +1433,12 @@ name = "object"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ab52be62400ca80aa00285d25253d7f7c437b7375c4de678f5405d3afe82ca5"
+
+[[package]]
+name = "once_cell"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "260e51e7efe62b592207e9e13a68e43692a7a279171d6ba57abd208bf23645ad"
 
 [[package]]
 name = "ordered-float"
@@ -1932,7 +1981,13 @@ dependencies = [
 name = "tearchan-examples"
 version = "0.0.1"
 dependencies = [
+ "intertrait",
+ "linkme",
+ "nalgebra-glm",
  "tearchan",
+ "tearchan_core",
+ "tearchan_graphics",
+ "winit 0.22.2",
 ]
 
 [[package]]
@@ -1940,9 +1995,14 @@ name = "tearchan_core"
 version = "0.0.1"
 dependencies = [
  "derive_builder",
+ "intertrait",
+ "linkme",
  "nalgebra-glm",
  "objc",
  "objc-foundation",
+ "tearchan_graphics",
+ "tearchan_utility",
+ "winit 0.22.2",
 ]
 
 [[package]]
@@ -2020,6 +2080,15 @@ name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
+
+[[package]]
+name = "uuid"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fde2f6a4bea1d6e007c4ad38c6839fa71cbb63b6dbf5b595aa38dc9b1093c11"
+dependencies = [
+ "rand",
+]
 
 [[package]]
 name = "void"

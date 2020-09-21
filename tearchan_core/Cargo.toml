@@ -4,8 +4,13 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
+winit = { version = "0.22.2", features = ["web-sys"] }
 derive_builder = "0.9.0"
 nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
+tearchan_graphics = { path = "../tearchan_graphics" }
+tearchan_utility = { path = "../tearchan_utility" }
+intertrait = "0.2.0"
+linkme = "0.2"
 
 [target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies]
 objc = "0.2.7"

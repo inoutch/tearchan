@@ -1,4 +1,6 @@
 use nalgebra_glm::{vec2, TVec2, Vec2};
+use tearchan_core::scene::scene_factory::SceneFactory;
+use tearchan_core::scene::scene_manager::DummyScene;
 use tearchan_graphics::hal::renderer::RendererProperties;
 use tearchan_graphics::screen::{ScreenMode, ScreenResolutionMode};
 
@@ -10,7 +12,7 @@ pub struct StartupConfig {
     pub screen_size: Option<Vec2>,
     pub screen_resolution_mode: ScreenResolutionMode,
     pub min_physical_size: TVec2<u32>,
-    // pub scene_creator: SceneCreator,
+    pub scene_factory: SceneFactory,
     pub resource_path: Option<String>,
     pub writable_path: Option<String>,
     pub fps: u64,
@@ -25,7 +27,7 @@ impl Default for StartupConfig {
             screen_size: None,
             screen_resolution_mode: ScreenResolutionMode::Auto,
             min_physical_size: vec2(64u32, 64u32),
-            // scene_creator: |_, _| Box::new(DummyScene {}),
+            scene_factory: |_, _| Box::new(DummyScene {}),
             resource_path: None,
             writable_path: None,
             fps: 60,
@@ -40,6 +42,7 @@ pub struct EngineConfig {
     pub screen_size: Option<Vec2>,
     pub screen_resolution_mode: ScreenResolutionMode,
     pub min_physical_size: TVec2<u32>,
+    pub scene_factory: SceneFactory,
     pub resource_path: Option<String>,
     pub writable_path: Option<String>,
     pub fps: u64,

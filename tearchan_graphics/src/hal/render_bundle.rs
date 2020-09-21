@@ -2,7 +2,7 @@ use crate::display_size::DisplaySize;
 use gfx_hal::adapter::{MemoryProperties, MemoryType};
 use gfx_hal::device::Device;
 use gfx_hal::pool::CommandPoolCreateFlags;
-use gfx_hal::queue::{QueueGroup, QueueFamilyId};
+use gfx_hal::queue::{QueueFamilyId, QueueGroup};
 use gfx_hal::{Backend, Limits};
 use std::cell::{Ref, RefMut};
 use std::mem::ManuallyDrop;
@@ -10,7 +10,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use tearchan_utility::shared::Shared;
 
-pub struct RenderBundle<B: Backend> {
+pub struct RenderBundleCommon<B: Backend> {
     device: Rc<B::Device>,
     queue_group: Shared<QueueGroup<B>>,
     display_size: Shared<DisplaySize>,
@@ -20,14 +20,14 @@ pub struct RenderBundle<B: Backend> {
     command_pool: Shared<ManuallyDrop<B::CommandPool>>,
 }
 
-impl<B: Backend> RenderBundle<B> {
+impl<B: Backend> RenderBundleCommon<B> {
     pub fn new(
         device: Rc<B::Device>,
         queue_group: Shared<QueueGroup<B>>,
         display_size: Shared<DisplaySize>,
         memory_properties: Rc<MemoryProperties>,
         limits: Rc<Limits>,
-    ) -> RenderBundle<B> {
+    ) -> RenderBundleCommon<B> {
         let command_pool = unsafe {
             device.create_command_pool(
                 queue_group.borrow_mut().family,
@@ -36,7 +36,7 @@ impl<B: Backend> RenderBundle<B> {
         }
         .unwrap();
 
-        RenderBundle {
+        RenderBundleCommon {
             device,
             queue_group,
             command_pool: Shared::new(ManuallyDrop::new(command_pool)),
@@ -46,8 +46,8 @@ impl<B: Backend> RenderBundle<B> {
         }
     }
 
-    pub fn clone(&self) -> RenderBundle<B> {
-        RenderBundle {
+    pub fn clone(&self) -> RenderBundleCommon<B> {
+        RenderBundleCommon {
             device: Rc::clone(&self.device),
             queue_group: Shared::clone(&self.queue_group),
             command_pool: Shared::clone(&self.command_pool),
@@ -98,7 +98,7 @@ impl<B: Backend> RenderBundle<B> {
     }
 }
 
-impl<B: Backend> Drop for RenderBundle<B> {
+impl<B: Backend> Drop for RenderBundleCommon<B> {
     fn drop(&mut self) {
         unsafe {
             self.device

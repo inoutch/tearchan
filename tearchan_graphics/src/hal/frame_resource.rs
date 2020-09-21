@@ -1,4 +1,4 @@
-use crate::hal::render_bundle::RenderBundle;
+use crate::hal::render_bundle::RenderBundleCommon;
 use gfx_hal::command::Level;
 use gfx_hal::device::Device;
 use gfx_hal::pool::{CommandPool, CommandPoolCreateFlags};
@@ -7,7 +7,7 @@ use std::mem::ManuallyDrop;
 use std::ops::Deref;
 
 pub struct FrameResource<B: Backend> {
-    render_bundle: RenderBundle<B>,
+    render_bundle: RenderBundleCommon<B>,
     command_pool: ManuallyDrop<B::CommandPool>,
     command_buffer: B::CommandBuffer,
     submission_complete_fence: ManuallyDrop<B::Fence>,
@@ -15,7 +15,7 @@ pub struct FrameResource<B: Backend> {
 }
 
 impl<B: Backend> FrameResource<B> {
-    pub fn new(render_bundle: &RenderBundle<B>) -> FrameResource<B> {
+    pub fn new(render_bundle: &RenderBundleCommon<B>) -> FrameResource<B> {
         let mut command_pool = unsafe {
             render_bundle.device().create_command_pool(
                 render_bundle.queue_family(),
@@ -45,6 +45,18 @@ impl<B: Backend> FrameResource<B> {
 
     pub fn command_buffer(&self) -> &B::CommandBuffer {
         &self.command_buffer
+    }
+
+    pub fn command_buffer_mut(&mut self) -> &mut B::CommandBuffer {
+        &mut self.command_buffer
+    }
+
+    pub fn submission_complete_fence(&self) -> &B::Fence {
+        &self.submission_complete_fence
+    }
+
+    pub fn submission_complete_semaphore(&self) -> &B::Semaphore {
+        &self.submission_complete_semaphore
     }
 }
 

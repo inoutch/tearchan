@@ -1,5 +1,5 @@
 use crate::hal::image_resource::ImageResource;
-use crate::hal::render_bundle::RenderBundle;
+use crate::hal::render_bundle::RenderBundleCommon;
 use crate::image::Image;
 use gfx_hal::device::Device;
 use gfx_hal::image::{Filter, SamplerDesc, WrapMode};
@@ -32,14 +32,14 @@ impl Default for TextureConfig {
 }
 
 pub struct TextureCommon<B: Backend> {
-    render_bundle: RenderBundle<B>,
+    render_bundle: RenderBundleCommon<B>,
     image_resource: ImageResource<B>,
     sampler: ManuallyDrop<B::Sampler>,
 }
 
 impl<B: Backend> TextureCommon<B> {
     pub fn new(
-        render_bundle: &RenderBundle<B>,
+        render_bundle: &RenderBundleCommon<B>,
         image: &Image,
         config: TextureConfig,
     ) -> TextureCommon<B> {
@@ -73,7 +73,7 @@ impl<B: Backend> Drop for TextureCommon<B> {
 }
 
 fn create_sampler<B: Backend>(
-    render_bundle: &RenderBundle<B>,
+    render_bundle: &RenderBundleCommon<B>,
     config: TextureConfig,
 ) -> ManuallyDrop<B::Sampler> {
     ManuallyDrop::new(
@@ -87,7 +87,7 @@ fn create_sampler<B: Backend>(
 }
 
 fn destroy_sampler<B: Backend>(
-    render_bundle: &RenderBundle<B>,
+    render_bundle: &RenderBundleCommon<B>,
     sampler: &ManuallyDrop<B::Sampler>,
 ) {
     unsafe {

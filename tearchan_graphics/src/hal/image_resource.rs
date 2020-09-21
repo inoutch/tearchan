@@ -1,4 +1,4 @@
-use crate::hal::render_bundle::RenderBundle;
+use crate::hal::render_bundle::RenderBundleCommon;
 use crate::image::Image;
 use gfx_hal::adapter::MemoryType;
 use gfx_hal::command::{CommandBuffer, CommandBufferFlags, Level};
@@ -22,7 +22,7 @@ pub enum ImageResourceError {
 }
 
 pub struct ImageResource<B: Backend> {
-    render_bundle: RenderBundle<B>,
+    render_bundle: RenderBundleCommon<B>,
     image: ManuallyDrop<B::Image>,
     image_view: ManuallyDrop<B::ImageView>,
     image_memory: ManuallyDrop<B::Memory>,
@@ -33,7 +33,7 @@ pub struct ImageResource<B: Backend> {
 
 impl<B: Backend> ImageResource<B> {
     pub fn new(
-        render_bundle: &RenderBundle<B>,
+        render_bundle: &RenderBundleCommon<B>,
         size: TVec2<u32>,
         format: Format,
         usage: Usage,
@@ -82,7 +82,7 @@ impl<B: Backend> ImageResource<B> {
         }
     }
 
-    pub fn new_for_texture(render_bundle: &RenderBundle<B>, size: TVec2<u32>) -> ImageResource<B> {
+    pub fn new_for_texture(render_bundle: &RenderBundleCommon<B>, size: TVec2<u32>) -> ImageResource<B> {
         ImageResource::new(
             render_bundle,
             size,
@@ -95,7 +95,7 @@ impl<B: Backend> ImageResource<B> {
         )
     }
 
-    pub fn new_for_depth(render_bundle: &RenderBundle<B>, size: TVec2<u32>) -> ImageResource<B> {
+    pub fn new_for_depth(render_bundle: &RenderBundleCommon<B>, size: TVec2<u32>) -> ImageResource<B> {
         ImageResource::new(
             render_bundle,
             size,

@@ -19,11 +19,16 @@ extern crate gfx_backend_metal as back;
 extern crate gfx_backend_vulkan as back;
 
 use crate::hal::instance::create_backend;
+use crate::hal::render_bundle::RenderBundleCommon;
+use crate::hal::renderer_context::RendererContextCommon;
 use gfx_hal::adapter::Adapter;
 use winit::window::Window;
 
 pub type Backend = back::Backend;
 pub type Surface = back::Surface;
+
+pub type RenderBundle = RenderBundleCommon<Backend>;
+pub type RendererContext<'a> = RendererContextCommon<'a, Backend>;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type Instance = back::Instance;

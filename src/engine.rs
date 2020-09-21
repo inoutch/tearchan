@@ -1,15 +1,24 @@
 use crate::engine_config::{EngineConfig, StartupConfig};
 use nalgebra_glm::vec2;
+use std::ops::Deref;
+use std::time::{Duration, Instant};
+use tearchan_core::game::game_context::GameContext;
+use tearchan_core::game::game_plugin::GamePlugin;
+use tearchan_core::scene::scene_manager::SceneManager;
+use tearchan_core::ui::ui_manager::UIManager;
 use tearchan_graphics::hal::backend::create_fixed_backend;
-use tearchan_graphics::hal::renderer::Renderer;
+use tearchan_graphics::hal::renderer::{Renderer, RendererBeginResult};
 use tearchan_graphics::screen::ScreenMode;
+use tearchan_utility::time::DurationWatch;
 use winit::dpi::{PhysicalSize, Size};
-use winit::event_loop::EventLoop;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
 use winit::monitor::MonitorHandle;
 use winit::window::{Fullscreen, WindowBuilder};
 
 pub struct Engine {
     config: EngineConfig,
+    plugins: Vec<Box<dyn GamePlugin>>,
 }
 
 impl Engine {
@@ -21,18 +30,29 @@ impl Engine {
                 screen_size: config.screen_size,
                 screen_resolution_mode: config.screen_resolution_mode,
                 min_physical_size: config.min_physical_size,
+                scene_factory: config.scene_factory,
                 resource_path: config.resource_path,
                 writable_path: config.writable_path,
                 fps: config.fps,
                 renderer_properties: config.renderer_properties,
             },
-            // scene_manager: SceneManager::new(config.scene_creator),
+            plugins: vec![],
         }
+    }
+
+    pub fn with_plugin(&mut self, plugin: Box<dyn GamePlugin>) {
+        self.plugins.push(plugin);
+    }
+
+    pub fn with_default_plugins(mut self) -> Self {
+        self.with_plugin(Box::new(UIManager::new()));
+        self
     }
 
     pub fn run(self) {
         let event_loop = EventLoop::new();
         let monitor = prompt_for_monitor(&event_loop);
+        let screen_resolution_mode = self.config.screen_resolution_mode;
         let physical_size = match &self.config.screen_mode {
             ScreenMode::FullScreenWindow => vec2(monitor.size().width, monitor.size().height),
             ScreenMode::Windowed { resolutions } => resolutions[0].clone_owned(),
@@ -61,6 +81,7 @@ impl Engine {
             }
         };
 
+        // Prepare renderer
         let window = window_builder.build(&event_loop).unwrap();
         let (instance, mut adapters, surface) = create_fixed_backend(&window);
         let mut renderer = Renderer::new(
@@ -70,11 +91,72 @@ impl Engine {
             physical_size,
             self.config.renderer_properties,
         );
-        renderer.set_screen_resolution_mode(&self.config.screen_resolution_mode);
+        renderer.set_screen_resolution_mode(&screen_resolution_mode);
+
+        let mut plugins = self.plugins;
+        // TODO: Prepare file manager
+        // TODO: Prepare sound manager
+        // TODO: Prepare network manager
+
+        // TODO: Prepare asset manager
+        // TODO: Prepare touch manager
+        // TODO: Prepare object manager
+
+        let mut scene_manager = SceneManager::new(self.config.scene_factory);
+        let mut duration_watch = DurationWatch::new();
+        let duration = Duration::from_millis(1000 / self.config.fps);
+
+        event_loop.run(move |event, _, control_flow| match event {
+            Event::NewEvents(_) => {}
+            Event::WindowEvent { event, .. } => {
+                match event {
+                    WindowEvent::Resized(size) => {
+                        let v_size = vec2(size.width as _, size.height as _);
+                        renderer.set_dimensions(v_size);
+                        renderer.recreate_swapchain();
+                        renderer.set_screen_resolution_mode(&screen_resolution_mode);
+                        for plugin in &mut plugins {
+                            plugin.on_resize(renderer.display_size().deref());
+                        }
+                    }
+                    _ => {
+                        for plugin in &mut plugins {
+                            plugin.on_window_event(&event);
+                        }
+                    }
+                };
+            }
+            Event::DeviceEvent { .. } => {}
+            Event::UserEvent(_) => {}
+            Event::Suspended => {}
+            Event::Resumed => {}
+            Event::MainEventsCleared => {
+                *control_flow = ControlFlow::WaitUntil(Instant::now() + duration);
+                window.request_redraw();
+            }
+            Event::RedrawRequested(_) => {
+                let delta = duration_watch.measure_as_sec();
+                renderer.render(|event| match event {
+                    RendererBeginResult::Context { context } => {
+                        let mut game_context = GameContext::new(delta, context);
+                        scene_manager.on_update(&mut game_context, &mut plugins);
+
+                        for plugin in &mut plugins {
+                            plugin.on_update(&mut game_context);
+                        }
+                    }
+                    RendererBeginResult::Resize => {}
+                });
+                duration_watch.reset();
+            }
+            Event::RedrawEventsCleared => {}
+            Event::LoopDestroyed => {}
+        });
     }
 }
 
 pub fn prompt_for_monitor(event_loop: &EventLoop<()>) -> MonitorHandle {
+    // TODO: Manage monitor with config
     let num = 0;
     event_loop.available_monitors().nth(num).unwrap()
 }
