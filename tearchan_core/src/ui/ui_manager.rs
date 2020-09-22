@@ -1,9 +1,9 @@
-use crate::controller::touch::Touch;
 use crate::game::game_plugin::GamePlugin;
 use crate::game::object::game_object_base::GameObjectBase;
 use crate::game::object::game_object_manager::GameObjectManager;
 use crate::game::object::GameObject;
 use crate::ui::ui_object::UIObject;
+use crate::ui::ui_touch::UITouch;
 use nalgebra_glm::{vec2, TVec2};
 use std::collections::HashMap;
 use winit::event::{ElementState, KeyboardInput, MouseButton, TouchPhase, WindowEvent};
@@ -41,7 +41,7 @@ impl UIManager {
         });
     }
 
-    fn on_touch_start(&mut self, touch: &Touch) {
+    fn on_touch_start(&mut self, touch: &UITouch) {
         let index = self.touch_index;
         self.touch_indices.insert(touch.id, self.touch_index);
         self.touch_index += 1;
@@ -51,7 +51,7 @@ impl UIManager {
         });
     }
 
-    fn on_touch_move(&mut self, touch: &Touch) {
+    fn on_touch_move(&mut self, touch: &UITouch) {
         let index = match self.touch_indices.get(&touch.id) {
             Some(index) => *index,
             None => return,
@@ -62,7 +62,7 @@ impl UIManager {
         });
     }
 
-    fn on_touch_end(&mut self, touch: &Touch) {
+    fn on_touch_end(&mut self, touch: &UITouch) {
         let index = match self.touch_indices.remove(&touch.id) {
             Some(index) => index,
             None => return,
@@ -76,7 +76,7 @@ impl UIManager {
         });
     }
 
-    fn on_touch_cancel(&mut self, touch: &Touch) {
+    fn on_touch_cancel(&mut self, touch: &UITouch) {
         let index = match self.touch_indices.remove(&touch.id) {
             Some(index) => index,
             None => return,
@@ -118,7 +118,7 @@ impl GamePlugin for UIManager {
                 let prev_location = vec2(position.x as u32, position.y as u32);
                 if prev_location != self.cursor_location {
                     if let TouchPhase::Started = self.cursor_phase {
-                        let touch = Touch {
+                        let touch = UITouch {
                             id: 0,
                             location: prev_location.clone_owned(),
                             phase: TouchPhase::Moved,
@@ -133,7 +133,7 @@ impl GamePlugin for UIManager {
                     match state {
                         ElementState::Pressed => {
                             if let TouchPhase::Ended = self.cursor_phase {
-                                let touch = Touch {
+                                let touch = UITouch {
                                     id: 0,
                                     location: self.cursor_location.clone_owned(),
                                     phase: TouchPhase::Started,
@@ -143,7 +143,7 @@ impl GamePlugin for UIManager {
                             }
                         }
                         ElementState::Released => {
-                            let touch = Touch {
+                            let touch = UITouch {
                                 id: 0,
                                 location: self.cursor_location.clone_owned(),
                                 phase: TouchPhase::Ended,
@@ -155,7 +155,7 @@ impl GamePlugin for UIManager {
                 }
             }
             WindowEvent::Touch(touch) => {
-                let touch = Touch {
+                let touch = UITouch {
                     id: touch.id,
                     location: vec2(touch.location.x as u32, touch.location.y as u32),
                     phase: touch.phase,
