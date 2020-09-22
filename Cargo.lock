@@ -546,6 +546,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-cmp"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "499a1bfa03d254b047e7e5c1fc8dd23a8cf6b344a8eb7e622ae4bc76bfac8e68"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2033,6 +2042,7 @@ version = "0.0.1"
 name = "tearchan_utility"
 version = "0.0.1"
 dependencies = [
+ "float-cmp",
  "nalgebra-glm",
  "serde",
 ]
