@@ -31,4 +31,8 @@ impl<'a, B: gfx_hal::Backend> RendererContextCommon<'a, B> {
     pub fn render_bundle_mut(&mut self) -> &mut RenderBundleCommon<B> {
         self.render_bundle
     }
+
+    pub fn primary_render_pass(&self) -> &RenderPass<B> {
+        self.primary_render_pass
+    }
 }

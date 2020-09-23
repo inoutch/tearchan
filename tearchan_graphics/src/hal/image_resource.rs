@@ -1,6 +1,6 @@
+use crate::hal::helper::find_memory_type;
 use crate::hal::render_bundle::RenderBundleCommon;
 use crate::image::Image;
-use gfx_hal::adapter::MemoryType;
 use gfx_hal::command::{CommandBuffer, CommandBufferFlags, Level};
 use gfx_hal::device::Device;
 use gfx_hal::format::{Aspects, Format, Swizzle};
@@ -8,11 +8,11 @@ use gfx_hal::image::{
     Access, Extent, Kind, Layout, Offset, SubresourceLayers, SubresourceRange, Tiling, Usage,
     ViewCapabilities, ViewKind,
 };
-use gfx_hal::memory::{Dependencies, Properties, Requirements, Segment};
+use gfx_hal::memory::{Dependencies, Properties, Segment};
 use gfx_hal::pool::CommandPool;
 use gfx_hal::pso::PipelineStage;
 use gfx_hal::queue::CommandQueue;
-use gfx_hal::{buffer, Backend, MemoryTypeId};
+use gfx_hal::{buffer, Backend};
 use nalgebra_glm::TVec2;
 use std::mem::ManuallyDrop;
 
@@ -53,7 +53,7 @@ impl<B: Backend> ImageResource<B> {
         }
         .unwrap();
         let image_req = unsafe { device.get_image_requirements(&image) };
-        let device_type = find_image_memory_type(
+        let device_type = find_memory_type(
             render_bundle.memory_types(),
             &image_req,
             Properties::DEVICE_LOCAL,
@@ -82,7 +82,10 @@ impl<B: Backend> ImageResource<B> {
         }
     }
 
-    pub fn new_for_texture(render_bundle: &RenderBundleCommon<B>, size: TVec2<u32>) -> ImageResource<B> {
+    pub fn new_for_texture(
+        render_bundle: &RenderBundleCommon<B>,
+        size: TVec2<u32>,
+    ) -> ImageResource<B> {
         ImageResource::new(
             render_bundle,
             size,
@@ -95,7 +98,10 @@ impl<B: Backend> ImageResource<B> {
         )
     }
 
-    pub fn new_for_depth(render_bundle: &RenderBundleCommon<B>, size: TVec2<u32>) -> ImageResource<B> {
+    pub fn new_for_depth(
+        render_bundle: &RenderBundleCommon<B>,
+        size: TVec2<u32>,
+    ) -> ImageResource<B> {
         ImageResource::new(
             render_bundle,
             size,
@@ -144,7 +150,7 @@ impl<B: Backend> ImageResource<B> {
                 .device()
                 .get_buffer_requirements(&image_upload_buffer)
         };
-        let memory_type = find_image_memory_type(
+        let memory_type = find_memory_type(
             self.render_bundle.memory_types(),
             &image_upload_buffer_req,
             Properties::CPU_VISIBLE,
@@ -291,20 +297,4 @@ impl<B: Backend> Drop for ImageResource<B> {
                 .free_memory(ManuallyDrop::into_inner(std::ptr::read(&self.image_memory)));
         }
     }
-}
-
-fn find_image_memory_type(
-    memory_types: &Vec<MemoryType>,
-    image_req: &Requirements,
-    properties: Properties,
-) -> MemoryTypeId {
-    memory_types
-        .iter()
-        .enumerate()
-        .position(|(id, memory_type)| {
-            image_req.type_mask & (1 << id) as u32 != 0
-                && memory_type.properties.contains(properties)
-        })
-        .unwrap()
-        .into()
 }

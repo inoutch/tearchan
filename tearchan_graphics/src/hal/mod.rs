@@ -1,7 +1,10 @@
 pub mod backend;
+pub mod buffer;
 pub mod depth_resource;
 pub mod device_info;
 pub mod frame_resource;
+pub mod graphic_pipeline;
+pub mod helper;
 pub mod image_resource;
 pub mod instance;
 pub mod queue;
@@ -9,6 +12,7 @@ pub mod render_bundle;
 pub mod render_pass;
 pub mod renderer;
 pub mod renderer_context;
+pub mod shader;
 pub mod surface;
 pub mod texture;
 pub mod viewport;

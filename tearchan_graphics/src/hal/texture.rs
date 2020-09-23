@@ -64,6 +64,10 @@ impl<B: Backend> TextureCommon<B> {
         destroy_sampler(&self.render_bundle, &self.sampler);
         self.sampler = create_sampler(&self.render_bundle, config);
     }
+
+    pub fn sampler(&self) -> &B::Sampler {
+        &self.sampler
+    }
 }
 
 impl<B: Backend> Drop for TextureCommon<B> {

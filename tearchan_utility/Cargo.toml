@@ -6,6 +6,8 @@ edition = "2018"
 [dependencies]
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
+tobj = "2.0.1"
+texture_packer = "0.21.1"
 
 [dev-dependencies]
 float-cmp = "0.7.0"
