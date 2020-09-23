@@ -4,6 +4,7 @@ use std::ops::Deref;
 use std::time::{Duration, Instant};
 use tearchan_core::game::game_context::GameContext;
 use tearchan_core::game::game_plugin::GamePlugin;
+use tearchan_core::game::game_plugin_manager::GamePluginManager;
 use tearchan_core::scene::scene_manager::SceneManager;
 use tearchan_core::ui::ui_manager::UIManager;
 use tearchan_graphics::hal::backend::create_fixed_backend;
@@ -18,7 +19,7 @@ use winit::window::{Fullscreen, WindowBuilder};
 
 pub struct Engine {
     config: EngineConfig,
-    plugins: Vec<Box<dyn GamePlugin>>,
+    plugin_manager: GamePluginManager,
 }
 
 impl Engine {
@@ -36,16 +37,16 @@ impl Engine {
                 fps: config.fps,
                 renderer_properties: config.renderer_properties,
             },
-            plugins: vec![],
+            plugin_manager: GamePluginManager::new(),
         }
     }
 
-    pub fn with_plugin(&mut self, plugin: Box<dyn GamePlugin>) {
-        self.plugins.push(plugin);
+    pub fn with_plugin(&mut self, plugin: Box<dyn GamePlugin>, key: String, order: i32) {
+        self.plugin_manager.add(plugin, key, order);
     }
 
     pub fn with_default_plugins(mut self) -> Self {
-        self.with_plugin(Box::new(UIManager::new()));
+        self.with_plugin(Box::new(UIManager::new()), "UIManager".to_string(), 0);
         self
     }
 
@@ -93,7 +94,7 @@ impl Engine {
         );
         renderer.set_screen_resolution_mode(&screen_resolution_mode);
 
-        let mut plugins = self.plugins;
+        let mut plugin_manager = self.plugin_manager;
         // TODO: Prepare file manager
         // TODO: Prepare sound manager
         // TODO: Prepare network manager
@@ -115,14 +116,14 @@ impl Engine {
                         renderer.set_dimensions(v_size);
                         renderer.recreate_swapchain();
                         renderer.set_screen_resolution_mode(&screen_resolution_mode);
-                        for plugin in &mut plugins {
+                        plugin_manager.for_each_mut(|plugin| {
                             plugin.on_resize(renderer.display_size().deref());
-                        }
+                        });
                     }
                     _ => {
-                        for plugin in &mut plugins {
+                        plugin_manager.for_each_mut(|plugin| {
                             plugin.on_window_event(&event);
-                        }
+                        });
                     }
                 };
             }
@@ -139,11 +140,11 @@ impl Engine {
                 renderer.render(|event| match event {
                     RendererBeginResult::Context { context } => {
                         let mut game_context = GameContext::new(delta, context);
-                        scene_manager.on_update(&mut game_context, &mut plugins);
+                        scene_manager.on_update(&mut game_context, &mut plugin_manager);
 
-                        for plugin in &mut plugins {
+                        plugin_manager.for_each_mut(|plugin| {
                             plugin.on_update(&mut game_context);
-                        }
+                        });
                     }
                     RendererBeginResult::Resize => {}
                 });

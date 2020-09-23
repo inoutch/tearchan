@@ -1,5 +1,4 @@
 use crate::game::game_context::GameContext;
-use crate::game::game_plugin::GamePlugin;
 use crate::game::object::game_object_base::GameObjectBase;
 use crate::game::object::game_object_manager::GameObjectManager;
 use crate::scene::scene_context::SceneContext;
@@ -8,6 +7,7 @@ use crate::scene::scene_result::SceneResult;
 use crate::scene::Scene;
 use std::option::Option::Some;
 use winit::event::WindowEvent;
+use crate::game::game_plugin_manager::GamePluginManager;
 
 pub struct SceneManager {
     current_scene: Box<dyn Scene>,
@@ -117,8 +117,8 @@ impl SceneManager {
         }*/
     }
 
-    pub fn on_update(&mut self, context: &mut GameContext, plugins: &mut Vec<Box<dyn GamePlugin>>) {
-        let mut scene_context = SceneContext::new(context, plugins, &mut self.object_manager);
+    pub fn on_update(&mut self, context: &mut GameContext, plugin_manager: &mut GamePluginManager) {
+        let mut scene_context = SceneContext::new(context, plugin_manager, &mut self.object_manager);
         if let Some((scene_factory, options)) = std::mem::replace(&mut self.scene_factory, None) {
             self.current_scene = scene_factory(&mut scene_context, options);
             self.scene_factory = None;

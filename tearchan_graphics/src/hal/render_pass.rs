@@ -73,6 +73,10 @@ impl<B: Backend> RenderPass<B> {
         }
         .unwrap()
     }
+
+    pub fn get(&self) -> &B::RenderPass {
+        &self.render_pass
+    }
 }
 
 impl<B: Backend> Drop for RenderPass<B> {

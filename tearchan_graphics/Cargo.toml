@@ -52,3 +52,7 @@ features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
 
 [dev-dependencies]
 raw-window-handle = "0.3.3" # For dummy surface
+tearchan_utility = { path = "../tearchan_utility" }
+
+[build-dependencies]
+shaderc = "0.6.2"
