@@ -714,7 +714,6 @@ dependencies = [
  "parking_lot 0.11.0",
  "range-alloc",
  "raw-window-handle",
- "smallvec 1.4.2",
  "spirv_cross",
  "storage-map",
 ]
