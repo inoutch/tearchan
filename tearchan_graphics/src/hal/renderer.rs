@@ -171,15 +171,14 @@ where
     }
 
     pub fn recreate_swapchain(&mut self) {
-        let display_size = self.render_bundle.display_size();
         let caps = self.surface.capabilities(&self.adapter.physical_device);
         let surface_format = find_support_format(self.surface.deref(), &self.adapter);
         let swap_config = SwapchainConfig::from_caps(
             &caps,
             surface_format,
             Extent2D {
-                width: display_size.physical.x as _,
-                height: display_size.physical.y as _,
+                width: self.render_bundle.display_size().physical.x as _,
+                height: self.render_bundle.display_size().physical.y as _,
             },
         );
         let extent = swap_config.extent;
