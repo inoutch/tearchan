@@ -12,6 +12,7 @@ impl<T> Shared<T> {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Shared<T> {
         Shared {
             v: Rc::clone(&self.v),
