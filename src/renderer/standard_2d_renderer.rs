@@ -24,7 +24,7 @@ pub struct Standard2DRenderer {
 }
 
 impl Standard2DRenderer {
-    pub fn new(r: RendererContext, texture: Texture) -> Standard2DRenderer {
+    pub fn new(r: &mut RendererContext, texture: Texture) -> Standard2DRenderer {
         let camera = Camera2D::new(&r.render_bundle().display_size().logical);
         let shader_program = Standard2DShaderProgram::new(r.render_bundle(), camera.base());
         let graphic_pipeline = GraphicPipeline::new(
@@ -69,6 +69,11 @@ impl GamePlugin for Standard2DRenderer {
             .create_write_descriptor_sets(descriptor_set, &self.texture)
             .write(context.r.render_bundle());
 
-        // context.r.draw_elements();
+        context.r.draw_elements(
+            &self.graphic_pipeline,
+            0,
+            self.batch2d.provider().index_buffer(),
+            &self.batch2d.provider().vertex_buffers(),
+        );
     }
 }
