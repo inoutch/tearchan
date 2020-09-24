@@ -2,7 +2,7 @@ use crate::hal::render_bundle::RenderBundleCommon;
 use crate::hal::shader::attribute::Attribute;
 use crate::hal::shader::shader_source::ShaderSource;
 use gfx_hal::device::Device;
-use gfx_hal::pso::{EntryPoint, Specialization};
+use gfx_hal::pso::{DescriptorSetLayoutBinding, EntryPoint, Specialization};
 use gfx_hal::Backend;
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
@@ -51,13 +51,11 @@ impl<B: Backend> ShaderCommon<B> {
         }
     }
 
-    pub fn borrow_attributes(&self) -> &Vec<Attribute> {
+    pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attributes
     }
 
-    pub fn borrow_descriptor_set_layout_bindings(
-        &self,
-    ) -> &Vec<gfx_hal::pso::DescriptorSetLayoutBinding> {
+    pub fn descriptor_set_layout_bindings(&self) -> &Vec<DescriptorSetLayoutBinding> {
         &self.descriptor_set_layout_bindings
     }
 

@@ -58,7 +58,7 @@ impl<B: Backend> GraphicPipelineCommon<B> {
         let descriptor_set_layout = unsafe {
             render_bundle
                 .device()
-                .create_descriptor_set_layout(shader.borrow_descriptor_set_layout_bindings(), &[])
+                .create_descriptor_set_layout(shader.descriptor_set_layout_bindings(), &[])
                 .unwrap()
         };
         let descriptor_set = unsafe {
@@ -78,9 +78,9 @@ impl<B: Backend> GraphicPipelineCommon<B> {
             index: 0,
             main_pass: render_pass.get(),
         };
-        let vertex_buffers = convert_to_input_attribute_descriptions(shader.borrow_attributes());
+        let vertex_buffers = convert_to_input_attribute_descriptions(shader.attributes());
         let attributes = shader
-            .borrow_attributes()
+            .attributes()
             .iter()
             .map(|x| x.attribute_desc)
             .collect::<Vec<_>>();
@@ -113,7 +113,6 @@ impl<B: Backend> GraphicPipelineCommon<B> {
             fun: Comparison::LessEqual,
             write: true,
         });
-        pipeline_desc.depth_stencil.depth_bounds = true;
 
         let pipeline = unsafe {
             render_bundle
