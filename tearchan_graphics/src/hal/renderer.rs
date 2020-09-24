@@ -194,15 +194,6 @@ where
             display_size.logical = vec2(extent.width as _, extent.height as _);
             self.actual_viewports = [convert_up_side_down(&display_size.viewport)];
         }
-
-        self.depth_resource = DepthResource::new(&self.render_bundle);
-        self.primary_render_pass = RenderPass::from_formats(
-            &self.render_bundle,
-            AttachmentLoadOp::Clear,
-            AttachmentLoadOp::Clear,
-            Some(surface_format),
-            Some(self.depth_resource.image_resource().format().clone()),
-        );
     }
 
     pub fn render<F>(&mut self, scope: F)
