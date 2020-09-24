@@ -155,7 +155,7 @@ mod test {
 
     #[test]
     fn test_batch_buffer_memory_allocation() {
-        let mock = Shared::new(MockFunc::new());
+        let mock = Shared::new(MockFunc::default());
         let mock_vertex_buffer = MockVertexBuffer::new(&mock, vec![0.0f32; 32].as_slice());
         let mut batch_buffer = BatchBuffer::new(mock_vertex_buffer, |buffer, size| {
             let mut vertices = buffer.vertices.borrow().clone();

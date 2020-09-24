@@ -3,10 +3,6 @@ pub struct MockFunc {
 }
 
 impl MockFunc {
-    pub fn new() -> MockFunc {
-        MockFunc { calls: vec![] }
-    }
-
     pub fn call(&mut self, logs: Vec<String>) {
         self.calls.push(logs);
     }
@@ -23,5 +19,11 @@ impl MockFunc {
 
     pub fn clear(&mut self) {
         self.calls.clear();
+    }
+}
+
+impl Default for MockFunc {
+    fn default() -> Self {
+        MockFunc { calls: vec![] }
     }
 }
