@@ -36,7 +36,7 @@ impl<B: Backend> IndexBufferCommon<B> {
         Some(IndexBufferCommon::new(&self.render_bundle, indices))
     }
 
-    pub fn buffer(&self) -> &B::Buffer {
+    pub fn get(&self) -> &B::Buffer {
         &self.buffer
     }
 

@@ -30,7 +30,7 @@ impl<B: Backend> VertexBufferCommon<B> {
         Some(VertexBufferCommon::new(&self.render_bundle, vertices))
     }
 
-    pub fn borrow_buffer(&self) -> &B::Buffer {
+    pub fn get(&self) -> &B::Buffer {
         &self.buffer
     }
 
