@@ -7,14 +7,6 @@ pub struct DurationWatch {
 }
 
 impl DurationWatch {
-    pub fn new() -> DurationWatch {
-        DurationWatch {
-            prev: Instant::now(),
-            now: Instant::now(),
-            reset: true,
-        }
-    }
-
     pub fn measure_as_sec(&mut self) -> f32 {
         if self.reset {
             self.now = Instant::now();
@@ -26,5 +18,15 @@ impl DurationWatch {
     pub fn reset(&mut self) {
         self.reset = true;
         self.prev = self.now;
+    }
+}
+
+impl Default for DurationWatch {
+    fn default() -> Self {
+        DurationWatch {
+            prev: Instant::now(),
+            now: Instant::now(),
+            reset: true,
+        }
     }
 }
