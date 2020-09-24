@@ -104,7 +104,7 @@ impl Engine {
         // TODO: Prepare object manager
 
         let mut scene_manager = SceneManager::new(self.config.scene_factory);
-        let mut duration_watch = DurationWatch::new();
+        let mut duration_watch = DurationWatch::default();
         let duration = Duration::from_millis(1000 / self.config.fps);
 
         event_loop.run(move |event, _, control_flow| match event {
