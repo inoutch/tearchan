@@ -17,3 +17,4 @@ tearchan = { path = ".." }
 tearchan_core = { path = "../tearchan_core" }
 tearchan_graphics = { path = "../tearchan_graphics" }
 nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
+env_logger = "0.7.1"
