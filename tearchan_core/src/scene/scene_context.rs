@@ -37,4 +37,8 @@ impl<'a, 'b> SceneContext<'a, 'b> {
         });
         Some(game_object)
     }
+
+    pub fn plugin_manager_mut(&mut self) -> &mut GamePluginManager {
+        self.plugin_manager
+    }
 }
