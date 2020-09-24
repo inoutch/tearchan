@@ -19,7 +19,7 @@ impl<B: Backend> FrameResource<B> {
         let mut command_pool = unsafe {
             render_bundle.device().create_command_pool(
                 render_bundle.queue_family(),
-                CommandPoolCreateFlags::empty(),
+                CommandPoolCreateFlags::RESET_INDIVIDUAL,
             )
         }
         .expect("Can't create command pool");
