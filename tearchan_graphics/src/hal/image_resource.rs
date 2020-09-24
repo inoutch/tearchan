@@ -64,7 +64,7 @@ impl<B: Backend> ImageResource<B> {
             device.create_image_view(
                 &image,
                 ViewKind::D2,
-                Format::Rgba8Srgb,
+                format,
                 Swizzle::NO,
                 color_range.clone(),
             )
@@ -108,7 +108,7 @@ impl<B: Backend> ImageResource<B> {
             Format::D32SfloatS8Uint,
             Usage::DEPTH_STENCIL_ATTACHMENT,
             SubresourceRange {
-                aspects: Aspects::COLOR,
+                aspects: Aspects::DEPTH,
                 ..Default::default()
             },
         )
