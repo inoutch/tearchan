@@ -1,14 +1,17 @@
 use crate::batch::batch2d::{Batch2D, Batch2DProvider};
+use nalgebra_glm::{vec2, vec3};
 use tearchan_core::game::game_context::GameContext;
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::game_object_manager::GameObjectManager;
 use tearchan_core::game::object::GameObject;
+use tearchan_graphics::batch::batch_command::{BatchCommand, BatchCommandData, BATCH_ID_EMPTY};
 use tearchan_graphics::batch::batch_command_queue::BatchCommandQueue;
 use tearchan_graphics::camera::camera_2d::Camera2D;
 use tearchan_graphics::hal::backend::{GraphicPipeline, RendererContext, Texture};
 use tearchan_graphics::hal::graphic_pipeline::GraphicPipelineConfig;
 use tearchan_graphics::shader::standard_2d_shader_program::Standard2DShaderProgram;
+use tearchan_utility::mesh::MeshBuilder;
 
 pub trait Standard2DRenderObject: GameObjectBase {
     fn attach_queue(&mut self, queue: BatchCommandQueue);
@@ -33,13 +36,38 @@ impl Standard2DRenderer {
             shader_program.shader(),
             GraphicPipelineConfig::default(),
         );
+        let mut batch2d = Batch2DProvider::new(r.render_bundle());
+        let mut queue = batch2d.create_queue();
+        let mesh = MeshBuilder::new()
+            .with_square(vec2(100.0f32, 100.0f32))
+            .build()
+            .unwrap();
+        queue.queue(BatchCommand::Add {
+            id: BATCH_ID_EMPTY,
+            data: vec![
+                BatchCommandData::V3U32 {
+                    data: vec![vec3(0u32, 3u32, 2u32), vec3(0u32, 1u32, 3u32)],
+                },
+                BatchCommandData::V3F32 {
+                    data: mesh.positions.clone(),
+                },
+                BatchCommandData::V4F32 {
+                    data: mesh.colors.clone(),
+                },
+                BatchCommandData::V2F32 {
+                    data: mesh.texcoords.clone(),
+                },
+            ],
+            order: None,
+        });
+
         Standard2DRenderer {
             texture,
             camera,
             shader_program,
             graphic_pipeline,
             object_manager: GameObjectManager::new(),
-            batch2d: Batch2DProvider::new(r.render_bundle()),
+            batch2d,
         }
     }
 }
@@ -71,7 +99,7 @@ impl GamePlugin for Standard2DRenderer {
 
         context.r.draw_elements(
             &self.graphic_pipeline,
-            0,
+            3,
             self.batch2d.provider().index_buffer(),
             &self.batch2d.provider().vertex_buffers(),
         );
