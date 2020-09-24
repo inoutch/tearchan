@@ -31,6 +31,16 @@ impl Batch2DProvider {
     }
 }
 
+impl Batch2DProvider {
+    pub fn index_buffer(&self) -> &IndexBuffer {
+        self.index_buffer.buffer()
+    }
+
+    pub fn vertex_buffers(&self) -> Vec<&VertexBuffer> {
+        self.vertex_buffers.iter().map(|b| b.buffer()).collect()
+    }
+}
+
 impl BatchProvider for Batch2DProvider {
     fn run(&mut self, command: BatchCommand) {
         match &command {
