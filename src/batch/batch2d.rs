@@ -39,12 +39,19 @@ impl Batch2DProvider {
     pub fn vertex_buffers(&self) -> Vec<&VertexBuffer> {
         self.vertex_buffers.iter().map(|b| b.buffer()).collect()
     }
+
+    pub fn index_count(&self) -> usize {
+        self.index_buffer.last()
+    }
 }
 
 impl BatchProvider for Batch2DProvider {
     fn run(&mut self, command: BatchCommand) {
         match &command {
             BatchCommand::Add { id, data, .. } => {
+                debug_assert_eq!(data[1].len(), data[2].len());
+                debug_assert_eq!(data[2].len(), data[3].len());
+
                 self.index_buffer.allocate(*id, data[0].len() * 3);
                 self.vertex_buffers[0].allocate(*id, data[1].len() * 3);
                 self.vertex_buffers[1].allocate(*id, data[2].len() * 4);
@@ -73,16 +80,16 @@ impl BatchProvider for Batch2DProvider {
     }
 
     fn flush(&mut self) {
-        let mut index_mapping = self.index_buffer.buffer().open(0, self.index_buffer.size());
+        let mut index_mapping = self.index_buffer.buffer().open(0, self.index_buffer.len());
         let mut position_mapping = self.vertex_buffers[0]
             .buffer()
-            .open(0, self.vertex_buffers[0].size());
+            .open(0, self.vertex_buffers[0].len());
         let mut color_mapping = self.vertex_buffers[1]
             .buffer()
-            .open(0, self.vertex_buffers[1].size());
+            .open(0, self.vertex_buffers[1].len());
         let mut texcoord_mapping = self.vertex_buffers[2]
             .buffer()
-            .open(0, self.vertex_buffers[2].size());
+            .open(0, self.vertex_buffers[2].len());
         let object_manager = &mut self.object_manager;
         let index_buffer = &self.index_buffer;
         let vertex_buffers = &self.vertex_buffers;

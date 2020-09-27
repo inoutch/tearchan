@@ -14,6 +14,7 @@ use gfx_hal::adapter::{Adapter, PhysicalDevice};
 use gfx_hal::command::{CommandBuffer, CommandBufferFlags};
 use gfx_hal::device::Device;
 use gfx_hal::pass::AttachmentLoadOp;
+use gfx_hal::pool::CommandPoolCreateFlags;
 use gfx_hal::pso::Viewport;
 use gfx_hal::queue::{CommandQueue, Submission};
 use gfx_hal::window::{Extent2D, PresentationSurface};
@@ -63,6 +64,7 @@ pub struct Renderer<B: gfx_hal::Backend> {
     properties: RendererProperties,
     // Share resources
     render_bundle: RenderBundleCommon<B>,
+    command_pool: Shared<ManuallyDrop<B::CommandPool>>,
     display_size: Shared<DisplaySize>,
 }
 
@@ -116,6 +118,12 @@ where
                 .expect("Can't configure swapchain");
         };
 
+        let command_pool = Shared::new(ManuallyDrop::new(
+            unsafe {
+                device.create_command_pool(queue_group.family, CommandPoolCreateFlags::empty())
+            }
+            .unwrap(),
+        ));
         // Rendering setup
         let viewport = Viewport {
             rect: gfx_hal::pso::Rect {
@@ -138,6 +146,7 @@ where
             Shared::clone(&display_size),
             Rc::new(memory_properties),
             Rc::new(limits),
+            Shared::clone(&command_pool),
         );
         let depth_resource = DepthResource::new(&render_bundle);
         let primary_render_pass = RenderPass::from_formats(
@@ -145,7 +154,7 @@ where
             AttachmentLoadOp::Clear,
             AttachmentLoadOp::Clear,
             Some(surface_format),
-            Some(depth_resource.image_resource().format().clone()),
+            Some(*depth_resource.image_resource().format()),
         );
 
         let mut frame_resources = Vec::with_capacity(properties.frames_in_flight as _);
@@ -166,6 +175,7 @@ where
             properties,
             //
             render_bundle,
+            command_pool,
             display_size,
         }
     }
@@ -182,6 +192,7 @@ where
             },
         );
         let extent = swap_config.extent;
+
         unsafe {
             self.surface
                 .configure_swapchain(self.render_bundle.device(), swap_config)
@@ -194,6 +205,15 @@ where
             display_size.logical = vec2(extent.width as _, extent.height as _);
             self.actual_viewports = [convert_up_side_down(&display_size.viewport)];
         }
+
+        self.depth_resource = DepthResource::new(&self.render_bundle);
+        self.primary_render_pass = RenderPass::from_formats(
+            &self.render_bundle,
+            AttachmentLoadOp::Clear,
+            AttachmentLoadOp::Clear,
+            Some(surface_format),
+            Some(*self.depth_resource.image_resource().format()),
+        );
     }
 
     pub fn render<F>(&mut self, scope: F)
@@ -223,7 +243,7 @@ where
             framebuffer_extent,
         );
 
-        self.wait_fence(&mut self.frame_resources[frame_idx].fence());
+        self.wait_fence(self.frame_resources[frame_idx].fence());
 
         unsafe {
             let frame_resource = &mut self.frame_resources[frame_idx];
@@ -302,6 +322,14 @@ where
 
 impl<B: gfx_hal::Backend> Drop for Renderer<B> {
     fn drop(&mut self) {
+        unsafe {
+            self.render_bundle
+                .device()
+                .destroy_command_pool(ManuallyDrop::into_inner(std::ptr::read(
+                    self.command_pool.borrow().deref(),
+                )))
+        }
+
         if let Some(instance) = &self.instance {
             unsafe {
                 let surface = ManuallyDrop::into_inner(std::ptr::read(&self.surface));

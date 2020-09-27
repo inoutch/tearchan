@@ -1,7 +1,5 @@
 use crate::display_size::DisplaySize;
 use gfx_hal::adapter::{MemoryProperties, MemoryType};
-use gfx_hal::device::Device;
-use gfx_hal::pool::CommandPoolCreateFlags;
 use gfx_hal::queue::{QueueFamilyId, QueueGroup};
 use gfx_hal::{Backend, Limits};
 use std::cell::{Ref, RefMut};
@@ -27,25 +25,19 @@ impl<B: Backend> RenderBundleCommon<B> {
         display_size: Shared<DisplaySize>,
         memory_properties: Rc<MemoryProperties>,
         limits: Rc<Limits>,
+        command_pool: Shared<ManuallyDrop<B::CommandPool>>,
     ) -> RenderBundleCommon<B> {
-        let command_pool = unsafe {
-            device.create_command_pool(
-                queue_group.borrow_mut().family,
-                CommandPoolCreateFlags::empty(),
-            )
-        }
-        .unwrap();
-
         RenderBundleCommon {
             device,
             queue_group,
-            command_pool: Shared::new(ManuallyDrop::new(command_pool)),
+            command_pool,
             display_size,
             memory_properties,
             limits,
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> RenderBundleCommon<B> {
         RenderBundleCommon {
             device: Rc::clone(&self.device),
@@ -95,16 +87,5 @@ impl<B: Backend> RenderBundleCommon<B> {
 
     pub fn queue_family(&self) -> QueueFamilyId {
         self.queue_group.borrow().family
-    }
-}
-
-impl<B: Backend> Drop for RenderBundleCommon<B> {
-    fn drop(&mut self) {
-        unsafe {
-            self.device
-                .destroy_command_pool(ManuallyDrop::into_inner(std::ptr::read(
-                    self.command_pool.borrow().deref(),
-                )))
-        }
     }
 }

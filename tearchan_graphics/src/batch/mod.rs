@@ -1,6 +1,7 @@
 use crate::batch::batch_command::{BatchCommand, BatchObjectId};
 use crate::batch::batch_command_queue::BatchCommandQueue;
 use crate::batch::batch_provider::BatchProvider;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tearchan_utility::id_manager::IdManager;
 
@@ -22,7 +23,7 @@ pub struct BatchContext {
 
 pub struct Batch<T: BatchProvider> {
     provider: T,
-    commands: Arc<Mutex<Vec<BatchCommand>>>,
+    commands: Arc<Mutex<VecDeque<BatchCommand>>>,
     id_manager: IdManager<BatchObjectId>,
 }
 
@@ -33,7 +34,7 @@ where
     pub fn new(provider: T) -> Self {
         Batch {
             provider,
-            commands: Arc::new(Mutex::new(vec![])),
+            commands: Arc::new(Mutex::new(VecDeque::new())),
             id_manager: IdManager::new(0u64, |id| id + 1),
         }
     }
@@ -50,11 +51,7 @@ where
     }
 
     pub fn flush(&mut self) {
-        loop {
-            let command = match self.commands.lock().unwrap().pop() {
-                Some(command) => command,
-                None => break,
-            };
+        while let Some(command) = self.commands.lock().unwrap().pop_front() {
             self.provider.run(command);
         }
         self.provider.flush()

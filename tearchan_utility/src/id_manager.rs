@@ -25,7 +25,7 @@ impl<T> IdManager<T> {
         self.current = Arc::new(Mutex::new(first));
     }
 
-    pub fn create_generator(&mut self) -> IdGenerator<T> {
+    pub fn create_generator(&self) -> IdGenerator<T> {
         IdGenerator {
             current: Arc::clone(&self.current),
             incrementer: Arc::clone(&self.incrementer),

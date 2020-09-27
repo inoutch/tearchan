@@ -82,7 +82,7 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         &mut self.buffer
     }
 
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.buffer.len()
     }
 
@@ -184,7 +184,7 @@ mod test {
         }
         assert_eq!(batch_buffer.pointers.len(), 3);
 
-        assert_eq!(batch_buffer.size(), 160); // (30 + 50) * 2
+        assert_eq!(batch_buffer.len(), 160); // (30 + 50) * 2
         assert_eq!(batch_buffer.last(), 122);
 
         batch_buffer.reallocate(1, 40);
@@ -195,7 +195,7 @@ mod test {
         assert_eq!(batch_buffer.get_pointer(&3).unwrap().first, 80);
         assert_eq!(batch_buffer.get_pointer(&3).unwrap().last(), 122);
 
-        assert_eq!(batch_buffer.size(), 324); // (30 + 50) * 2 => 162 * 2
+        assert_eq!(batch_buffer.len(), 324); // (30 + 50) * 2 => 162 * 2
         assert_eq!(batch_buffer.last(), 162);
         assert_eq!(batch_buffer.pending_pointers.len(), 1);
 
@@ -204,7 +204,7 @@ mod test {
         assert_eq!(batch_buffer.get_pointer(&1).unwrap().last(), 162);
         assert_eq!(batch_buffer.get_pointer(&3).unwrap().first, 80);
         assert_eq!(batch_buffer.get_pointer(&3).unwrap().last(), 122);
-        assert_eq!(batch_buffer.size(), 324);
+        assert_eq!(batch_buffer.len(), 324);
         assert_eq!(batch_buffer.last(), 162);
         assert_eq!(batch_buffer.pointers.len(), 2);
         assert_eq!(batch_buffer.pending_pointers.len(), 2);

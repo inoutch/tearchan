@@ -4,3 +4,11 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
+serde = "1.0.18"
+intertrait = "0.2.0"
+linkme = "0.2"
+tearchan_core = { path = "../tearchan_core" }
+tearchan_utility = { path = "../tearchan_utility" }
+
+[dev-dependencies]
+serde_json = "1.0"

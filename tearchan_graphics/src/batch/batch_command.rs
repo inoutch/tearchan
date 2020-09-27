@@ -29,9 +29,13 @@ impl BatchCommandData {
             BatchCommandData::V4U32 { data } => data.len(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BatchCommandTransform {
     Mat4 { m: Mat4 },
     None,

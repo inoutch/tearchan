@@ -2,17 +2,18 @@ use intertrait::cast::CastRc;
 use intertrait::CastFrom;
 use std::cell::Cell;
 use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
 use std::rc::Rc;
+use tearchan_utility::id_manager::IdManager;
 
 pub mod game_object_base;
 pub mod game_object_manager;
 pub mod game_object_operator;
 
-pub type GameObjectId = *const bool;
+pub type GameObjectId = u64;
+pub const EMPTY_ID: GameObjectId = std::u64::MAX;
 
-type BorrowFlag = isize;
-const UNUSED: BorrowFlag = 0;
+pub type BorrowFlag = isize;
+pub const UNUSED: BorrowFlag = 0;
 
 #[derive(Debug)]
 pub struct BorrowError;
@@ -21,20 +22,30 @@ pub struct BorrowError;
 pub struct BorrowMutError;
 
 #[inline(always)]
-fn is_writing(x: BorrowFlag) -> bool {
+pub fn is_writing(x: BorrowFlag) -> bool {
     x < UNUSED
 }
 
 #[inline(always)]
-fn is_reading(x: BorrowFlag) -> bool {
+pub fn is_reading(x: BorrowFlag) -> bool {
     x > UNUSED
+}
+
+struct GameObjectIdManager {
+    id_manager: IdManager<GameObjectId>,
+}
+
+lazy_static! {
+    static ref GAME_OBJECT_ID_MANAGER: GameObjectIdManager = GameObjectIdManager {
+        id_manager: IdManager::new(0, |id| id + 1),
+    };
 }
 
 pub struct GameObject<T: ?Sized>
 where
     T: CastFrom,
 {
-    id_marker: Rc<Pin<Box<bool>>>,
+    id: GameObjectId,
     borrow: Rc<Cell<BorrowFlag>>,
     object: Rc<T>,
 }
@@ -45,7 +56,7 @@ where
 {
     pub fn new(object: Rc<T>) -> GameObject<T> {
         GameObject {
-            id_marker: Rc::new(Box::pin(true)),
+            id: GAME_OBJECT_ID_MANAGER.id_manager.create_generator().gen(),
             borrow: Rc::new(Cell::new(UNUSED)),
             object,
         }
@@ -53,22 +64,14 @@ where
 
     pub fn from_inner_properties(
         object: Rc<T>,
-        id_marker: Rc<Pin<Box<bool>>>,
+        id: GameObjectId,
         borrow: Rc<Cell<BorrowFlag>>,
     ) -> GameObject<T> {
-        GameObject {
-            id_marker,
-            borrow,
-            object,
-        }
+        GameObject { id, borrow, object }
     }
 
     pub fn clone_inner_borrow(&self) -> Rc<Cell<BorrowFlag>> {
         self.borrow.clone()
-    }
-
-    pub fn clone_inner_id_marker(&self) -> Rc<Pin<Box<bool>>> {
-        self.id_marker.clone()
     }
 
     pub fn clone_inner_object(&self) -> Rc<T> {
@@ -76,18 +79,14 @@ where
     }
 
     pub fn id(&self) -> GameObjectId {
-        self.id_marker.deref().deref()
+        self.id
     }
 
     pub fn cast<U>(&self) -> Option<GameObject<U>>
     where
         U: ?Sized + CastFrom,
     {
-        self.object
-            .clone()
-            .cast::<U>()
-            .ok()
-            .map(|x| GameObject::new(x))
+        self.object.clone().cast::<U>().ok().map(GameObject::new)
     }
 
     pub fn borrow(&self) -> Ref<'_, T> {
@@ -118,16 +117,17 @@ where
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn clone(&self) -> Self {
         GameObject {
-            id_marker: Rc::clone(&self.id_marker),
+            id: self.id,
             borrow: Rc::clone(&self.borrow),
             object: Rc::clone(&self.object),
         }
     }
 }
 
-struct BorrowRef<'b> {
+pub struct BorrowRef<'b> {
     borrow: &'b Cell<BorrowFlag>,
 }
 
@@ -174,6 +174,15 @@ where
     _borrow: BorrowRef<'a>,
 }
 
+impl<'a, T: ?Sized> Ref<'a, T> {
+    pub fn new(value: &'a T, borrow: BorrowRef<'a>) -> Ref<'a, T> {
+        Ref {
+            value,
+            _borrow: borrow,
+        }
+    }
+}
+
 impl<T: ?Sized> Deref for Ref<'_, T> {
     type Target = T;
 
@@ -183,7 +192,7 @@ impl<T: ?Sized> Deref for Ref<'_, T> {
     }
 }
 
-struct BorrowRefMut<'a> {
+pub struct BorrowRefMut<'a> {
     borrow: &'a Cell<BorrowFlag>,
 }
 
@@ -198,7 +207,7 @@ impl Drop for BorrowRefMut<'_> {
 
 impl<'a> BorrowRefMut<'a> {
     #[inline]
-    fn new(borrow: &'a Cell<BorrowFlag>) -> Option<BorrowRefMut<'a>> {
+    pub fn new(borrow: &'a Cell<BorrowFlag>) -> Option<BorrowRefMut<'a>> {
         match borrow.get() {
             UNUSED => {
                 borrow.set(UNUSED - 1);
@@ -225,6 +234,15 @@ impl<'a> Clone for BorrowRefMut<'a> {
 pub struct RefMut<'a, T: ?Sized + 'a> {
     value: &'a mut T,
     _borrow: BorrowRefMut<'a>,
+}
+
+impl<'a, T: ?Sized> RefMut<'a, T> {
+    pub fn new(value: &'a mut T, borrow: BorrowRefMut<'a>) -> RefMut<'a, T> {
+        RefMut {
+            value,
+            _borrow: borrow,
+        }
+    }
 }
 
 impl<T: ?Sized> Deref for RefMut<'_, T> {
@@ -286,12 +304,12 @@ mod test {
             let game_object = GameObject::new(Rc::new(Object { id: 33 }));
             game_object_manager_1.add(GameObject::from_inner_properties(
                 game_object.clone_inner_object(),
-                game_object.clone_inner_id_marker(),
+                game_object.id(),
                 game_object.clone_inner_borrow(),
             ));
             game_object_manager_2.add(GameObject::from_inner_properties(
                 game_object.clone_inner_object(),
-                game_object.clone_inner_id_marker(),
+                game_object.id(),
                 game_object.clone_inner_borrow(),
             ));
         }

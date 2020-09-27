@@ -1,3 +1,5 @@
+#![feature(map_first_last)]
+
 pub mod any;
 pub mod binary;
 pub mod btree;

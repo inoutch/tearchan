@@ -70,6 +70,44 @@ where
         self.btree.range_mut(range)
     }
 
+    pub fn pop_first_back(&mut self) -> Option<V>
+    where
+        K: Ord,
+    {
+        match self.btree.pop_first() {
+            None => None,
+            Some((key, mut queue)) => {
+                let ret = match queue.pop_front() {
+                    None => panic!("Illegal state"),
+                    Some(x) => x,
+                };
+                if !queue.is_empty() {
+                    self.btree.insert(key, queue);
+                }
+                Some(ret)
+            }
+        }
+    }
+
+    pub fn pop_last_back(&mut self) -> Option<V>
+    where
+        K: Ord,
+    {
+        match self.btree.pop_last() {
+            None => None,
+            Some((key, mut queue)) => {
+                let ret = match queue.pop_front() {
+                    None => panic!("Illegal state"),
+                    Some(x) => x,
+                };
+                if !queue.is_empty() {
+                    self.btree.insert(key, queue);
+                }
+                Some(ret)
+            }
+        }
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         self.btree.len()
@@ -88,6 +126,19 @@ where
     #[inline]
     pub fn clear(&mut self) {
         self.btree.clear();
+    }
+}
+
+impl<K, V> Into<Vec<V>> for DuplicatableBTreeMap<K, V>
+where
+    K: Ord,
+{
+    fn into(mut self) -> Vec<V> {
+        let mut ret = vec![];
+        while let Some(x) = self.pop_first_back() {
+            ret.push(x);
+        }
+        ret
     }
 }
 

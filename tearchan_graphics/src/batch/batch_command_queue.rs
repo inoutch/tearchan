@@ -1,15 +1,16 @@
 use crate::batch::batch_command::{BatchCommand, BatchObjectId};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tearchan_utility::id_manager::IdGenerator;
 
 pub struct BatchCommandQueue {
-    commands: Arc<Mutex<Vec<BatchCommand>>>,
+    commands: Arc<Mutex<VecDeque<BatchCommand>>>,
     id_generator: IdGenerator<BatchObjectId>,
 }
 
 impl BatchCommandQueue {
     pub fn new(
-        commands: Arc<Mutex<Vec<BatchCommand>>>,
+        commands: Arc<Mutex<VecDeque<BatchCommand>>>,
         id_generator: IdGenerator<BatchObjectId>,
     ) -> Self {
         BatchCommandQueue {
@@ -27,7 +28,7 @@ impl BatchCommandQueue {
             }
             _ => {}
         }
-        self.commands.lock().unwrap().push(command);
+        self.commands.lock().unwrap().push_back(command);
         next_id
     }
 }

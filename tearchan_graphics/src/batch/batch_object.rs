@@ -1,5 +1,5 @@
 use crate::batch::batch_command::{BatchCommandData, BatchCommandTransform, BatchObjectId};
-use nalgebra_glm::{vec3_to_vec4, Mat4, TVec2, TVec3, TVec4};
+use nalgebra_glm::{vec4, Mat4, TVec2, TVec3, TVec4};
 
 pub struct BatchObject {
     pub id: BatchObjectId,
@@ -10,56 +10,38 @@ pub struct BatchObject {
 
 impl BatchObject {
     pub fn copy_v2f32(&mut self, index: usize, from: &[TVec2<f32>], offset: usize) {
-        match &mut self.data[index] {
-            BatchCommandData::V2F32 { data } => {
-                data[offset..from.len()].clone_from_slice(from);
-            }
-            _ => {}
+        if let BatchCommandData::V2F32 { data } = &mut self.data[index] {
+            data[offset..from.len()].clone_from_slice(from);
         }
     }
 
     pub fn copy_v2u32(&mut self, index: usize, from: &[TVec2<u32>], offset: usize) {
-        match &mut self.data[index] {
-            BatchCommandData::V2U32 { data } => {
-                data[offset..from.len()].clone_from_slice(from);
-            }
-            _ => {}
+        if let BatchCommandData::V2U32 { data } = &mut self.data[index] {
+            data[offset..from.len()].clone_from_slice(from);
         }
     }
 
     pub fn copy_v3f32(&mut self, index: usize, from: &[TVec3<f32>], offset: usize) {
-        match &mut self.data[index] {
-            BatchCommandData::V3F32 { data } => {
-                data[offset..from.len()].clone_from_slice(from);
-            }
-            _ => {}
+        if let BatchCommandData::V3F32 { data } = &mut self.data[index] {
+            data[offset..from.len()].clone_from_slice(from);
         }
     }
 
     pub fn copy_v3u32(&mut self, index: usize, from: &[TVec3<u32>], offset: usize) {
-        match &mut self.data[index] {
-            BatchCommandData::V3U32 { data } => {
-                data[offset..from.len()].clone_from_slice(from);
-            }
-            _ => {}
+        if let BatchCommandData::V3U32 { data } = &mut self.data[index] {
+            data[offset..from.len()].clone_from_slice(from);
         }
     }
 
     pub fn copy_v4f32(&mut self, index: usize, from: &[TVec4<f32>], offset: usize) {
-        match &mut self.data[index] {
-            BatchCommandData::V4F32 { data } => {
-                data[offset..from.len()].clone_from_slice(from);
-            }
-            _ => {}
+        if let BatchCommandData::V4F32 { data } = &mut self.data[index] {
+            data[offset..from.len()].clone_from_slice(from);
         }
     }
 
     pub fn copy_v4u32(&mut self, index: usize, from: &[TVec4<u32>], offset: usize) {
-        match &mut self.data[index] {
-            BatchCommandData::V4U32 { data } => {
-                data[offset..from.len()].clone_from_slice(from);
-            }
-            _ => {}
+        if let BatchCommandData::V4U32 { data } = &mut self.data[index] {
+            data[offset..from.len()].clone_from_slice(from);
         }
     }
 
@@ -67,18 +49,15 @@ impl BatchObject {
     where
         F: FnMut(usize, f32),
     {
-        match &self.data[index] {
-            BatchCommandData::V2F32 { data } => {
-                let mut i = 0usize;
-                for datum in data {
-                    callback(i, datum.x);
-                    i += 1;
+        if let BatchCommandData::V2F32 { data } = &self.data[index] {
+            let mut i = 0usize;
+            for datum in data {
+                callback(i, datum.x);
+                i += 1;
 
-                    callback(i, datum.y);
-                    i += 1;
-                }
+                callback(i, datum.y);
+                i += 1;
             }
-            _ => {}
         }
     }
 
@@ -86,18 +65,15 @@ impl BatchObject {
     where
         F: FnMut(usize, u32),
     {
-        match &self.data[index] {
-            BatchCommandData::V2U32 { data } => {
-                let mut i = 0usize;
-                for datum in data {
-                    callback(i, datum.x);
-                    i += 1;
+        if let BatchCommandData::V2U32 { data } = &self.data[index] {
+            let mut i = 0usize;
+            for datum in data {
+                callback(i, datum.x);
+                i += 1;
 
-                    callback(i, datum.y);
-                    i += 1;
-                }
+                callback(i, datum.y);
+                i += 1;
             }
-            _ => {}
         }
     }
 
@@ -105,26 +81,24 @@ impl BatchObject {
     where
         F: FnMut(usize, f32),
     {
-        match &self.data[index] {
-            BatchCommandData::V3F32 { data } => {
-                let mut i = 0usize;
-                let m = match &self.transforms[index] {
-                    BatchCommandTransform::Mat4 { m } => m.clone_owned(),
-                    _ => Mat4::identity(),
-                };
-                for datum in data {
-                    let p = &m * vec3_to_vec4(&datum);
-                    callback(i, p.x);
-                    i += 1;
+        if let BatchCommandData::V3F32 { data } = &self.data[index] {
+            let mut i = 0usize;
+            let m = match &self.transforms[index] {
+                BatchCommandTransform::Mat4 { m } => m.clone_owned(),
+                _ => Mat4::identity(),
+            };
+            for datum in data {
+                #[allow(clippy::op_ref)]
+                let p = &m * vec4(datum.x, datum.y, datum.z, 1.0f32);
+                callback(i, p.x);
+                i += 1;
 
-                    callback(i, p.y);
-                    i += 1;
+                callback(i, p.y);
+                i += 1;
 
-                    callback(i, p.z);
-                    i += 1;
-                }
+                callback(i, p.z);
+                i += 1;
             }
-            _ => {}
         }
     }
 
@@ -132,21 +106,18 @@ impl BatchObject {
     where
         F: FnMut(usize, u32),
     {
-        match &self.data[index] {
-            BatchCommandData::V3U32 { data } => {
-                let mut i = 0usize;
-                for datum in data {
-                    callback(i, datum.x);
-                    i += 1;
+        if let BatchCommandData::V3U32 { data } = &self.data[index] {
+            let mut i = 0usize;
+            for datum in data {
+                callback(i, datum.x);
+                i += 1;
 
-                    callback(i, datum.y);
-                    i += 1;
+                callback(i, datum.y);
+                i += 1;
 
-                    callback(i, datum.z);
-                    i += 1;
-                }
+                callback(i, datum.z);
+                i += 1;
             }
-            _ => {}
         }
     }
 
@@ -154,24 +125,21 @@ impl BatchObject {
     where
         F: FnMut(usize, f32),
     {
-        match &self.data[index] {
-            BatchCommandData::V4F32 { data } => {
-                let mut i = 0usize;
-                for datum in data {
-                    callback(i, datum.x);
-                    i += 1;
+        if let BatchCommandData::V4F32 { data } = &self.data[index] {
+            let mut i = 0usize;
+            for datum in data {
+                callback(i, datum.x);
+                i += 1;
 
-                    callback(i, datum.y);
-                    i += 1;
+                callback(i, datum.y);
+                i += 1;
 
-                    callback(i, datum.z);
-                    i += 1;
+                callback(i, datum.z);
+                i += 1;
 
-                    callback(i, datum.w);
-                    i += 1;
-                }
+                callback(i, datum.w);
+                i += 1;
             }
-            _ => {}
         }
     }
 
@@ -179,24 +147,21 @@ impl BatchObject {
     where
         F: FnMut(usize, u32),
     {
-        match &self.data[index] {
-            BatchCommandData::V4U32 { data } => {
-                let mut i = 0usize;
-                for datum in data {
-                    callback(i, datum.x);
-                    i += 1;
+        if let BatchCommandData::V4U32 { data } = &self.data[index] {
+            let mut i = 0usize;
+            for datum in data {
+                callback(i, datum.x);
+                i += 1;
 
-                    callback(i, datum.y);
-                    i += 1;
+                callback(i, datum.y);
+                i += 1;
 
-                    callback(i, datum.z);
-                    i += 1;
+                callback(i, datum.z);
+                i += 1;
 
-                    callback(i, datum.w);
-                    i += 1;
-                }
+                callback(i, datum.w);
+                i += 1;
             }
-            _ => {}
         }
     }
 }

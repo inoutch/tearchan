@@ -73,11 +73,7 @@ impl BatchObjectManager {
         F: FnMut(&BatchObject),
     {
         for (_, range) in self.changed_objects.range_mut(..) {
-            loop {
-                let id = match range.pop_front() {
-                    Some(id) => id,
-                    None => break,
-                };
+            while let Some(id) = range.pop_front() {
                 self.changed_object_set.remove(&id);
 
                 let object = match self.objects.get(&id) {

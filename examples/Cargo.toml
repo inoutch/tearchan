@@ -9,6 +9,10 @@ edition = "2018"
 name = "cube"
 path = "cube/main.rs"
 
+[[bin]]
+name = "horde"
+path = "horde/main.rs"
+
 [dependencies]
 winit = { version = "0.22.2", features = ["web-sys"] }
 intertrait = "0.2.0"
@@ -16,5 +20,7 @@ linkme = "0.2"
 tearchan = { path = ".." }
 tearchan_core = { path = "../tearchan_core" }
 tearchan_graphics = { path = "../tearchan_graphics" }
+tearchan_horde = { path = "../tearchan_horde" }
+tearchan_utility = { path = "../tearchan_utility" }
 nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
 env_logger = "0.7.1"

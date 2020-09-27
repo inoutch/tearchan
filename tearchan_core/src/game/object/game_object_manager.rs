@@ -17,6 +17,7 @@ impl<T: ?Sized> GameObjectManager<T>
 where
     T: CastFrom,
 {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> GameObjectManager<T> {
         GameObjectManager {
             objects: Shared::new(HashMap::new()),
@@ -52,6 +53,11 @@ where
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.objects.borrow().is_empty()
+    }
+
+    #[inline]
     pub fn for_each_mut<F>(&mut self, callback: F)
     where
         F: Fn(&mut GameObject<T>),
@@ -63,10 +69,7 @@ where
     }
 
     pub fn create_operator(&self) -> GameObjectOperator<T> {
-        GameObjectOperator::new(
-            Shared::clone(&self.objects),
-            Shared::clone(&self.sorted_object_ids),
-        )
+        GameObjectOperator::new(Shared::clone(&self.objects))
     }
 
     #[inline]
