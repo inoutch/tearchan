@@ -105,7 +105,8 @@ impl Engine {
 
         let mut scene_manager = SceneManager::new(self.config.scene_factory);
         let mut duration_watch = DurationWatch::default();
-        let duration = Duration::from_millis(1000 / self.config.fps);
+        let duration = Duration::from_millis(1000 / self.config.fps).as_millis() as u64;
+        let mut start_time = Instant::now();
 
         event_loop.run(move |event, _, control_flow| match event {
             Event::NewEvents(_) => {}
@@ -132,7 +133,7 @@ impl Engine {
             Event::Suspended => {}
             Event::Resumed => {}
             Event::MainEventsCleared => {
-                *control_flow = ControlFlow::WaitUntil(Instant::now() + duration);
+                start_time = Instant::now();
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
@@ -142,13 +143,24 @@ impl Engine {
                         let mut game_context = GameContext::new(delta, context);
                         scene_manager.on_update(&mut game_context, &mut plugin_manager);
 
+                        plugin_manager.update();
+
                         plugin_manager.for_each_mut(|plugin| {
                             plugin.on_update(&mut game_context);
                         });
                     }
                     RendererBeginResult::Resize => {}
                 });
+
                 duration_watch.reset();
+
+                let elapsed_time = Instant::now().duration_since(start_time).as_millis() as u64;
+                let wait_millis = match duration >= elapsed_time {
+                    true => duration - elapsed_time,
+                    false => 0,
+                };
+                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                *control_flow = ControlFlow::WaitUntil(new_inst);
             }
             Event::RedrawEventsCleared => {}
             Event::LoopDestroyed => {}

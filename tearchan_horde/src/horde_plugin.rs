@@ -9,6 +9,8 @@ use serde::export::fmt::Debug;
 use std::collections::{HashMap, HashSet};
 use tearchan_core::game::game_context::GameContext;
 use tearchan_core::game::game_plugin::GamePlugin;
+use tearchan_core::game::game_plugin_command::GamePluginCommand;
+use tearchan_core::game::game_plugin_operator::GamePluginOperator;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::game_object_manager::GameObjectManager;
 use tearchan_core::game::object::{GameObject, GameObjectId};
@@ -49,6 +51,7 @@ pub struct HordePlugin<T: HordePluginProvider> {
     object_manager: GameObjectManager<dyn Object>,
     object_factories: HashMap<String, ObjectFactory>,
     object_stores: Vec<ObjectStore<dyn ObjectStoreBase>>,
+    operator: GamePluginOperator,
     provider: T,
 }
 
@@ -95,7 +98,7 @@ impl<T: HordePluginProvider> GamePlugin for HordePlugin<T> {
 }
 
 impl<T: HordePluginProvider> HordePlugin<T> {
-    pub fn new(provider: T) -> HordePlugin<T> {
+    pub fn new(provider: T, operator: GamePluginOperator) -> HordePlugin<T> {
         HordePlugin {
             action_manager: ActionManager::new(),
             action_creator_manager: ActionCreatorManager::new(),
@@ -103,6 +106,7 @@ impl<T: HordePluginProvider> HordePlugin<T> {
             object_manager: GameObjectManager::new(),
             object_factories: HashMap::new(),
             object_stores: vec![],
+            operator,
             provider,
         }
     }
@@ -154,7 +158,10 @@ impl<T: HordePluginProvider> HordePlugin<T> {
         let object_id = object.id();
         store.set_id(object_id);
 
-        self.object_manager.add(object);
+        let game_object = object.cast().ok_or(ObjectError::InvalidType)?;
+        self.operator.queue(GamePluginCommand::CreateGameObject {
+            object: game_object,
+        });
         self.object_stores.push(store);
 
         Ok(object_id)

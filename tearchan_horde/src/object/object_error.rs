@@ -2,4 +2,5 @@
 pub enum ObjectError {
     FactoryNotRegistered,
     CreationFailed,
+    InvalidType,
 }

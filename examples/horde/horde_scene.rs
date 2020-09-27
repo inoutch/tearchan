@@ -13,7 +13,10 @@ use tearchan_graphics::image::Image;
 use tearchan_horde::horde_plugin::HordePlugin;
 use tearchan_horde::object::object_store::ObjectStore;
 
-pub struct HordeScene {}
+pub struct HordeScene {
+    fps_counter: u64,
+    fps_duration: f32,
+}
 
 impl HordeScene {
     pub fn factory() -> SceneFactory {
@@ -23,7 +26,10 @@ impl HordeScene {
 
             let renderer_plugin = Standard2DRenderer::new(&mut ctx.g.r, texture);
 
-            let mut horde_plugin = HordePlugin::new(HordeProvider::default());
+            let mut horde_plugin = HordePlugin::new(
+                HordeProvider::default(),
+                ctx.plugin_manager_mut().create_operator(),
+            );
             horde_plugin.register_factory(PersonObject::kind(), PersonObject::factory());
             horde_plugin
                 .create_object(ObjectStore::new(
@@ -37,13 +43,25 @@ impl HordeScene {
             ctx.plugin_manager_mut()
                 .add(Box::new(renderer_plugin), "renderer".to_string(), 0);
 
-            Box::new(HordeScene {})
+            Box::new(HordeScene {
+                fps_counter: 0,
+                fps_duration: 0.0f32,
+            })
         }
     }
 }
 
 impl Scene for HordeScene {
-    fn update(&mut self, _context: &mut SceneContext) -> SceneResult {
+    fn update(&mut self, context: &mut SceneContext) -> SceneResult {
+        self.fps_counter += 1;
+        self.fps_duration += context.g.delta;
+        if self.fps_counter > 300 {
+            let avg = self.fps_duration / self.fps_counter as f32;
+            println!("FPS: {}", 1.0f32 / avg);
+            self.fps_counter = 0;
+            self.fps_duration = 0.0f32;
+        }
+
         SceneResult::None
     }
 }
