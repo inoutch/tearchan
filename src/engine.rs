@@ -137,11 +137,12 @@ impl Engine {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                let mut exit = false;
                 let delta = duration_watch.measure_as_sec();
                 renderer.render(|event| match event {
                     RendererBeginResult::Context { context } => {
                         let mut game_context = GameContext::new(delta, context);
-                        scene_manager.on_update(&mut game_context, &mut plugin_manager);
+                        exit = scene_manager.on_update(&mut game_context, &mut plugin_manager);
 
                         plugin_manager.update();
 
@@ -154,13 +155,17 @@ impl Engine {
 
                 duration_watch.reset();
 
-                let elapsed_time = Instant::now().duration_since(start_time).as_millis() as u64;
-                let wait_millis = match duration >= elapsed_time {
-                    true => duration - elapsed_time,
-                    false => 0,
-                };
-                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
-                *control_flow = ControlFlow::WaitUntil(new_inst);
+                if exit {
+                    *control_flow = ControlFlow::Exit;
+                } else {
+                    let elapsed_time = Instant::now().duration_since(start_time).as_millis() as u64;
+                    let wait_millis = match duration >= elapsed_time {
+                        true => duration - elapsed_time,
+                        false => 0,
+                    };
+                    let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                    *control_flow = ControlFlow::WaitUntil(new_inst);
+                }
             }
             Event::RedrawEventsCleared => {}
             Event::LoopDestroyed => {}

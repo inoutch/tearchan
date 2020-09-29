@@ -19,7 +19,7 @@ impl CubeScene {
             let image = Image::new_empty();
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
 
-            let mut plugin = Box::new(Standard2DRenderer::new(&mut ctx.g.r, texture));
+            let mut plugin = Box::new(Standard2DRenderer::from_texture(&mut ctx.g.r, texture));
 
             let mut batch_queue = plugin.create_batch_queue();
             thread::spawn(move || {

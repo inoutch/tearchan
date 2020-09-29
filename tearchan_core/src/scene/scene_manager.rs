@@ -26,7 +26,11 @@ impl SceneManager {
 
     pub fn event(&mut self, _event: &WindowEvent) {}
 
-    pub fn on_update(&mut self, context: &mut GameContext, plugin_manager: &mut GamePluginManager) {
+    pub fn on_update(
+        &mut self,
+        context: &mut GameContext,
+        plugin_manager: &mut GamePluginManager,
+    ) -> bool {
         let mut scene_context =
             SceneContext::new(context, plugin_manager, &mut self.object_manager);
         if let Some((scene_factory, options)) = std::mem::replace(&mut self.scene_factory, None) {
@@ -35,14 +39,15 @@ impl SceneManager {
         }
 
         match self.current_scene.update(&mut scene_context) {
-            SceneResult::Exit => {}
+            SceneResult::Exit => true,
             SceneResult::TransitScene {
                 scene_factory,
                 option,
             } => {
                 self.scene_factory = Some((scene_factory, option));
+                false
             }
-            _ => {}
+            _ => false,
         }
     }
 }
