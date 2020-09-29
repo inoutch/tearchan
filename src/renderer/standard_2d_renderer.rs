@@ -14,17 +14,57 @@ pub trait Standard2DRenderObject: GameObjectBase {
     fn attach_queue(&mut self, queue: BatchCommandQueue);
 }
 
-pub struct Standard2DRenderer {
+pub trait Standard2DRendererProvider {
+    fn graphic_pipeline(&self) -> &GraphicPipeline;
+    fn prepare(&mut self, context: &mut GameContext);
+}
+
+pub struct Standard2DRendererDefaultProvider {
     texture: Texture,
     camera: Camera2D,
-    shader_program: Standard2DShaderProgram,
     graphic_pipeline: GraphicPipeline,
+    shader_program: Standard2DShaderProgram,
+}
+
+impl Standard2DRendererProvider for Standard2DRendererDefaultProvider {
+    fn graphic_pipeline(&self) -> &GraphicPipeline {
+        &self.graphic_pipeline
+    }
+
+    fn prepare(&mut self, context: &mut GameContext) {
+        self.camera.update();
+        self.shader_program.prepare(self.camera.combine());
+
+        let descriptor_set = self.graphic_pipeline.descriptor_set();
+        self.shader_program
+            .create_write_descriptor_sets(descriptor_set, &self.texture)
+            .write(context.r.render_bundle());
+    }
+}
+
+pub struct Standard2DRenderer<T: Standard2DRendererProvider> {
+    provider: T,
     object_manager: GameObjectManager<dyn Standard2DRenderObject>,
     batch2d: Batch2D,
 }
 
-impl Standard2DRenderer {
-    pub fn new(r: &mut RendererContext, texture: Texture) -> Standard2DRenderer {
+impl<T: Standard2DRendererProvider> Standard2DRenderer<T> {
+    pub fn new(r: &mut RendererContext, provider: T) -> Standard2DRenderer<T> {
+        let batch2d = Batch2DProvider::new(r.render_bundle());
+
+        Standard2DRenderer {
+            provider,
+            object_manager: GameObjectManager::new(),
+            batch2d,
+        }
+    }
+}
+
+impl Standard2DRenderer<Standard2DRendererDefaultProvider> {
+    pub fn from_texture(
+        r: &mut RendererContext,
+        texture: Texture,
+    ) -> Standard2DRenderer<Standard2DRendererDefaultProvider> {
         let camera = Camera2D::new(&r.render_bundle().display_size().logical);
         let shader_program = Standard2DShaderProgram::new(r.render_bundle(), camera.base());
         let graphic_pipeline = GraphicPipeline::new(
@@ -36,23 +76,25 @@ impl Standard2DRenderer {
         let batch2d = Batch2DProvider::new(r.render_bundle());
 
         Standard2DRenderer {
-            texture,
-            camera,
-            shader_program,
-            graphic_pipeline,
+            provider: Standard2DRendererDefaultProvider {
+                camera,
+                shader_program,
+                graphic_pipeline,
+                texture,
+            },
             object_manager: GameObjectManager::new(),
             batch2d,
         }
     }
 }
 
-impl Standard2DRenderer {
+impl<T: Standard2DRendererProvider> Standard2DRenderer<T> {
     pub fn create_batch_queue(&mut self) -> BatchCommandQueue {
         self.batch2d.create_queue()
     }
 }
 
-impl GamePlugin for Standard2DRenderer {
+impl<T: Standard2DRendererProvider> GamePlugin for Standard2DRenderer<T> {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
         if let Some(mut render_object) = game_object.cast::<dyn Standard2DRenderObject>() {
             render_object
@@ -67,18 +109,11 @@ impl GamePlugin for Standard2DRenderer {
     }
 
     fn on_update(&mut self, context: &mut GameContext) {
-        self.camera.update();
         self.batch2d.flush();
-
-        self.shader_program.prepare(self.camera.combine());
-
-        let descriptor_set = self.graphic_pipeline.descriptor_set();
-        self.shader_program
-            .create_write_descriptor_sets(descriptor_set, &self.texture)
-            .write(context.r.render_bundle());
+        self.provider.prepare(context);
 
         context.r.draw_elements(
-            &self.graphic_pipeline,
+            self.provider.graphic_pipeline(),
             self.batch2d.provider().index_count(),
             self.batch2d.provider().index_buffer(),
             &self.batch2d.provider().vertex_buffers(),

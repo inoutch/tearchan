@@ -21,6 +21,7 @@ extern crate gfx_backend_vulkan as back;
 use crate::hal::buffer::index_buffer::IndexBufferCommon;
 use crate::hal::buffer::uniform_buffer::UniformBufferCommon;
 use crate::hal::buffer::vertex_buffer::VertexBufferCommon;
+use crate::hal::font_texture::FontTextureCommon;
 use crate::hal::graphic_pipeline::GraphicPipelineCommon;
 use crate::hal::instance::create_backend;
 use crate::hal::render_bundle::RenderBundleCommon;
@@ -45,6 +46,7 @@ pub type UniformBuffer<T> = UniformBufferCommon<Backend, T>;
 pub type IndexBuffer = IndexBufferCommon<Backend>;
 pub type VertexBuffer = VertexBufferCommon<Backend>;
 pub type Texture = TextureCommon<Backend>;
+pub type FontTexture = FontTextureCommon<Backend>;
 pub type GraphicPipeline = GraphicPipelineCommon<Backend>;
 
 #[cfg(not(target_arch = "wasm32"))]

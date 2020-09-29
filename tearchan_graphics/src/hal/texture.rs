@@ -35,6 +35,7 @@ pub struct TextureCommon<B: Backend> {
     render_bundle: RenderBundleCommon<B>,
     image_resource: ImageResource<B>,
     sampler: ManuallyDrop<B::Sampler>,
+    config: TextureConfig,
 }
 
 impl<B: Backend> TextureCommon<B> {
@@ -45,14 +46,15 @@ impl<B: Backend> TextureCommon<B> {
     ) -> TextureCommon<B> {
         let mut image_resource =
             ImageResource::new_for_texture(render_bundle, image.size().clone_owned());
-        let _ = image_resource.copy(image, vec2(0u32, 0u32)).unwrap();
+        let _ = image_resource.copy(image, &vec2(0u32, 0u32)).unwrap();
 
-        let sampler = create_sampler(&render_bundle, config);
+        let sampler = create_sampler(&render_bundle, &config);
 
         TextureCommon {
             render_bundle: render_bundle.clone(),
             image_resource,
             sampler,
+            config,
         }
     }
 
@@ -60,13 +62,21 @@ impl<B: Backend> TextureCommon<B> {
         &self.image_resource
     }
 
+    pub fn image_resource_mut(&mut self) -> &mut ImageResource<B> {
+        &mut self.image_resource
+    }
+
     pub fn set_config(&mut self, config: TextureConfig) {
         destroy_sampler(&self.render_bundle, &self.sampler);
-        self.sampler = create_sampler(&self.render_bundle, config);
+        self.sampler = create_sampler(&self.render_bundle, &config);
     }
 
     pub fn sampler(&self) -> &B::Sampler {
         &self.sampler
+    }
+
+    pub fn config(&self) -> &TextureConfig {
+        &self.config
     }
 }
 
@@ -78,7 +88,7 @@ impl<B: Backend> Drop for TextureCommon<B> {
 
 fn create_sampler<B: Backend>(
     render_bundle: &RenderBundleCommon<B>,
-    config: TextureConfig,
+    config: &TextureConfig,
 ) -> ManuallyDrop<B::Sampler> {
     ManuallyDrop::new(
         unsafe {

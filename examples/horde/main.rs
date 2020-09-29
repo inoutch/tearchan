@@ -20,6 +20,7 @@ fn main() {
         .screen_mode(ScreenMode::Windowed {
             resolutions: vec![vec2(1200, 800)],
         })
+        .fps(144)
         .scene_factory(HordeScene::factory())
         .build()
         .unwrap();

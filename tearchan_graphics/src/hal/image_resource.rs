@@ -117,7 +117,7 @@ impl<B: Backend> ImageResource<B> {
     pub fn copy(
         &mut self,
         image_raw: &Image,
-        offset: TVec2<u32>,
+        offset: &TVec2<u32>,
     ) -> Result<(), ImageResourceError> {
         if image_raw.size().x + offset.x > self.size.x
             || image_raw.size().y + offset.y > self.size.y

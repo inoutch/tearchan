@@ -2,6 +2,7 @@ pub mod backend;
 pub mod buffer;
 pub mod depth_resource;
 pub mod device_info;
+pub mod font_texture;
 pub mod frame_resource;
 pub mod graphic_pipeline;
 pub mod helper;

@@ -1,6 +1,7 @@
 use crate::horde_provider::HordeProvider;
 use crate::person_object::PersonObject;
 use crate::person_object_store::PersonObjectStore;
+use nalgebra_glm::vec2;
 use std::rc::Rc;
 use tearchan::renderer::standard_2d_renderer::Standard2DRenderer;
 use tearchan_core::scene::scene_context::SceneContext;
@@ -21,10 +22,18 @@ pub struct HordeScene {
 impl HordeScene {
     pub fn factory() -> SceneFactory {
         |ctx, _| {
-            let image = Image::new_empty();
+            let image = Image::new(
+                vec![
+                    255u8, 0u8, 0u8, 255u8, 0u8, 255u8, 0u8, 255u8, 0u8, 0u8, 255u8, 255u8, 0u8,
+                    0u8, 0u8, 0u8,
+                ],
+                vec2(2, 2),
+            );
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
 
-            let renderer_plugin = Standard2DRenderer::new(&mut ctx.g.r, texture);
+            let renderer_plugin = Standard2DRenderer::from_texture(&mut ctx.g.r, texture);
+            ctx.plugin_manager_mut()
+                .add(Box::new(renderer_plugin), "renderer".to_string(), 0);
 
             let mut horde_plugin = HordePlugin::new(
                 HordeProvider::default(),
@@ -39,9 +48,7 @@ impl HordeScene {
                 .unwrap();
 
             ctx.plugin_manager_mut()
-                .add(Box::new(horde_plugin), "horde".to_string(), 0);
-            ctx.plugin_manager_mut()
-                .add(Box::new(renderer_plugin), "renderer".to_string(), 0);
+                .add(Box::new(horde_plugin), "horde".to_string(), 1);
 
             Box::new(HordeScene {
                 fps_counter: 0,
