@@ -14,6 +14,10 @@ name = "horde"
 path = "horde/main.rs"
 
 [[bin]]
+name = "text"
+path = "text/main.rs"
+
+[[bin]]
 name = "ui"
 path = "ui/main.rs"
 
