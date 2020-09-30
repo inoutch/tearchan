@@ -2,8 +2,7 @@ use crate::batch::batch_command::{BatchCommand, BatchObjectId, BatchProviderComm
 use crate::batch::batch_command_queue::BatchCommandQueue;
 use crate::batch::batch_object_manager::BatchObjectManager;
 use crate::batch::batch_provider::BatchProvider;
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use tearchan_utility::id_manager::IdManager;
 
 pub mod batch_buffer;
@@ -24,7 +23,8 @@ pub struct BatchContext {
 
 pub struct Batch<T: BatchProvider> {
     provider: T,
-    commands: Arc<Mutex<VecDeque<BatchCommand>>>,
+    sender: Sender<BatchCommand>,
+    receiver: Receiver<BatchCommand>,
     id_manager: IdManager<BatchObjectId>,
     batch_object_manager: BatchObjectManager,
 }
@@ -34,9 +34,11 @@ where
     T: BatchProvider,
 {
     pub fn new(provider: T) -> Self {
+        let (sender, receiver) = channel();
         Batch {
             provider,
-            commands: Arc::new(Mutex::new(VecDeque::new())),
+            sender,
+            receiver,
             id_manager: IdManager::new(0u64, |id| id + 1),
             batch_object_manager: BatchObjectManager::new(),
         }
@@ -48,14 +50,14 @@ where
 
     pub fn create_queue(&mut self) -> BatchCommandQueue {
         BatchCommandQueue::new(
-            Arc::clone(&self.commands),
+            Sender::clone(&self.sender),
             self.id_manager.create_generator(),
         )
     }
 
     pub fn flush(&mut self) {
         let mut need_sort_all = false;
-        while let Some(command) = self.commands.lock().unwrap().pop_front() {
+        while let Ok(command) = self.receiver.try_recv() {
             self.provider.run(match &command {
                 BatchCommand::Add { id, data, order } => {
                     if order.is_some() {

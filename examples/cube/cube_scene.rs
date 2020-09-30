@@ -1,4 +1,4 @@
-use nalgebra_glm::{vec2, vec3};
+use nalgebra_glm::vec2;
 use std::thread;
 use tearchan::renderer::standard_2d_renderer::Standard2DRenderer;
 use tearchan_core::scene::scene_context::SceneContext;
@@ -31,8 +31,8 @@ impl CubeScene {
                     .queue(BatchCommand::Add {
                         id: BATCH_ID_EMPTY,
                         data: vec![
-                            BatchCommandData::V3U32 {
-                                data: vec![vec3(0u32, 3u32, 2u32), vec3(0u32, 1u32, 3u32)],
+                            BatchCommandData::V1U32 {
+                                data: mesh.indices.clone(),
                             },
                             BatchCommandData::V3F32 {
                                 data: mesh.positions.clone(),

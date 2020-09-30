@@ -63,7 +63,9 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
                 self.allocate(id, size);
                 self.pending_pointers.push_back(pointer.size, pointer);
             }
-            _ => {}
+            _ => {
+                self.pointers.insert(id, pointer);
+            }
         }
     }
 
@@ -101,9 +103,9 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
     // NOTICE: Destroy structures
     pub fn defragmentation(&mut self) {
         let mut first: usize = 0;
-        for (_, pointer) in &mut self.pointers {
-            pointer.first = first;
-            first += pointer.size;
+        for pointer in &mut self.pointers {
+            pointer.1.first = first;
+            first += pointer.1.size;
         }
 
         self.last = first;
@@ -115,7 +117,7 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         self.pointers.get(id)
     }
 
-    pub fn sort(&mut self, ids: &Vec<BatchObjectId>) {
+    pub fn sort(&mut self, ids: &[BatchObjectId]) {
         debug_assert_eq!(ids.len(), self.pointers.len());
         let mut pointers = HashMap::new();
         let mut size = 0;

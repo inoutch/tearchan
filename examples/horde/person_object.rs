@@ -45,8 +45,8 @@ impl Standard2DRenderObject for PersonObject {
             .queue(BatchCommand::Add {
                 id: BATCH_ID_EMPTY,
                 data: vec![
-                    BatchCommandData::V3U32 {
-                        data: vec![vec3(0u32, 3u32, 2u32), vec3(0u32, 1u32, 3u32)],
+                    BatchCommandData::V1U32 {
+                        data: mesh.indices.clone(),
                     },
                     BatchCommandData::V3F32 {
                         data: mesh.positions.clone(),

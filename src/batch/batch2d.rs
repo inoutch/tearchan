@@ -107,7 +107,7 @@ impl BatchProvider for Batch2DProvider {
         batch_object_manager.flush(|object, attribute| match attribute {
             0 => {
                 let p0 = index_buffer.get_pointer(&object.id).unwrap();
-                object.for_each_v3u32(0, |i, v| {
+                object.for_each_v1u32(0, |i, v| {
                     index_mapping.set(v, i + p0.first);
                 });
             }

@@ -80,6 +80,17 @@ impl BatchObjectManager {
                     None => return,
                 };
                 object.data[attribute as usize] = data;
+
+                match self.changed_object_map.get_mut(&id) {
+                    None => {
+                        let mut set = HashSet::new();
+                        set.insert(attribute);
+                        self.changed_object_map.insert(id, set);
+                    }
+                    Some(set) => {
+                        set.insert(attribute);
+                    }
+                }
             }
             BatchCommand::Refresh { attribute } => {
                 for id in self.objects.keys() {

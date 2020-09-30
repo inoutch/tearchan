@@ -10,6 +10,8 @@ pub enum BatchCommandValue {
 }
 
 pub enum BatchCommandData {
+    V1F32 { data: Vec<f32> },
+    V1U32 { data: Vec<u32> },
     V2F32 { data: Vec<TVec2<f32>> },
     V2U32 { data: Vec<TVec2<u32>> },
     V3F32 { data: Vec<TVec3<f32>> },
@@ -21,6 +23,8 @@ pub enum BatchCommandData {
 impl BatchCommandData {
     pub fn len(&self) -> usize {
         match self {
+            BatchCommandData::V1F32 { data } => data.len(),
+            BatchCommandData::V1U32 { data } => data.len(),
             BatchCommandData::V2F32 { data } => data.len(),
             BatchCommandData::V2U32 { data } => data.len(),
             BatchCommandData::V3F32 { data } => data.len(),

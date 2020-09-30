@@ -45,6 +45,28 @@ impl BatchObject {
         }
     }
 
+    pub fn for_each_v1f32<F>(&self, index: usize, mut callback: F)
+    where
+        F: FnMut(usize, f32),
+    {
+        if let BatchCommandData::V1F32 { data } = &self.data[index] {
+            for (i, datum) in data.iter().enumerate() {
+                callback(i, *datum);
+            }
+        }
+    }
+
+    pub fn for_each_v1u32<F>(&self, index: usize, mut callback: F)
+    where
+        F: FnMut(usize, u32),
+    {
+        if let BatchCommandData::V1U32 { data } = &self.data[index] {
+            for (i, datum) in data.iter().enumerate() {
+                callback(i, *datum);
+            }
+        }
+    }
+
     pub fn for_each_v2f32<F>(&self, index: usize, mut callback: F)
     where
         F: FnMut(usize, f32),

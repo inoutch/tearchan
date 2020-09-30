@@ -1,34 +1,27 @@
 use crate::batch::batch_command::{BatchCommand, BatchObjectId};
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use tearchan_utility::id_manager::IdGenerator;
 
 pub struct BatchCommandQueue {
-    commands: Arc<Mutex<VecDeque<BatchCommand>>>,
+    sender: Sender<BatchCommand>,
     id_generator: IdGenerator<BatchObjectId>,
 }
 
 impl BatchCommandQueue {
-    pub fn new(
-        commands: Arc<Mutex<VecDeque<BatchCommand>>>,
-        id_generator: IdGenerator<BatchObjectId>,
-    ) -> Self {
+    pub fn new(sender: Sender<BatchCommand>, id_generator: IdGenerator<BatchObjectId>) -> Self {
         BatchCommandQueue {
-            commands,
+            sender,
             id_generator,
         }
     }
 
     pub fn queue(&mut self, mut command: BatchCommand) -> Option<BatchObjectId> {
         let mut next_id = None;
-        match &mut command {
-            BatchCommand::Add { id, .. } => {
-                *id = self.id_generator.gen();
-                next_id = Some(*id);
-            }
-            _ => {}
+        if let BatchCommand::Add { id, .. } = &mut command {
+            *id = self.id_generator.gen();
+            next_id = Some(*id);
         }
-        self.commands.lock().unwrap().push_back(command);
+        self.sender.send(command).unwrap();
         next_id
     }
 }
