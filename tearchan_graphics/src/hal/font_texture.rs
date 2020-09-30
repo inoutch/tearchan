@@ -3,8 +3,14 @@ use crate::hal::texture::{TextureCommon, TextureConfig};
 use crate::image::Image;
 use gfx_hal::Backend;
 use nalgebra_glm::{vec2, vec4, TVec2, Vec2};
-use rusttype::{point, Font, GlyphId, Scale};
+use rusttype::{point, Font, GlyphId, IntoGlyphId, Scale};
 use std::collections::HashMap;
+use tearchan_utility::math::vec::vec4_white;
+use tearchan_utility::mesh::square::{
+    create_square_colors, create_square_indices_with_offset, create_square_positions,
+    create_square_texcoords,
+};
+use tearchan_utility::mesh::{IndexType, Mesh, MeshBuilder};
 use tearchan_utility::rect::{rect2, Rect2};
 
 const DEFAULT_TEXTURE_SIZE_WIDTH: u32 = 512;
@@ -76,6 +82,81 @@ impl<B: Backend> FontTextureCommon<B> {
 
     pub fn texture(&self) -> &TextureCommon<B> {
         &self.texture
+    }
+
+    pub fn create_mesh(&self, text: &str) -> (Mesh, Vec2) {
+        let mut size = vec2(0.0f32, 0.0f32);
+        let font = rusttype::Font::try_from_bytes(&self.font_data).unwrap();
+        let scale = Scale::uniform(self.scale);
+        let v_metrics = font.v_metrics(scale);
+        let line_height = v_metrics.ascent;
+
+        let mut indices = vec![];
+        let mut positions = vec![];
+        let mut colors = vec![];
+        let mut texcoords = vec![];
+        let texture_size = vec2(self.image_size.x as f32, self.image_size.y as f32);
+        let prev_glyph_id: Option<GlyphId> = None;
+
+        let mut x = 0.0f32;
+        let mut y = -line_height - v_metrics.descent;
+        for glyph in font.layout(text, scale, point(0.0f32, 0.0f32)) {
+            if glyph.id() == '\n'.into_glyph_id(&font) {
+                x = 0.0f32;
+                y -= line_height;
+                continue;
+            }
+            x -= match prev_glyph_id {
+                None => 0.0f32,
+                Some(id) => font.pair_kerning(scale, id, glyph.id()),
+            };
+            let h_metrics = glyph.unpositioned().h_metrics();
+            let max_y = match glyph.pixel_bounding_box() {
+                Some(bounding_box) => (bounding_box.max.y) as f32,
+                None => {
+                    x += h_metrics.advance_width;
+                    continue;
+                }
+            };
+            let texture_rect = &self.database[&glyph.id()];
+            let uv_rect = rect2(
+                texture_rect.origin.x / texture_size.x,
+                texture_rect.origin.y / texture_size.y,
+                texture_rect.size.x / texture_size.x,
+                texture_rect.size.y / texture_size.y,
+            );
+            let rect = rect2(
+                x + h_metrics.left_side_bearing,
+                y - max_y,
+                h_metrics.advance_width - h_metrics.left_side_bearing,
+                texture_rect.size.y,
+            );
+            indices.append(&mut create_square_indices_with_offset(
+                positions.len() as IndexType
+            ));
+            positions.append(&mut create_square_positions(&rect));
+            colors.append(&mut create_square_colors(vec4_white()));
+            texcoords.append(&mut create_square_texcoords(&uv_rect));
+
+            x += h_metrics.advance_width;
+            size.x = size.x.max(x);
+        }
+        size.y = -y;
+
+        for position in &mut positions {
+            position.y += size.y;
+        }
+        (
+            MeshBuilder::new()
+                .indices(indices)
+                .positions(positions)
+                .colors(colors)
+                .texcoords(texcoords)
+                .normals(vec![])
+                .build()
+                .unwrap(),
+            size,
+        )
     }
 
     fn update_texture(&mut self, characters: &str) -> Result<(), FontTextureError> {
