@@ -27,7 +27,7 @@ impl CubeScene {
                     .with_square(vec2(100.0f32, 100.0f32))
                     .build()
                     .unwrap();
-                let batch_object_id = batch_queue
+                batch_queue
                     .queue(BatchCommand::Add {
                         id: BATCH_ID_EMPTY,
                         data: vec![
@@ -44,12 +44,9 @@ impl CubeScene {
                                 data: mesh.texcoords,
                             },
                         ],
-                        order: None,
+                        order: Some(0),
                     })
                     .unwrap();
-                batch_queue.queue(BatchCommand::Remove {
-                    id: batch_object_id,
-                });
             });
 
             ctx.plugin_manager_mut()

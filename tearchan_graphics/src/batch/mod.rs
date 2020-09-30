@@ -1,5 +1,6 @@
-use crate::batch::batch_command::{BatchCommand, BatchObjectId};
+use crate::batch::batch_command::{BatchCommand, BatchObjectId, BatchProviderCommand};
 use crate::batch::batch_command_queue::BatchCommandQueue;
+use crate::batch::batch_object_manager::BatchObjectManager;
 use crate::batch::batch_provider::BatchProvider;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -25,6 +26,7 @@ pub struct Batch<T: BatchProvider> {
     provider: T,
     commands: Arc<Mutex<VecDeque<BatchCommand>>>,
     id_manager: IdManager<BatchObjectId>,
+    batch_object_manager: BatchObjectManager,
 }
 
 impl<T> Batch<T>
@@ -36,6 +38,7 @@ where
             provider,
             commands: Arc::new(Mutex::new(VecDeque::new())),
             id_manager: IdManager::new(0u64, |id| id + 1),
+            batch_object_manager: BatchObjectManager::new(),
         }
     }
 
@@ -51,9 +54,41 @@ where
     }
 
     pub fn flush(&mut self) {
+        let mut need_sort_all = false;
         while let Some(command) = self.commands.lock().unwrap().pop_front() {
-            self.provider.run(command);
+            self.provider.run(match &command {
+                BatchCommand::Add { id, data, order } => {
+                    if order.is_some() {
+                        need_sort_all = true;
+                    }
+                    BatchProviderCommand::Add { id: *id, data }
+                }
+                BatchCommand::Remove { id } => BatchProviderCommand::Remove { id: *id },
+                BatchCommand::Transform { .. } => BatchProviderCommand::None,
+                BatchCommand::Replace {
+                    id,
+                    attribute,
+                    data,
+                } => BatchProviderCommand::Replace {
+                    id: *id,
+                    attribute: *attribute,
+                    data,
+                },
+                _ => BatchProviderCommand::None,
+            });
+            self.batch_object_manager.run(command);
         }
-        self.provider.flush()
+
+        if need_sort_all {
+            let attributes = self
+                .provider
+                .sort(self.batch_object_manager.create_sorted_ids());
+            for attribute in attributes {
+                self.batch_object_manager
+                    .run(BatchCommand::Refresh { attribute });
+            }
+        }
+
+        self.provider.flush(&mut self.batch_object_manager);
     }
 }

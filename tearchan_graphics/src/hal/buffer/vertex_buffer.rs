@@ -75,6 +75,10 @@ impl<B: Backend> BufferInterface for VertexBufferCommon<B> {
         self.len
     }
 
+    fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     fn clear(&self, offset: usize, size: usize) {
         let mut mapping = self.open(offset, size);
         debug_assert!(offset + size <= self.len);
@@ -205,6 +209,10 @@ pub mod test {
 
         fn len(&self) -> usize {
             self.vertices.borrow().len()
+        }
+
+        fn is_empty(&self) -> bool {
+            self.vertices.borrow().is_empty()
         }
 
         fn clear(&self, offset: usize, size: usize) {

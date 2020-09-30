@@ -60,8 +60,23 @@ pub enum BatchCommand {
         attribute: u32,
         data: BatchCommandData,
     },
-    CopyForEach {
-        id: BatchObjectId,
-        value: BatchCommandValue,
+    Refresh {
+        attribute: u32,
     },
+}
+
+pub enum BatchProviderCommand<'a> {
+    Add {
+        id: BatchObjectId,
+        data: &'a Vec<BatchCommandData>,
+    },
+    Remove {
+        id: BatchObjectId,
+    },
+    Replace {
+        id: BatchObjectId,
+        attribute: u32,
+        data: &'a BatchCommandData,
+    },
+    None,
 }

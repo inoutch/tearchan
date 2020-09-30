@@ -122,6 +122,14 @@ impl<T: HordePluginProvider> HordePlugin<T> {
         self.object_factories.insert(kind.to_string(), factory);
     }
 
+    pub fn provider(&self) -> &T {
+        &self.provider
+    }
+
+    pub fn provider_mut(&mut self) -> &mut T {
+        &mut self.provider
+    }
+
     pub fn create_object(
         &mut self,
         store: ObjectStore<dyn ObjectStoreBase>,

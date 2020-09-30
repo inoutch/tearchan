@@ -12,6 +12,8 @@ pub trait BufferInterface {
 
     fn len(&self) -> usize;
 
+    fn is_empty(&self) -> bool;
+
     fn clear(&self, offset: usize, size: usize);
 }
 

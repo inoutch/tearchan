@@ -86,6 +86,10 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
         self.buffer.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
     pub fn last(&self) -> usize {
         self.last
     }
@@ -109,6 +113,20 @@ impl<TBuffer: BufferInterface> BatchBuffer<TBuffer> {
 
     pub fn get_pointer(&self, id: &BatchObjectId) -> Option<&BatchPointer> {
         self.pointers.get(id)
+    }
+
+    pub fn sort(&mut self, ids: &Vec<BatchObjectId>) {
+        debug_assert_eq!(ids.len(), self.pointers.len());
+        let mut pointers = HashMap::new();
+        let mut size = 0;
+        for id in ids {
+            let pointer = &self.pointers[id];
+            pointers.insert(*id, BatchPointer::new(size, pointer.size));
+            size += pointer.size;
+        }
+
+        self.pointers = pointers;
+        self.last = size;
     }
 
     fn reallocate_buffer(&mut self, size: usize) {
@@ -231,7 +249,7 @@ mod test {
 
     #[test]
     fn test_batch_buffer_values() {
-        let mock = Shared::new(MockFunc::new());
+        let mock = Shared::new(MockFunc::default());
         let mock_vertex_buffer = MockIndexBuffer::new(&mock, vec![0u32; 32].as_slice());
         let mut batch_buffer = BatchBuffer::new(mock_vertex_buffer, |buffer, size| {
             let mut indices = buffer.indices.borrow().clone();

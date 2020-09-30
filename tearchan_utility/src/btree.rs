@@ -108,6 +108,15 @@ where
         }
     }
 
+    pub fn remove(&mut self, key: &K, value: &V) -> Option<V>
+    where
+        V: Eq,
+    {
+        let values = self.btree.get_mut(key)?;
+        let index = values.iter().position(|v| v == value)?;
+        values.remove(index)
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         self.btree.len()

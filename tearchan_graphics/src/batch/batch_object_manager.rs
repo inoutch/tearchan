@@ -6,16 +6,17 @@ use tearchan_utility::btree::DuplicatableBTreeMap;
 
 pub struct BatchObjectManager {
     objects: HashMap<BatchObjectId, BatchObject>,
-    changed_objects: DuplicatableBTreeMap<i32, BatchObjectId>,
-    changed_object_set: HashSet<BatchObjectId>,
+    sorted_object_ids: DuplicatableBTreeMap<i32, BatchObjectId>,
+    changed_object_map: HashMap<BatchObjectId, HashSet<u32>>,
 }
 
 impl BatchObjectManager {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> BatchObjectManager {
         BatchObjectManager {
             objects: HashMap::new(),
-            changed_objects: DuplicatableBTreeMap::new(),
-            changed_object_set: HashSet::new(),
+            sorted_object_ids: DuplicatableBTreeMap::new(),
+            changed_object_map: HashMap::new(),
         }
     }
 
@@ -24,18 +25,28 @@ impl BatchObjectManager {
             BatchCommand::Add { id, data, order } => {
                 let order = order.map_or(0, |x| x);
                 let transforms = vec![BatchCommandTransform::None; data.len()];
-                let object = BatchObject {
+                let mut set = HashSet::with_capacity(data.len());
+                for i in 0u32..data.len() as u32 {
+                    set.insert(i);
+                }
+
+                self.objects.insert(
                     id,
-                    data,
-                    transforms,
-                    order,
-                };
-                self.objects.insert(id, object);
-                self.changed_objects.push_back(order, id);
-                self.changed_object_set.insert(id);
+                    BatchObject {
+                        id,
+                        data,
+                        transforms,
+                        order,
+                    },
+                );
+                self.sorted_object_ids.push_back(order, id);
+                self.changed_object_map.insert(id, set);
             }
             BatchCommand::Remove { id } => {
-                self.objects.remove(&id);
+                self.changed_object_map.remove(&id);
+                if let Some(object) = self.objects.remove(&id) {
+                    self.sorted_object_ids.remove(&object.order, &id);
+                }
             }
             BatchCommand::Transform {
                 id,
@@ -48,9 +59,15 @@ impl BatchObjectManager {
                 };
                 object.transforms[attribute as usize] = transform;
 
-                if !self.changed_object_set.contains(&id) {
-                    self.changed_object_set.insert(id);
-                    self.changed_objects.push_back(object.order, id);
+                match self.changed_object_map.get_mut(&id) {
+                    None => {
+                        let mut set = HashSet::new();
+                        set.insert(attribute);
+                        self.changed_object_map.insert(id, set);
+                    }
+                    Some(set) => {
+                        set.insert(attribute);
+                    }
                 }
             }
             BatchCommand::Replace {
@@ -64,25 +81,46 @@ impl BatchObjectManager {
                 };
                 object.data[attribute as usize] = data;
             }
-            BatchCommand::CopyForEach { .. } => unimplemented!(),
+            BatchCommand::Refresh { attribute } => {
+                for id in self.objects.keys() {
+                    match self.changed_object_map.get_mut(id) {
+                        None => {
+                            let mut set = HashSet::new();
+                            set.insert(attribute);
+                            self.changed_object_map.insert(*id, set);
+                        }
+                        Some(set) => {
+                            set.insert(attribute);
+                        }
+                    }
+                }
+            }
         }
     }
 
     pub fn flush<F>(&mut self, mut callback: F)
     where
-        F: FnMut(&BatchObject),
+        F: FnMut(&BatchObject, u32),
     {
-        for (_, range) in self.changed_objects.range_mut(..) {
-            while let Some(id) = range.pop_front() {
-                self.changed_object_set.remove(&id);
-
-                let object = match self.objects.get(&id) {
-                    Some(object) => object,
-                    None => continue,
-                };
-                callback(object);
+        for (id, attributes) in &mut self.changed_object_map {
+            let object = match self.objects.get(&id) {
+                Some(object) => object,
+                None => continue,
+            };
+            for attribute in attributes.iter() {
+                callback(object, *attribute);
             }
         }
+        self.changed_object_map.clear();
+    }
+
+    pub fn create_sorted_ids(&self) -> Vec<BatchObjectId> {
+        self.sorted_object_ids
+            .iter()
+            .map(|(_, ids)| ids)
+            .flatten()
+            .copied()
+            .collect()
     }
 }
 
@@ -127,23 +165,32 @@ mod test {
         let mut positions = vec![];
         let mut texcoords = vec![];
         let mut colors = vec![];
-        manager.flush(|object| {
-            object.for_each_v3u32(0, |i, v| {
-                assert_eq!(i, indices.len());
-                (&mut indices).push(v);
-            });
-            object.for_each_v3f32(1, |i, v| {
-                assert_eq!(i, positions.len());
-                (&mut positions).push(v);
-            });
-            object.for_each_v2f32(2, |i, v| {
-                assert_eq!(i, texcoords.len());
-                (&mut texcoords).push(v);
-            });
-            object.for_each_v4f32(3, |i, v| {
-                assert_eq!(i, colors.len());
-                (&mut colors).push(v);
-            });
+        manager.flush(|object, attribute| match attribute {
+            0 => {
+                object.for_each_v3u32(0, |i, v| {
+                    assert_eq!(i, indices.len());
+                    (&mut indices).push(v);
+                });
+            }
+            1 => {
+                object.for_each_v3f32(1, |i, v| {
+                    assert_eq!(i, positions.len());
+                    (&mut positions).push(v);
+                });
+            }
+            2 => {
+                object.for_each_v2f32(2, |i, v| {
+                    assert_eq!(i, texcoords.len());
+                    (&mut texcoords).push(v);
+                });
+            }
+            3 => {
+                object.for_each_v4f32(3, |i, v| {
+                    assert_eq!(i, colors.len());
+                    (&mut colors).push(v);
+                });
+            }
+            _ => {}
         });
 
         assert_eq!(indices, [0, 1, 2]);

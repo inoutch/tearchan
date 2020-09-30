@@ -1,5 +1,7 @@
+use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 use tearchan_graphics::batch::batch_buffer::BatchBuffer;
-use tearchan_graphics::batch::batch_command::BatchCommand;
+use tearchan_graphics::batch::batch_command::BatchProviderCommand;
 use tearchan_graphics::batch::batch_object_manager::BatchObjectManager;
 use tearchan_graphics::batch::batch_provider::BatchProvider;
 use tearchan_graphics::batch::Batch;
@@ -14,7 +16,6 @@ pub type Batch2D = Batch<Batch2DProvider>;
 pub struct Batch2DProvider {
     index_buffer: BatchBuffer<IndexBuffer>,
     vertex_buffers: Vec<BatchBuffer<VertexBuffer>>,
-    object_manager: BatchObjectManager,
 }
 
 impl Batch2DProvider {
@@ -26,7 +27,6 @@ impl Batch2DProvider {
                 create_vertex_batch_buffer(render_bundle),
                 create_vertex_batch_buffer(render_bundle),
             ],
-            object_manager: BatchObjectManager::new(),
         })
     }
 }
@@ -46,9 +46,9 @@ impl Batch2DProvider {
 }
 
 impl BatchProvider for Batch2DProvider {
-    fn run(&mut self, command: BatchCommand) {
+    fn run(&mut self, command: BatchProviderCommand) {
         match &command {
-            BatchCommand::Add { id, data, .. } => {
+            BatchProviderCommand::Add { id, data, .. } => {
                 debug_assert_eq!(data[1].len(), data[2].len());
                 debug_assert_eq!(data[2].len(), data[3].len());
 
@@ -57,13 +57,13 @@ impl BatchProvider for Batch2DProvider {
                 self.vertex_buffers[1].allocate(*id, data[2].len() * 4);
                 self.vertex_buffers[2].allocate(*id, data[3].len() * 2);
             }
-            BatchCommand::Remove { id } => {
+            BatchProviderCommand::Remove { id } => {
                 self.index_buffer.free(*id);
                 self.vertex_buffers[0].free(*id);
                 self.vertex_buffers[1].free(*id);
                 self.vertex_buffers[2].free(*id);
             }
-            BatchCommand::Replace {
+            BatchProviderCommand::Replace {
                 id,
                 attribute,
                 data,
@@ -76,10 +76,22 @@ impl BatchProvider for Batch2DProvider {
             },
             _ => {}
         }
-        self.object_manager.run(command);
     }
 
-    fn flush(&mut self) {
+    fn sort(&mut self, ids: Vec<u64>) -> HashSet<u32, RandomState> {
+        self.index_buffer.sort(&ids);
+        self.vertex_buffers[0].sort(&ids);
+        self.vertex_buffers[1].sort(&ids);
+        self.vertex_buffers[2].sort(&ids);
+        let mut set = HashSet::with_capacity(4);
+        set.insert(0);
+        set.insert(1);
+        set.insert(2);
+        set.insert(3);
+        set
+    }
+
+    fn flush(&mut self, batch_object_manager: &mut BatchObjectManager) {
         let mut index_mapping = self.index_buffer.buffer().open(0, self.index_buffer.len());
         let mut position_mapping = self.vertex_buffers[0]
             .buffer()
@@ -90,26 +102,34 @@ impl BatchProvider for Batch2DProvider {
         let mut texcoord_mapping = self.vertex_buffers[2]
             .buffer()
             .open(0, self.vertex_buffers[2].len());
-        let object_manager = &mut self.object_manager;
         let index_buffer = &self.index_buffer;
         let vertex_buffers = &self.vertex_buffers;
-        object_manager.flush(|object| {
-            let p0 = index_buffer.get_pointer(&object.id).unwrap();
-            object.for_each_v3u32(0, |i, v| {
-                index_mapping.set(v, i + p0.first);
-            });
-            let p1 = vertex_buffers[0].get_pointer(&object.id).unwrap();
-            object.for_each_v3f32(1, |i, v| {
-                position_mapping.set(v, i + p1.first);
-            });
-            let p2 = vertex_buffers[1].get_pointer(&object.id).unwrap();
-            object.for_each_v4f32(2, |i, v| {
-                color_mapping.set(v, i + p2.first);
-            });
-            let p3 = vertex_buffers[2].get_pointer(&object.id).unwrap();
-            object.for_each_v2f32(3, |i, v| {
-                texcoord_mapping.set(v, i + p3.first);
-            });
+        batch_object_manager.flush(|object, attribute| match attribute {
+            0 => {
+                let p0 = index_buffer.get_pointer(&object.id).unwrap();
+                object.for_each_v3u32(0, |i, v| {
+                    index_mapping.set(v, i + p0.first);
+                });
+            }
+            1 => {
+                let p1 = vertex_buffers[0].get_pointer(&object.id).unwrap();
+                object.for_each_v3f32(1, |i, v| {
+                    position_mapping.set(v, i + p1.first);
+                });
+            }
+            2 => {
+                let p2 = vertex_buffers[1].get_pointer(&object.id).unwrap();
+                object.for_each_v4f32(2, |i, v| {
+                    color_mapping.set(v, i + p2.first);
+                });
+            }
+            3 => {
+                let p3 = vertex_buffers[2].get_pointer(&object.id).unwrap();
+                object.for_each_v2f32(3, |i, v| {
+                    texcoord_mapping.set(v, i + p3.first);
+                });
+            }
+            _ => {}
         });
 
         self.index_buffer.buffer().close(index_mapping);

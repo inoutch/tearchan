@@ -85,6 +85,10 @@ impl<B: Backend> BufferInterface for IndexBufferCommon<B> {
         self.len
     }
 
+    fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     fn clear(&self, offset: usize, size: usize) {
         let mut mapping = self.open(offset, size);
         debug_assert!(offset + size <= self.len);
@@ -196,6 +200,10 @@ pub mod test {
 
         fn len(&self) -> usize {
             self.indices.borrow().len()
+        }
+
+        fn is_empty(&self) -> bool {
+            self.indices.borrow().is_empty()
         }
 
         fn clear(&self, offset: usize, size: usize) {
