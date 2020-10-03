@@ -3,7 +3,7 @@ use crate::person_object::PersonObject;
 use crate::person_object_store::PersonObjectStore;
 use nalgebra_glm::vec2;
 use std::rc::Rc;
-use tearchan::renderer::standard_2d_renderer::Standard2DRenderer;
+use tearchan::plugin::renderer::standard_2d_renderer::Standard2DRenderer;
 use tearchan_core::scene::scene_context::SceneContext;
 use tearchan_core::scene::scene_factory::SceneFactory;
 use tearchan_core::scene::scene_result::SceneResult;

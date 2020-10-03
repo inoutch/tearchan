@@ -4,7 +4,7 @@ use nalgebra_glm::{rotate, translate, vec2, vec2_to_vec3, vec3, Mat4, Vec2};
 use std::f32::consts::PI;
 use std::option::Option::Some;
 use std::rc::Rc;
-use tearchan::renderer::standard_2d_renderer::Standard2DRenderObject;
+use tearchan::plugin::renderer::standard_2d_renderer::Standard2DRenderObject;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::GameObject;
 use tearchan_graphics::batch::batch_command::{
