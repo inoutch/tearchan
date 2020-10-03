@@ -1,4 +1,4 @@
-use crate::renderer::standard_font_renderer::standard_font_command::StandardFontCommand;
+use crate::plugin::renderer::standard_font_renderer::standard_font_command::StandardFontCommand;
 use std::sync::mpsc::Sender;
 use tearchan_core::game::object::EMPTY_ID;
 use tearchan_graphics::batch::batch_command::{BatchCommand, BatchCommandData, BatchObjectId};
