@@ -1,8 +1,8 @@
 use crate::batch::batch2d::{Batch2D, Batch2DProvider};
-use crate::renderer::standard_font_renderer::standard_font_command::StandardFontCommand;
-use crate::renderer::standard_font_renderer::standard_font_command_queue::StandardFontCommandQueue;
-use crate::renderer::standard_font_renderer::standard_font_render_object::StandardFontRenderObject;
-use crate::renderer::standard_font_renderer::standard_font_renderer_provider::{
+use crate::plugin::renderer::standard_font_renderer::standard_font_command::StandardFontCommand;
+use crate::plugin::renderer::standard_font_renderer::standard_font_command_queue::StandardFontCommandQueue;
+use crate::plugin::renderer::standard_font_renderer::standard_font_render_object::StandardFontRenderObject;
+use crate::plugin::renderer::standard_font_renderer::standard_font_renderer_provider::{
     StandardFontRendererDefaultProvider, StandardFontRendererProvider,
 };
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -97,6 +97,7 @@ impl<T: StandardFontRendererProvider> GamePlugin for StandardFontRenderer<T> {
     fn on_update(&mut self, context: &mut GameContext) {
         self.batch2d.flush();
 
+        let mut changed = false;
         while let Ok(command) = self.receiver.try_recv() {
             match command {
                 StandardFontCommand::SetText { id, text } => {
@@ -131,8 +132,12 @@ impl<T: StandardFontRendererProvider> GamePlugin for StandardFontRenderer<T> {
                             data: mesh.texcoords.clone(),
                         },
                     });
+                    changed = true;
                 }
             }
+        }
+        if changed {
+            self.batch2d.flush();
         }
 
         self.provider.prepare(context, self.font_texture.texture());
