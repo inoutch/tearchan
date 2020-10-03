@@ -52,7 +52,7 @@ impl BatchProvider for Batch2DProvider {
                 debug_assert_eq!(data[1].len(), data[2].len());
                 debug_assert_eq!(data[2].len(), data[3].len());
 
-                self.index_buffer.allocate(*id, data[0].len() * 3);
+                self.index_buffer.allocate(*id, data[0].len());
                 self.vertex_buffers[0].allocate(*id, data[1].len() * 3);
                 self.vertex_buffers[1].allocate(*id, data[2].len() * 4);
                 self.vertex_buffers[2].allocate(*id, data[3].len() * 2);
@@ -68,7 +68,7 @@ impl BatchProvider for Batch2DProvider {
                 attribute,
                 data,
             } => match attribute {
-                0 => self.index_buffer.reallocate(*id, data.len() * 3),
+                0 => self.index_buffer.reallocate(*id, data.len()),
                 1 => self.vertex_buffers[0].reallocate(*id, data.len() * 3),
                 2 => self.vertex_buffers[1].reallocate(*id, data.len() * 4),
                 3 => self.vertex_buffers[2].reallocate(*id, data.len() * 2),
@@ -107,8 +107,9 @@ impl BatchProvider for Batch2DProvider {
         batch_object_manager.flush(|object, attribute| match attribute {
             0 => {
                 let p0 = index_buffer.get_pointer(&object.id).unwrap();
+                let p1 = vertex_buffers[0].get_pointer(&object.id).unwrap();
                 object.for_each_v1u32(0, |i, v| {
-                    index_mapping.set(v, i + p0.first);
+                    index_mapping.set(v + p1.first as u32 / 3, i + p0.first);
                 });
             }
             1 => {
