@@ -3,7 +3,6 @@ use serde::export::Option::Some;
 use std::collections::HashMap;
 use tearchan::plugin::animation::animation_object::AnimationObject;
 use tearchan::plugin::animation::animator::{AnimationData, AnimationGroup, Animator};
-use tearchan::plugin::renderer::render_object::RenderObject;
 use tearchan::plugin::renderer::sprite_renderer::sprite::Sprite;
 use tearchan::plugin::renderer::sprite_renderer::sprite_command_queue::SpriteCommandQueue;
 use tearchan::plugin::renderer::sprite_renderer::sprite_object::SpriteObject;
@@ -61,9 +60,6 @@ impl Default for SkeletonSprite {
 
 #[cast_to]
 impl GameObjectBase for SkeletonSprite {}
-
-#[cast_to]
-impl RenderObject for SkeletonSprite {}
 
 #[cast_to]
 impl SpriteObject for SkeletonSprite {

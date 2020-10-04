@@ -1,9 +1,8 @@
 use crate::batch::batch2d::{Batch2D, Batch2DProvider};
+use crate::plugin::renderer::sprite_renderer::sprite_command_queue::SpriteCommandQueue;
 use crate::plugin::renderer::sprite_renderer::sprite_object::SpriteObject;
-use crate::plugin::renderer::standard_2d_renderer::{
-    Standard2DRendererDefaultProvider, Standard2DRendererProvider,
-};
-use std::ops::DerefMut;
+use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_default_provider::Standard2DRendererDefaultProvider;
+use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_provider::Standard2DRendererProvider;
 use tearchan_core::game::game_context::GameContext;
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
@@ -54,10 +53,9 @@ where
 {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
         if let Some(mut render_object) = game_object.cast::<dyn SpriteObject>() {
-            SpriteObject::attach_queue(
-                render_object.borrow_mut().deref_mut(),
-                self.batch2d.create_queue(),
-            );
+            render_object
+                .borrow_mut()
+                .attach_sprite_queue(SpriteCommandQueue::new(self.batch2d.create_queue()));
             self.object_manager.add(render_object);
         }
     }

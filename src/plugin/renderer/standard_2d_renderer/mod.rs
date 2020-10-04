@@ -1,65 +1,18 @@
 use crate::batch::batch2d::{Batch2D, Batch2DProvider};
+use crate::plugin::renderer::standard_2d_renderer::standard_2d_object::Standard2DRenderObject;
+use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_default_provider::Standard2DRendererDefaultProvider;
+use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_provider::Standard2DRendererProvider;
 use tearchan_core::game::game_context::GameContext;
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::game_object_manager::GameObjectManager;
 use tearchan_core::game::object::GameObject;
 use tearchan_graphics::batch::batch_command_queue::BatchCommandQueue;
-use tearchan_graphics::camera::camera_2d::Camera2D;
-use tearchan_graphics::hal::backend::{GraphicPipeline, RendererContext, Texture};
-use tearchan_graphics::hal::graphic_pipeline::GraphicPipelineConfig;
-use tearchan_graphics::shader::standard_2d_shader_program::Standard2DShaderProgram;
+use tearchan_graphics::hal::backend::{RendererContext, Texture};
 
-pub trait Standard2DRenderObject: GameObjectBase {
-    fn attach_queue(&mut self, queue: BatchCommandQueue);
-}
-
-pub trait Standard2DRendererProvider {
-    fn graphic_pipeline(&self) -> &GraphicPipeline;
-    fn prepare(&mut self, context: &mut GameContext);
-}
-
-pub struct Standard2DRendererDefaultProvider {
-    texture: Texture,
-    camera: Camera2D,
-    graphic_pipeline: GraphicPipeline,
-    shader_program: Standard2DShaderProgram,
-}
-
-impl Standard2DRendererDefaultProvider {
-    pub fn from_texture(r: &mut RendererContext, texture: Texture) -> Self {
-        let camera = Camera2D::new(&r.render_bundle().display_size().logical);
-        let shader_program = Standard2DShaderProgram::new(r.render_bundle(), camera.base());
-        let graphic_pipeline = GraphicPipeline::new(
-            r.render_bundle(),
-            r.primary_render_pass(),
-            shader_program.shader(),
-            GraphicPipelineConfig::default(),
-        );
-        Standard2DRendererDefaultProvider {
-            texture,
-            camera,
-            graphic_pipeline,
-            shader_program,
-        }
-    }
-}
-
-impl Standard2DRendererProvider for Standard2DRendererDefaultProvider {
-    fn graphic_pipeline(&self) -> &GraphicPipeline {
-        &self.graphic_pipeline
-    }
-
-    fn prepare(&mut self, context: &mut GameContext) {
-        self.camera.update();
-        self.shader_program.prepare(self.camera.combine());
-
-        let descriptor_set = self.graphic_pipeline.descriptor_set();
-        self.shader_program
-            .create_write_descriptor_sets(descriptor_set, &self.texture)
-            .write(context.r.render_bundle());
-    }
-}
+pub mod standard_2d_object;
+pub mod standard_2d_renderer_default_provider;
+pub mod standard_2d_renderer_provider;
 
 pub struct Standard2DRenderer<T: Standard2DRendererProvider> {
     provider: T,
@@ -77,6 +30,10 @@ impl<T: Standard2DRendererProvider> Standard2DRenderer<T> {
             batch2d,
         }
     }
+
+    pub fn create_batch_queue(&mut self) -> BatchCommandQueue {
+        self.batch2d.create_queue()
+    }
 }
 
 impl Standard2DRenderer<Standard2DRendererDefaultProvider> {
@@ -90,12 +47,6 @@ impl Standard2DRenderer<Standard2DRendererDefaultProvider> {
             object_manager: GameObjectManager::new(),
             batch2d,
         }
-    }
-}
-
-impl<T: Standard2DRendererProvider> Standard2DRenderer<T> {
-    pub fn create_batch_queue(&mut self) -> BatchCommandQueue {
-        self.batch2d.create_queue()
     }
 }
 
