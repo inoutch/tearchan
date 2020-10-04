@@ -48,7 +48,7 @@ where
         &self.provider
     }
 
-    pub fn create_queue(&mut self) -> BatchCommandQueue {
+    pub fn create_queue(&self) -> BatchCommandQueue {
         BatchCommandQueue::new(
             Sender::clone(&self.sender),
             self.id_manager.create_generator(),
