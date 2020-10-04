@@ -6,20 +6,20 @@ use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::game_object_manager::GameObjectManager;
 use tearchan_core::game::object::GameObject;
 
-pub struct Animator {
+pub struct AnimationRunner {
     animation_objects: GameObjectManager<dyn AnimationObject>,
 }
 
-impl Animator {
+impl AnimationRunner {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        Animator {
+        AnimationRunner {
             animation_objects: GameObjectManager::new(),
         }
     }
 }
 
-impl GamePlugin for Animator {
+impl GamePlugin for AnimationRunner {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
         if let Some(animation_object) = game_object.cast::<dyn AnimationObject>() {
             self.animation_objects.add(animation_object);
