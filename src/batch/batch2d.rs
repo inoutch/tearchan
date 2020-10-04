@@ -29,9 +29,7 @@ impl Batch2DProvider {
             ],
         })
     }
-}
 
-impl Batch2DProvider {
     pub fn index_buffer(&self) -> &IndexBuffer {
         self.index_buffer.buffer()
     }
