@@ -15,14 +15,19 @@ use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
 use std::ops::Range;
 
 pub type IndexType = u32;
+pub type IndexArray = Vec<IndexType>;
+pub type PositionArray = Vec<Vec3>;
+pub type ColorArray = Vec<Vec4>;
+pub type TexcoordArray = Vec<Vec2>;
+pub type NormalArray = Vec<Vec3>;
 
 #[derive(Clone, Debug)]
 pub struct Mesh {
-    pub indices: Vec<IndexType>,
-    pub positions: Vec<Vec3>,
-    pub colors: Vec<Vec4>,
-    pub texcoords: Vec<Vec2>,
-    pub normals: Vec<Vec3>,
+    pub indices: IndexArray,
+    pub positions: PositionArray,
+    pub colors: ColorArray,
+    pub texcoords: TexcoordArray,
+    pub normals: NormalArray,
 }
 
 impl Mesh {
@@ -44,6 +49,24 @@ impl Mesh {
 
     pub fn size(&self) -> usize {
         self.positions.len()
+    }
+
+    pub fn decompose(
+        self,
+    ) -> (
+        IndexArray,
+        PositionArray,
+        ColorArray,
+        TexcoordArray,
+        NormalArray,
+    ) {
+        (
+            self.indices,
+            self.positions,
+            self.colors,
+            self.texcoords,
+            self.normals,
+        )
     }
 }
 

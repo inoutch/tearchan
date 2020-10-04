@@ -21,7 +21,14 @@ path = "text/main.rs"
 name = "ui"
 path = "ui/main.rs"
 
+[[bin]]
+name = "sprite"
+path = "sprite/main.rs"
+
 [dependencies]
+serde = "1.0.116"
+serde_json = "1.0.58"
+image = "0.23.10"
 winit = { version = "0.22.2", features = ["web-sys"] }
 intertrait = "0.2.0"
 linkme = "0.2"
@@ -32,3 +39,10 @@ tearchan_horde = { path = "../tearchan_horde" }
 tearchan_utility = { path = "../tearchan_utility" }
 nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
 env_logger = "0.7.1"
+
+[build-dependencies]
+serde = "1.0.116"
+serde_json = "1.0.58"
+image = "0.23.10"
+texture_packer = "0.21.1"
+tearchan_utility = { path = "../tearchan_utility" }

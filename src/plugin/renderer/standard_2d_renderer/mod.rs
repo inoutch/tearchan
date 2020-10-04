@@ -26,6 +26,25 @@ pub struct Standard2DRendererDefaultProvider {
     shader_program: Standard2DShaderProgram,
 }
 
+impl Standard2DRendererDefaultProvider {
+    pub fn from_texture(r: &mut RendererContext, texture: Texture) -> Self {
+        let camera = Camera2D::new(&r.render_bundle().display_size().logical);
+        let shader_program = Standard2DShaderProgram::new(r.render_bundle(), camera.base());
+        let graphic_pipeline = GraphicPipeline::new(
+            r.render_bundle(),
+            r.primary_render_pass(),
+            shader_program.shader(),
+            GraphicPipelineConfig::default(),
+        );
+        Standard2DRendererDefaultProvider {
+            texture,
+            camera,
+            graphic_pipeline,
+            shader_program,
+        }
+    }
+}
+
 impl Standard2DRendererProvider for Standard2DRendererDefaultProvider {
     fn graphic_pipeline(&self) -> &GraphicPipeline {
         &self.graphic_pipeline
@@ -65,23 +84,9 @@ impl Standard2DRenderer<Standard2DRendererDefaultProvider> {
         r: &mut RendererContext,
         texture: Texture,
     ) -> Standard2DRenderer<Standard2DRendererDefaultProvider> {
-        let camera = Camera2D::new(&r.render_bundle().display_size().logical);
-        let shader_program = Standard2DShaderProgram::new(r.render_bundle(), camera.base());
-        let graphic_pipeline = GraphicPipeline::new(
-            r.render_bundle(),
-            r.primary_render_pass(),
-            shader_program.shader(),
-            GraphicPipelineConfig::default(),
-        );
         let batch2d = Batch2DProvider::new(r.render_bundle());
-
         Standard2DRenderer {
-            provider: Standard2DRendererDefaultProvider {
-                camera,
-                shader_program,
-                graphic_pipeline,
-                texture,
-            },
+            provider: Standard2DRendererDefaultProvider::from_texture(r, texture),
             object_manager: GameObjectManager::new(),
             batch2d,
         }

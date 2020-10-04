@@ -1,6 +1,6 @@
 use crate::text_object::TextObject;
 use std::rc::Rc;
-use tearchan::plugin::animation::animator::Animator;
+use tearchan::plugin::animation::animation_runner::AnimationRunner;
 use tearchan::plugin::renderer::standard_font_renderer::StandardFontRenderer;
 use tearchan_core::game::object::GameObject;
 use tearchan_core::scene::scene_context::SceneContext;
@@ -20,7 +20,7 @@ impl TextScene {
     pub fn new(ctx: &mut SceneContext) -> Self {
         let font_texture = FontTexture::new(
             ctx.g.r.render_bundle(),
-            include_bytes!("../../data/fonts/GenShinGothic-Medium.ttf").to_vec(),
+            include_bytes!("../data/fonts/GenShinGothic-Medium.ttf").to_vec(),
             TextureConfig::default(),
             50.0f32,
         )
@@ -32,7 +32,7 @@ impl TextScene {
         ));
         ctx.plugin_manager_mut().add(plugin, "font".to_string(), 0);
         ctx.plugin_manager_mut()
-            .add(Box::new(Animator::new()), "animator".to_string(), 0);
+            .add(Box::new(AnimationRunner::new()), "animator".to_string(), 0);
 
         ctx.add(GameObject::new(Rc::new(TextObject::new(
             "Example".to_string(),
