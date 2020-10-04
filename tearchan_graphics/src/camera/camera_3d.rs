@@ -12,7 +12,7 @@ pub struct Camera3D {
 
 impl Camera3D {
     pub fn default_with_aspect(aspect: f32) -> Self {
-        Camera3D::new(aspect, 0.1f32, 10.0f32)
+        Camera3D::new(aspect, 0.01f32, 10.0f32)
     }
 
     pub fn new(aspect: f32, near: f32, far: f32) -> Self {

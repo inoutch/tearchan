@@ -5,6 +5,7 @@ use tearchan::engine::Engine;
 use tearchan::engine_config::StartupConfigBuilder;
 use tearchan_graphics::screen::ScreenMode;
 
+pub mod cube;
 pub mod cube_scene;
 
 fn main() {
