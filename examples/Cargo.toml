@@ -25,6 +25,10 @@ path = "ui/main.rs"
 name = "sprite"
 path = "sprite/main.rs"
 
+[[bin]]
+name = "billboard"
+path = "billboard/main.rs"
+
 [dependencies]
 serde = "1.0.116"
 serde_json = "1.0.58"
