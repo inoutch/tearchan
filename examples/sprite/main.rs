@@ -13,7 +13,7 @@ fn main() {
     env_logger::init();
 
     let startup_config = StartupConfigBuilder::default()
-        .application_name("cube".to_string())
+        .application_name("sprite".to_string())
         .screen_mode(ScreenMode::Windowed {
             resolutions: vec![vec2(1200, 800)],
         })
