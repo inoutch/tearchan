@@ -1,4 +1,5 @@
 use intertrait::cast_to;
+use nalgebra_glm::vec4;
 use serde::export::Option::Some;
 use std::collections::HashMap;
 use tearchan::plugin::animation::animation_object::AnimationObject;
@@ -28,7 +29,6 @@ impl Default for SkeletonSprite {
     fn default() -> Self {
         let texture_atlas: TextureAtlas =
             serde_json::from_str(include_str!("../data/sprites/skeleton.json")).unwrap();
-        let sprite = Sprite::new(texture_atlas);
         let mut groups: HashMap<SkeletonState, AnimationGroup<&'static str>> = HashMap::new();
         groups.insert(
             SkeletonState::Stand,
@@ -48,6 +48,8 @@ impl Default for SkeletonSprite {
             },
         );
 
+        let mut sprite = Sprite::new(texture_atlas);
+        sprite.set_color(vec4(1.0f32, 0.0f32, 0.0f32, 1.0f32));
         SkeletonSprite {
             sprite,
             sprite_id: None,

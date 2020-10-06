@@ -1,15 +1,19 @@
 use crate::skeleton_sprite::SkeletonSprite;
 use std::rc::Rc;
 use tearchan::plugin::animation::animation_runner::AnimationRunner;
+use tearchan::plugin::object::camera::Camera2DDefaultObject;
 use tearchan::plugin::renderer::sprite_renderer::SpriteRenderer;
 use tearchan_core::game::object::GameObject;
 use tearchan_core::scene::scene_context::SceneContext;
 use tearchan_core::scene::scene_factory::SceneFactory;
 use tearchan_core::scene::scene_result::SceneResult;
 use tearchan_core::scene::Scene;
+use tearchan_graphics::camera::camera_2d::Camera2D;
 use tearchan_graphics::hal::backend::Texture;
 use tearchan_graphics::hal::texture::TextureConfig;
 use tearchan_graphics::image::Image;
+
+const PRIMARY_CAMERA: &str = "primary";
 
 pub struct SpriteScene {}
 
@@ -22,15 +26,21 @@ impl SpriteScene {
             )
             .unwrap();
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
-            let plugin = SpriteRenderer::from_texture(&mut ctx.g.r, texture);
+            let plugin =
+                SpriteRenderer::from_texture(&mut ctx.g.r, texture, PRIMARY_CAMERA.to_string());
             ctx.plugin_manager_mut()
                 .add(Box::new(plugin), "sprite".to_string(), 0);
+
             ctx.plugin_manager_mut().add(
                 Box::new(AnimationRunner::new()),
                 "animation".to_string(),
                 0,
             );
 
+            let mut camera = Camera2D::new(&ctx.g.r.render_bundle().display_size().logical);
+            camera.update();
+            let camera_object = Camera2DDefaultObject::new(camera, PRIMARY_CAMERA.to_string());
+            ctx.add(GameObject::new(Rc::new(camera_object)));
             ctx.add(GameObject::new(Rc::new(SkeletonSprite::default())));
 
             Box::new(SpriteScene {})

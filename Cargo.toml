@@ -16,6 +16,8 @@ serde = "1.0.116"
 derive_builder = "0.9.0"
 nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
 winit = { version = "0.22.2", features = ["web-sys"] }
+intertrait = "0.2.0"
+linkme = "0.2"
 tearchan_core = { path = "tearchan_core" }
 tearchan_graphics = { path = "tearchan_graphics" }
 tearchan_horde = { path = "tearchan_horde" }

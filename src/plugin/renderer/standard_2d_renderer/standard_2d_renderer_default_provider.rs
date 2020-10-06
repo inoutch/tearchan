@@ -7,7 +7,6 @@ use tearchan_graphics::shader::standard_2d_shader_program::Standard2DShaderProgr
 
 pub struct Standard2DRendererDefaultProvider {
     texture: Texture,
-    camera: Camera2D,
     graphic_pipeline: GraphicPipeline,
     shader_program: Standard2DShaderProgram,
 }
@@ -24,7 +23,6 @@ impl Standard2DRendererDefaultProvider {
         );
         Standard2DRendererDefaultProvider {
             texture,
-            camera,
             graphic_pipeline,
             shader_program,
         }
@@ -36,9 +34,8 @@ impl Standard2DRendererProvider for Standard2DRendererDefaultProvider {
         &self.graphic_pipeline
     }
 
-    fn prepare(&mut self, context: &mut GameContext) {
-        self.camera.update();
-        self.shader_program.prepare(self.camera.combine());
+    fn prepare(&mut self, context: &mut GameContext, camera: &Camera2D) {
+        self.shader_program.prepare(camera.combine());
 
         let descriptor_set = self.graphic_pipeline.descriptor_set();
         self.shader_program

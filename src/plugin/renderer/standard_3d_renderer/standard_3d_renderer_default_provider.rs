@@ -8,7 +8,6 @@ use tearchan_graphics::shader::standard_3d_shader_program::Standard3DShaderProgr
 
 pub struct Standard3DRendererDefaultProvider {
     texture: Texture,
-    camera: Camera3D,
     graphic_pipeline: GraphicPipeline,
     shader_program: Standard3DShaderProgram,
     light_position: Vec3,
@@ -19,7 +18,6 @@ pub struct Standard3DRendererDefaultProvider {
 impl Standard3DRendererDefaultProvider {
     pub fn new(
         texture: Texture,
-        camera: Camera3D,
         graphic_pipeline: GraphicPipeline,
         shader_program: Standard3DShaderProgram,
         light_position: Vec3,
@@ -28,7 +26,6 @@ impl Standard3DRendererDefaultProvider {
     ) -> Self {
         Standard3DRendererDefaultProvider {
             texture,
-            camera,
             graphic_pipeline,
             shader_program,
             light_position,
@@ -51,17 +48,12 @@ impl Standard3DRendererDefaultProvider {
 
         Standard3DRendererDefaultProvider::new(
             texture,
-            camera,
             graphic_pipeline,
             shader_program,
             vec3(0.0f32, 1.0f32, 0.0f32),
             vec3(1.0f32, 1.0f32, 1.0f32),
             0.1f32,
         )
-    }
-
-    pub fn camera_mut(&mut self) -> &mut Camera3D {
-        &mut self.camera
     }
 }
 
@@ -70,10 +62,9 @@ impl Standard3DRendererProvider for Standard3DRendererDefaultProvider {
         &self.graphic_pipeline
     }
 
-    fn prepare(&mut self, context: &mut GameContext) {
-        self.camera.update();
+    fn prepare(&mut self, context: &mut GameContext, camera: &Camera3D) {
         self.shader_program.prepare(
-            self.camera.combine(),
+            camera.combine(),
             &self.light_position,
             &self.light_color,
             self.ambient_strength,
