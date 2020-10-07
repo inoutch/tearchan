@@ -29,6 +29,10 @@ path = "sprite/main.rs"
 name = "billboard"
 path = "billboard/main.rs"
 
+[[bin]]
+name = "line"
+path = "line/main.rs"
+
 [dependencies]
 serde = "1.0.116"
 serde_json = "1.0.58"

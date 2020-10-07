@@ -2126,6 +2126,7 @@ name = "tearchan"
 version = "0.0.1"
 dependencies = [
  "derive_builder",
+ "gfx-hal",
  "intertrait",
  "linkme",
  "nalgebra-glm",
