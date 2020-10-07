@@ -2,7 +2,7 @@ use shaderc::ShaderKind;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-changed=example/data");
+    println!("cargo:rerun-if-changed=shaders");
 
     let shader_gen_path = "../target/shaders/";
     std::fs::create_dir_all(shader_gen_path)?;
