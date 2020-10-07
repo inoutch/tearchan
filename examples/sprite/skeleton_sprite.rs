@@ -6,7 +6,7 @@ use tearchan::plugin::animation::animation_object::AnimationObject;
 use tearchan::plugin::animation::animator::{AnimationData, AnimationGroup, Animator};
 use tearchan::plugin::renderer::sprite_renderer::sprite::Sprite;
 use tearchan::plugin::renderer::sprite_renderer::sprite_command_queue::SpriteCommandQueue;
-use tearchan::plugin::renderer::sprite_renderer::sprite_object::SpriteObject;
+use tearchan::plugin::renderer::sprite_renderer::sprite_render_object::SpriteRenderObject;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_graphics::batch::batch_command::BatchObjectId;
 use tearchan_utility::texture::TextureAtlas;
@@ -64,7 +64,7 @@ impl Default for SkeletonSprite {
 impl GameObjectBase for SkeletonSprite {}
 
 #[cast_to]
-impl SpriteObject for SkeletonSprite {
+impl SpriteRenderObject for SkeletonSprite {
     fn attach_sprite_queue(&mut self, mut queue: SpriteCommandQueue) {
         self.sprite_id = Some(queue.create_sprite(&self.sprite, None));
         self.sprite_queue = Some(queue);

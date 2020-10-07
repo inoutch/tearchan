@@ -2,7 +2,7 @@ use intertrait::cast_to;
 use nalgebra_glm::{vec2, vec3};
 use serde::export::Option::Some;
 use tearchan::plugin::renderer::billboard_renderer::billboard_command_queue::BillboardCommandQueue;
-use tearchan::plugin::renderer::billboard_renderer::billboard_object::BillboardObject;
+use tearchan::plugin::renderer::billboard_renderer::billboard_render_object::BillboardRenderObject;
 use tearchan::plugin::renderer::sprite_renderer::sprite::Sprite;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::EMPTY_ID;
@@ -32,7 +32,7 @@ impl Default for SkeletonBillboard {
 impl GameObjectBase for SkeletonBillboard {}
 
 #[cast_to]
-impl BillboardObject for SkeletonBillboard {
+impl BillboardRenderObject for SkeletonBillboard {
     fn attach_queue(&mut self, mut queue: BillboardCommandQueue) {
         self.sprite.set_scale(vec3(0.005f32, 0.005f32, 0.005f32));
         self.sprite.set_anchor_position(vec2(0.5f32, 0.5f32));

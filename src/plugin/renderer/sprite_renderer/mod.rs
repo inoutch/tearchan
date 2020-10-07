@@ -1,7 +1,7 @@
 use crate::batch::batch2d::{Batch2D, Batch2DProvider};
 use crate::plugin::object::camera::Camera2DObject;
 use crate::plugin::renderer::sprite_renderer::sprite_command_queue::SpriteCommandQueue;
-use crate::plugin::renderer::sprite_renderer::sprite_object::SpriteObject;
+use crate::plugin::renderer::sprite_renderer::sprite_render_object::SpriteRenderObject;
 use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_default_provider::Standard2DRendererDefaultProvider;
 use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_provider::Standard2DRendererProvider;
 use tearchan_core::game::game_context::GameContext;
@@ -13,10 +13,10 @@ use tearchan_graphics::hal::backend::{RendererContext, Texture};
 
 pub mod sprite;
 pub mod sprite_command_queue;
-pub mod sprite_object;
+pub mod sprite_render_object;
 
 pub struct SpriteRenderer<T> {
-    object_manager: GameObjectManager<dyn SpriteObject>,
+    object_manager: GameObjectManager<dyn SpriteRenderObject>,
     batch2d: Batch2D,
     camera_object: Option<GameObject<dyn Camera2DObject>>,
     camera_label: String,
@@ -59,7 +59,7 @@ where
     T: Standard2DRendererProvider,
 {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut render_object) = game_object.cast::<dyn SpriteObject>() {
+        if let Some(mut render_object) = game_object.cast::<dyn SpriteRenderObject>() {
             render_object
                 .borrow_mut()
                 .attach_sprite_queue(SpriteCommandQueue::new(self.batch2d.create_queue()));
@@ -90,7 +90,7 @@ where
         };
 
         self.batch2d.flush();
-        self.provider.prepare(context, camera_object.camera());
+        self.provider.prepare(context, camera_object.camera2d());
 
         context.r.draw_elements(
             self.provider.graphic_pipeline(),

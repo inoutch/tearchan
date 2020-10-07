@@ -1,14 +1,14 @@
 use crate::plugin::renderer::sprite_renderer::sprite_command_queue::SpriteCommandQueue;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 
-pub trait SpriteObject: GameObjectBase {
+pub trait SpriteRenderObject: GameObjectBase {
     fn attach_sprite_queue(&mut self, queue: SpriteCommandQueue);
 }
 
 #[cfg(test)]
 mod test {
     use crate::plugin::renderer::sprite_renderer::sprite_command_queue::SpriteCommandQueue;
-    use crate::plugin::renderer::sprite_renderer::sprite_object::SpriteObject;
+    use crate::plugin::renderer::sprite_renderer::sprite_render_object::SpriteRenderObject;
     use std::sync::mpsc::channel;
     use tearchan_core::game::object::game_object_base::GameObjectBase;
     use tearchan_graphics::batch::batch_command_queue::BatchCommandQueue;
@@ -20,7 +20,7 @@ mod test {
 
     impl GameObjectBase for ExampleSprite {}
 
-    impl SpriteObject for ExampleSprite {
+    impl SpriteRenderObject for ExampleSprite {
         fn attach_sprite_queue(&mut self, queue: SpriteCommandQueue) {
             self.queue = Some(queue)
         }

@@ -1,6 +1,6 @@
 use crate::batch::batch2d::{Batch2D, Batch2DProvider};
 use crate::plugin::object::camera::Camera2DObject;
-use crate::plugin::renderer::standard_2d_renderer::standard_2d_object::Standard2DRenderObject;
+use crate::plugin::renderer::standard_2d_renderer::standard_2d_render_object::Standard2DRenderObject;
 use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_default_provider::Standard2DRendererDefaultProvider;
 use crate::plugin::renderer::standard_2d_renderer::standard_2d_renderer_provider::Standard2DRendererProvider;
 use serde::export::Option::Some;
@@ -12,7 +12,7 @@ use tearchan_core::game::object::GameObject;
 use tearchan_graphics::batch::batch_command_queue::BatchCommandQueue;
 use tearchan_graphics::hal::backend::{RendererContext, Texture};
 
-pub mod standard_2d_object;
+pub mod standard_2d_render_object;
 pub mod standard_2d_renderer_default_provider;
 pub mod standard_2d_renderer_provider;
 
@@ -95,7 +95,7 @@ impl<T: Standard2DRendererProvider> GamePlugin for Standard2DRenderer<T> {
             Some(camera) => camera.borrow(),
         };
         self.batch2d.flush();
-        self.provider.prepare(context, camera_object.camera());
+        self.provider.prepare(context, camera_object.camera2d());
 
         context.r.draw_elements(
             self.provider.graphic_pipeline(),

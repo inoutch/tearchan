@@ -1,6 +1,6 @@
 use crate::batch::batch3d::{Batch3D, Batch3DProvider};
 use crate::plugin::object::camera::Camera3DObject;
-use crate::plugin::renderer::standard_3d_renderer::standard_3d_object::Standard3DObject;
+use crate::plugin::renderer::standard_3d_renderer::standard_3d_render_object::Standard3DRenderObject;
 use crate::plugin::renderer::standard_3d_renderer::standard_3d_renderer_default_provider::Standard3DRendererDefaultProvider;
 use crate::plugin::renderer::standard_3d_renderer::standard_3d_renderer_provider::Standard3DRendererProvider;
 use serde::export::Option::Some;
@@ -11,12 +11,12 @@ use tearchan_core::game::object::game_object_manager::GameObjectManager;
 use tearchan_core::game::object::GameObject;
 use tearchan_graphics::hal::backend::{RenderBundle, RendererContext, Texture};
 
-pub mod standard_3d_object;
+pub mod standard_3d_render_object;
 pub mod standard_3d_renderer_default_provider;
 pub mod standard_3d_renderer_provider;
 
 pub struct Standard3DRenderer<T: Standard3DRendererProvider> {
-    object_manager: GameObjectManager<dyn Standard3DObject>,
+    object_manager: GameObjectManager<dyn Standard3DRenderObject>,
     batch: Batch3D,
     camera_object: Option<GameObject<dyn Camera3DObject>>,
     camera_label: String,
@@ -65,7 +65,7 @@ impl Standard3DRenderer<Standard3DRendererDefaultProvider> {
 
 impl<T: Standard3DRendererProvider> GamePlugin for Standard3DRenderer<T> {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut object) = game_object.cast::<dyn Standard3DObject>() {
+        if let Some(mut object) = game_object.cast::<dyn Standard3DRenderObject>() {
             object.borrow_mut().attach_queue(self.batch.create_queue());
             self.object_manager.add(object);
         }
@@ -94,7 +94,7 @@ impl<T: Standard3DRendererProvider> GamePlugin for Standard3DRenderer<T> {
         };
 
         self.batch.flush();
-        self.provider.prepare(context, camera_object.camera());
+        self.provider.prepare(context, camera_object.camera3d());
 
         context.r.draw_elements(
             self.provider.graphic_pipeline(),

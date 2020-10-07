@@ -1,6 +1,6 @@
 use crate::batch::batch_billboard::{BatchBillboard, BatchBillboardProvider};
 use crate::plugin::renderer::billboard_renderer::billboard_command_queue::BillboardCommandQueue;
-use crate::plugin::renderer::billboard_renderer::billboard_object::BillboardObject;
+use crate::plugin::renderer::billboard_renderer::billboard_render_object::BillboardRenderObject;
 use crate::plugin::renderer::billboard_renderer::billboard_renderer_default_provider::BillboardRendererDefaultProvider;
 use crate::plugin::renderer::billboard_renderer::billboard_renderer_provider::BillboardRendererProvider;
 use serde::export::Option::Some;
@@ -12,12 +12,12 @@ use tearchan_core::game::object::GameObject;
 use tearchan_graphics::hal::backend::{RenderBundle, RendererContext, Texture};
 
 pub mod billboard_command_queue;
-pub mod billboard_object;
+pub mod billboard_render_object;
 pub mod billboard_renderer_default_provider;
 pub mod billboard_renderer_provider;
 
 pub struct BillboardRenderer<T: BillboardRendererProvider> {
-    object_manager: GameObjectManager<dyn BillboardObject>,
+    object_manager: GameObjectManager<dyn BillboardRenderObject>,
     batch: BatchBillboard,
     provider: T,
 }
@@ -52,7 +52,7 @@ impl BillboardRenderer<BillboardRendererDefaultProvider> {
 
 impl<T: BillboardRendererProvider> GamePlugin for BillboardRenderer<T> {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut billboard_object) = game_object.cast::<dyn BillboardObject>() {
+        if let Some(mut billboard_object) = game_object.cast::<dyn BillboardRenderObject>() {
             billboard_object
                 .borrow_mut()
                 .attach_queue(BillboardCommandQueue::new(self.batch.create_queue()));
@@ -61,7 +61,7 @@ impl<T: BillboardRendererProvider> GamePlugin for BillboardRenderer<T> {
     }
 
     fn on_remove(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut billboard_object) = game_object.cast::<dyn BillboardObject>() {
+        if let Some(mut billboard_object) = game_object.cast::<dyn BillboardRenderObject>() {
             billboard_object.borrow_mut().detach();
             self.object_manager.remove(&game_object.id());
         }
