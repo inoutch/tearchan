@@ -33,6 +33,10 @@ path = "billboard/main.rs"
 name = "line"
 path = "line/main.rs"
 
+[[bin]]
+name = "physics_3d"
+path = "physics_3d/main.rs"
+
 [dependencies]
 serde = "1.0.116"
 serde_json = "1.0.58"
@@ -45,8 +49,11 @@ tearchan_core = { path = "../tearchan_core" }
 tearchan_graphics = { path = "../tearchan_graphics" }
 tearchan_horde = { path = "../tearchan_horde" }
 tearchan_utility = { path = "../tearchan_utility" }
-nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
+nalgebra = "0.22.0"
+nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 env_logger = "0.7.1"
+ncollide3d = "0.24.0"
+nphysics3d = "0.17.0"
 
 [build-dependencies]
 serde = "1.0.116"
