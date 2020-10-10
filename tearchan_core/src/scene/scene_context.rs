@@ -30,6 +30,10 @@ impl<'a, 'b> SceneContext<'a, 'b> {
         self.object_manager.add(game_object);
     }
 
+    pub fn find_by_id(&self, id: GameObjectId) -> Option<GameObject<dyn GameObjectBase>> {
+        self.object_manager.find_by_id(id)
+    }
+
     pub fn remove(&mut self, id: &GameObjectId) -> Option<GameObject<dyn GameObjectBase>> {
         let game_object = self.object_manager.remove(id)?;
         self.plugin_manager.for_each_mut(|plugin| {
