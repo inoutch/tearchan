@@ -14,7 +14,7 @@ vulkan = ["tearchan_graphics/vulkan"]
 [dependencies]
 serde = "1.0.116"
 derive_builder = "0.9.0"
-nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
+nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 winit = { version = "0.22.2", features = ["web-sys"] }
 gfx-hal = { version = "0.6.0", path = "../gfx/src/hal" }
 intertrait = "0.2.0"

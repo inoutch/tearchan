@@ -16,7 +16,7 @@ winit = { version = "0.22.2", features = ["web-sys"] }
 gfx-hal = { version = "0.6.0", path = "../../gfx/src/hal" }
 gfx-auxil = { version = "0.5.0", path = "../../gfx/src/auxil/auxil" }
 gfx-backend-empty = { version = "0.6.0", path = "../../gfx/src/backend/empty" }
-nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
+nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 image = "0.23.4"
 rusttype = "0.9.2"
 tearchan_utility = { path = "../tearchan_utility" }
