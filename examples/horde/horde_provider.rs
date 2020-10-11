@@ -1,10 +1,12 @@
-use crate::person_object::PersonBehavior;
+use crate::person_object::PersonObject;
 use nalgebra_glm::{vec2, Vec2};
 use tearchan_core::game::object::GameObject;
 use tearchan_horde::action::action_manager::ActionManager;
 use tearchan_horde::action_creator::action_creator_manager::ActionCreatorCommand;
 use tearchan_horde::action_creator::action_creator_result::ActionCreatorResult;
 use tearchan_horde::horde_plugin::HordePluginProvider;
+use tearchan_horde::object::object_cast_manager::ObjectCastManager;
+use tearchan_horde::object::object_caster::ObjectCaster;
 use tearchan_horde::object::Object;
 
 #[derive(Debug)]
@@ -20,15 +22,27 @@ pub enum HordeActionCreatorStore {
     Wait { times: i32 },
 }
 
-#[derive(Default)]
-pub struct HordeProvider {}
+pub struct HordeProvider {
+    cast_manager: ObjectCastManager,
+}
+
+impl Default for HordeProvider {
+    fn default() -> Self {
+        let mut cast_manager = ObjectCastManager::default();
+        cast_manager.register(ObjectCaster::new(|object| {
+            let casted = object.downcast_rc::<PersonObject>().ok()?;
+            Some(casted)
+        }));
+        HordeProvider { cast_manager }
+    }
+}
 
 impl HordePluginProvider for HordeProvider {
     type ActionCommonStore = HordeActionStore;
     type ActionCreatorCommonStore = HordeActionCreatorStore;
 
     fn on_start_action(&mut self, store: &Self::ActionCommonStore, object: GameObject<dyn Object>) {
-        let mut person_object = object.cast::<dyn PersonBehavior>().unwrap();
+        let mut person_object = self.cast_manager.cast::<PersonObject>(&object).unwrap();
         match store {
             HordeActionStore::Move { from, .. } => {
                 person_object.borrow_mut().set_position(from.clone_owned());
@@ -49,7 +63,7 @@ impl HordePluginProvider for HordeProvider {
         ratio: f32,
         object: GameObject<dyn Object>,
     ) {
-        let mut person_object = object.cast::<dyn PersonBehavior>().unwrap();
+        let mut person_object = object.cast::<PersonObject>().unwrap();
         match store {
             HordeActionStore::Move { from, to } => {
                 person_object
@@ -66,7 +80,7 @@ impl HordePluginProvider for HordeProvider {
     }
 
     fn on_end_action(&mut self, store: &Self::ActionCommonStore, object: GameObject<dyn Object>) {
-        let mut person_object = object.cast::<dyn PersonBehavior>().unwrap();
+        let mut person_object = object.cast::<PersonObject>().unwrap();
         match store {
             HordeActionStore::Move { to, .. } => {
                 person_object.borrow_mut().set_position(to.clone_owned());

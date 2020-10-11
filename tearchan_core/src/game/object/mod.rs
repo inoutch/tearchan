@@ -1,5 +1,4 @@
-use intertrait::cast::CastRc;
-use intertrait::CastFrom;
+use crate::game::object::game_object_base::GameObjectBase;
 use std::cell::Cell;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -43,7 +42,7 @@ lazy_static! {
 
 pub struct GameObject<T: ?Sized>
 where
-    T: CastFrom,
+    T: GameObjectBase,
 {
     id: GameObjectId,
     borrow: Rc<Cell<BorrowFlag>>,
@@ -52,7 +51,7 @@ where
 
 impl<T: ?Sized> GameObject<T>
 where
-    T: CastFrom,
+    T: GameObjectBase,
 {
     pub fn new(object: Rc<T>) -> GameObject<T> {
         GameObject {
@@ -84,9 +83,12 @@ where
 
     pub fn cast<U>(&self) -> Option<GameObject<U>>
     where
-        U: ?Sized + CastFrom,
+        U: GameObjectBase,
     {
-        self.object.clone().cast::<U>().ok().map(GameObject::new)
+        downcast_rs::Downcast::into_any_rc(self.object.clone())
+            .downcast()
+            .ok()
+            .map(GameObject::new)
     }
 
     pub fn borrow(&self) -> Ref<'_, T> {
@@ -262,18 +264,18 @@ impl<T: ?Sized> DerefMut for RefMut<'_, T> {
 
 #[cfg(test)]
 mod test {
+    use crate::game::object::game_object_base::GameObjectBase;
     use crate::game::object::game_object_manager::GameObjectManager;
     use crate::game::object::GameObject;
-    use intertrait::{cast_to, CastFrom};
     use std::rc::Rc;
 
-    trait RenderObject: CastFrom {
+    trait RenderObject: GameObjectBase {
         fn render(&self);
 
         fn render_mut(&mut self);
     }
 
-    trait UpdateObject: CastFrom {
+    trait UpdateObject: GameObjectBase {
         fn update(&self, delta: f32);
     }
 
@@ -281,14 +283,14 @@ mod test {
         id: i32,
     }
 
-    #[cast_to]
+    impl GameObjectBase for Object {}
+
     impl RenderObject for Object {
         fn render(&self) {}
 
         fn render_mut(&mut self) {}
     }
 
-    #[cast_to]
     impl UpdateObject for Object {
         fn update(&self, _delta: f32) {}
     }
@@ -320,7 +322,8 @@ mod test {
     #[test]
     fn test_inheritance() {
         let original = GameObject::new(Rc::new(Object { id: 24 }));
-        let mut casted_clone = original.cast::<dyn RenderObject>().unwrap();
+        let mut casted_clone: GameObject<dyn RenderObject> =
+            GameObject::new(original.object.clone());
         let force_mut = unsafe { Rc::get_mut_unchecked(&mut casted_clone.object) };
         force_mut.render_mut();
     }

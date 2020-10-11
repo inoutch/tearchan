@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use nalgebra_glm::vec4;
 use serde::export::Option::Some;
 use std::collections::HashMap;
@@ -60,10 +59,8 @@ impl Default for SkeletonSprite {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for SkeletonSprite {}
 
-#[cast_to]
 impl SpriteRenderObject for SkeletonSprite {
     fn attach_sprite_queue(&mut self, mut queue: SpriteCommandQueue) {
         self.sprite_id = Some(queue.create_sprite(&self.sprite, None));
@@ -71,7 +68,6 @@ impl SpriteRenderObject for SkeletonSprite {
     }
 }
 
-#[cast_to]
 impl AnimationObject for SkeletonSprite {
     fn update(&mut self, delta: f32) {
         self.animator.update(delta);

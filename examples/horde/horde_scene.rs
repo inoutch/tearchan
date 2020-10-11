@@ -36,8 +36,16 @@ impl HordeScene {
             );
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
 
-            let renderer_plugin =
+            let mut renderer_plugin =
                 Standard2DRenderer::from_texture(&mut ctx.g.r, texture, PRIMARY_CAMERA.to_string());
+            renderer_plugin.register_caster_for_render_object(|object| {
+                let casted = object.downcast_rc::<PersonObject>().ok()?;
+                Some(casted)
+            });
+            renderer_plugin.register_caster_for_camera(|object| {
+                let casted = object.downcast_rc::<Camera2DDefaultObject>().ok()?;
+                Some(casted)
+            });
             ctx.plugin_manager_mut()
                 .add(Box::new(renderer_plugin), "renderer".to_string(), 0);
 
@@ -46,6 +54,10 @@ impl HordeScene {
                 ctx.plugin_manager_mut().create_operator(),
             );
             horde_plugin.register_factory(PersonObject::kind(), PersonObject::factory());
+            horde_plugin.register_caster(|object| {
+                let casted = object.downcast_rc::<PersonObject>().ok()?;
+                Some(casted)
+            });
             horde_plugin
                 .create_object(ObjectStore::new(
                     PersonObject::kind().to_string(),

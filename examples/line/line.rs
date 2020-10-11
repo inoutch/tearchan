@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use nalgebra_glm::{translate, vec3, Mat4};
 use std::ops::Range;
 use tearchan::batch::batch_line::BATCH_LINE_ATTRIB_POS;
@@ -25,10 +24,8 @@ impl Default for Line {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for Line {}
 
-#[cast_to]
 impl StandardLineRenderObject for Line {
     fn attach_queue(&mut self, mut queue: BatchCommandQueue) {
         let (indices, positions, colors, _, _) = MeshBuilder::new()

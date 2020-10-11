@@ -10,9 +10,9 @@ nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 lazy_static = "1.4.0"
 tearchan_graphics = { path = "../tearchan_graphics" }
 tearchan_utility = { path = "../tearchan_utility" }
-intertrait = "0.2.0"
-linkme = "0.2"
+downcast-rs = "1.2.0"
 
 [target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies]
 objc = "0.2.7"
 objc-foundation = "0.1.1"
+downcast-rs = "1.2.0"

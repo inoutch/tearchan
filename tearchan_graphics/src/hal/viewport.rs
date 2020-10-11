@@ -4,9 +4,9 @@ pub fn convert_up_side_down(viewport: &Viewport) -> Viewport {
     Viewport {
         rect: Rect {
             x: viewport.rect.x,
-            y: viewport.rect.y + viewport.rect.h,
+            y: viewport.rect.y,
             w: viewport.rect.w,
-            h: -viewport.rect.h,
+            h: viewport.rect.h,
         },
         depth: viewport.depth.clone(),
     }

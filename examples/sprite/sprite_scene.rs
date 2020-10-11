@@ -26,16 +26,27 @@ impl SpriteScene {
             )
             .unwrap();
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
-            let plugin =
+            let mut render_plugin =
                 SpriteRenderer::from_texture(&mut ctx.g.r, texture, PRIMARY_CAMERA.to_string());
-            ctx.plugin_manager_mut()
-                .add(Box::new(plugin), "sprite".to_string(), 0);
+            render_plugin.register_caster_for_render_object(|object| {
+                let casted = object.downcast_rc::<SkeletonSprite>().ok()?;
+                Some(casted)
+            });
+            render_plugin.register_caster_for_camera(|object| {
+                let casted = object.downcast_rc::<Camera2DDefaultObject>().ok()?;
+                Some(casted)
+            });
 
-            ctx.plugin_manager_mut().add(
-                Box::new(AnimationRunner::new()),
-                "animation".to_string(),
-                0,
-            );
+            ctx.plugin_manager_mut()
+                .add(Box::new(render_plugin), "sprite".to_string(), 0);
+
+            let mut plugin = AnimationRunner::new();
+            plugin.register(|object| {
+                let casted = object.downcast_rc::<SkeletonSprite>().ok()?;
+                Some(casted)
+            });
+            ctx.plugin_manager_mut()
+                .add(Box::new(plugin), "animation".to_string(), 0);
 
             let mut camera = Camera2D::new(&ctx.g.r.render_bundle().display_size().logical);
             camera.update();

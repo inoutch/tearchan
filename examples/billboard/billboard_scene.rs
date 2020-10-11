@@ -23,6 +23,10 @@ impl BillboardScene {
             .unwrap();
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
             let mut plugin = Box::new(BillboardRenderer::from_texture(&mut ctx.g.r, texture));
+            plugin.register_caster_for_billboard(|object| {
+                let casted = object.downcast_rc::<SkeletonBillboard>().ok()?;
+                Some(casted)
+            });
             plugin.provider_mut().camera_mut().position = vec3(0.0f32, 2.0f32, 4.0f32);
             plugin.provider_mut().camera_mut().target_position = vec3(0.0f32, 0.0f32, 0.0f32);
             plugin.provider_mut().camera_mut().up = vec3(0.0f32, 1.0f32, 0.0f32);

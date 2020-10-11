@@ -1,13 +1,13 @@
+use crate::game::object::game_object_base::GameObjectBase;
 use crate::game::object::game_object_operator::GameObjectOperator;
 use crate::game::object::{GameObject, GameObjectId};
-use intertrait::CastFrom;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use tearchan_utility::shared::Shared;
 
 pub struct GameObjectManager<T: ?Sized>
 where
-    T: CastFrom,
+    T: GameObjectBase,
 {
     objects: Shared<HashMap<GameObjectId, GameObject<T>>>,
     sorted_object_ids: Shared<Vec<GameObjectId>>,
@@ -15,7 +15,7 @@ where
 
 impl<T: ?Sized> GameObjectManager<T>
 where
-    T: CastFrom,
+    T: GameObjectBase,
 {
     #[allow(clippy::new_without_default)]
     pub fn new() -> GameObjectManager<T> {

@@ -1,5 +1,4 @@
-use intertrait::cast::CastRc;
-use intertrait::CastFrom;
+use downcast_rs::Downcast;
 use std::cell::Cell;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -8,7 +7,7 @@ use tearchan_core::game::object::{
     EMPTY_ID, UNUSED,
 };
 
-pub trait ObjectStoreBase: CastFrom {}
+pub trait ObjectStoreBase: Downcast {}
 
 pub struct ObjectStore<T: ?Sized> {
     id: GameObjectId,
@@ -20,7 +19,7 @@ pub struct ObjectStore<T: ?Sized> {
 
 impl<T: ?Sized> ObjectStore<T>
 where
-    T: CastFrom,
+    T: Downcast,
 {
     pub fn new(kind: String, store: Rc<T>) -> ObjectStore<T> {
         ObjectStore {
@@ -46,11 +45,10 @@ where
 
     pub fn cast<U>(&self) -> Option<ObjectStore<U>>
     where
-        U: ?Sized + CastFrom,
+        U: ObjectStoreBase,
     {
-        self.store
-            .clone()
-            .cast::<U>()
+        downcast_rs::Downcast::into_any_rc(self.store.clone())
+            .downcast()
             .ok()
             .map(|store| ObjectStore::new(self.kind.to_string(), store))
     }

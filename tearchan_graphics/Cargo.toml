@@ -19,6 +19,7 @@ gfx-backend-empty = { version = "0.6.0", path = "../../gfx/src/backend/empty" }
 nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 image = "0.23.4"
 rusttype = "0.9.2"
+log = "0.4.11"
 tearchan_utility = { path = "../tearchan_utility" }
 
 [dependencies.gfx-backend-gl]

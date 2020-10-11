@@ -6,6 +6,9 @@ extern crate objc;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate downcast_rs;
+
 pub mod controller;
 pub mod file;
 pub mod game;

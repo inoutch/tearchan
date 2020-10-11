@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_graphics::camera::camera_2d::Camera2D;
 use tearchan_graphics::camera::camera_3d::Camera3D;
@@ -33,10 +32,8 @@ impl Camera2DDefaultObject {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for Camera2DDefaultObject {}
 
-#[cast_to]
 impl Camera2DObject for Camera2DDefaultObject {
     fn label(&self) -> &str {
         &self.label
@@ -47,7 +44,6 @@ impl Camera2DObject for Camera2DDefaultObject {
     }
 }
 
-#[cast_to]
 impl CameraObject for Camera2DDefaultObject {
     fn label(&self) -> &str {
         &self.label
@@ -69,10 +65,8 @@ impl Camera3DDefaultObject {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for Camera3DDefaultObject {}
 
-#[cast_to]
 impl Camera3DObject for Camera3DDefaultObject {
     fn label(&self) -> &str {
         &self.label
@@ -83,7 +77,6 @@ impl Camera3DObject for Camera3DDefaultObject {
     }
 }
 
-#[cast_to]
 impl CameraObject for Camera3DDefaultObject {
     fn label(&self) -> &str {
         &self.label

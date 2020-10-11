@@ -26,13 +26,24 @@ impl TextScene {
         )
         .unwrap();
 
-        let plugin = Box::new(StandardFontRenderer::from_font_texture(
+        let mut render_plugin = Box::new(StandardFontRenderer::from_font_texture(
             &mut ctx.g.r,
             font_texture,
         ));
-        ctx.plugin_manager_mut().add(plugin, "font".to_string(), 0);
+        render_plugin.register_caster_for_render_object(|object| {
+            let casted = object.downcast_rc::<TextObject>().ok()?;
+            Some(casted)
+        });
         ctx.plugin_manager_mut()
-            .add(Box::new(AnimationRunner::new()), "animator".to_string(), 0);
+            .add(render_plugin, "font".to_string(), 0);
+
+        let mut animation_plugin = AnimationRunner::new();
+        animation_plugin.register(|object| {
+            let casted = object.downcast_rc::<TextObject>().ok()?;
+            Some(casted)
+        });
+        ctx.plugin_manager_mut()
+            .add(Box::new(animation_plugin), "animator".to_string(), 0);
 
         ctx.add(GameObject::new(Rc::new(TextObject::new(
             "Example".to_string(),

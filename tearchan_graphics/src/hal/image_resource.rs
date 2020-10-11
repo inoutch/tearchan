@@ -105,7 +105,7 @@ impl<B: Backend> ImageResource<B> {
         ImageResource::new(
             render_bundle,
             size,
-            Format::D32SfloatS8Uint,
+            Format::D32Sfloat,
             Usage::DEPTH_STENCIL_ATTACHMENT,
             SubresourceRange {
                 aspects: Aspects::DEPTH,

@@ -16,11 +16,19 @@ pub struct LineScene {}
 impl LineScene {
     pub fn factory() -> SceneFactory {
         |ctx, _| {
-            let plugin = Box::new(StandardLineRenderer::new(
+            let mut plugin = Box::new(StandardLineRenderer::new(
                 &mut ctx.g.r,
                 PRIMARY_CAMERA.to_string(),
             ));
 
+            plugin.register_caster_for_render_object(|object| {
+                let casted = object.downcast_rc::<Line>().ok()?;
+                Some(casted)
+            });
+            plugin.register_caster_for_camera(|object| {
+                let casted = object.downcast_rc::<Camera2DDefaultObject>().ok()?;
+                Some(casted)
+            });
             ctx.plugin_manager_mut()
                 .add(plugin, "renderer".to_string(), 0);
 

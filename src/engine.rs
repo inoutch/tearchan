@@ -1,7 +1,7 @@
 use crate::engine_config::{EngineConfig, StartupConfig};
+use instant::{Duration, Instant};
 use nalgebra_glm::vec2;
 use std::ops::Deref;
-use std::time::{Duration, Instant};
 use tearchan_core::game::game_context::GameContext;
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::game_plugin_manager::GamePluginManager;
@@ -55,7 +55,10 @@ impl Engine {
         let monitor = prompt_for_monitor(&event_loop);
         let screen_resolution_mode = self.config.screen_resolution_mode;
         let physical_size = match &self.config.screen_mode {
-            ScreenMode::FullScreenWindow => vec2(monitor.size().width, monitor.size().height),
+            ScreenMode::FullScreenWindow => match &monitor {
+                Some(m) => vec2(m.size().width, m.size().height),
+                None => vec2(0u32, 0u32),
+            },
             ScreenMode::Windowed { resolutions } => resolutions[0].clone_owned(),
         };
 
@@ -67,9 +70,9 @@ impl Engine {
             )));
 
         window_builder = match &self.config.screen_mode {
-            ScreenMode::FullScreenWindow => {
-                window_builder.with_fullscreen(Some(Fullscreen::Borderless(monitor)))
-            }
+            ScreenMode::FullScreenWindow => window_builder.with_fullscreen(Some(
+                Fullscreen::Borderless(monitor.expect("unavailable fullscreen")),
+            )),
             ScreenMode::Windowed { resolutions } => {
                 assert!(
                     !resolutions.is_empty(),
@@ -173,8 +176,8 @@ impl Engine {
     }
 }
 
-pub fn prompt_for_monitor(event_loop: &EventLoop<()>) -> MonitorHandle {
+pub fn prompt_for_monitor(event_loop: &EventLoop<()>) -> Option<MonitorHandle> {
     // TODO: Manage monitor with config
     let num = 0;
-    event_loop.available_monitors().nth(num).unwrap()
+    event_loop.available_monitors().nth(num)
 }

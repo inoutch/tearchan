@@ -3,7 +3,9 @@ use crate::plugin::object::camera::CameraObject;
 use crate::plugin::renderer::standard_line_renderer::standard_line_render_object::StandardLineRenderObject;
 use crate::plugin::renderer::standard_line_renderer::standard_line_renderer_default_provider::StandardLineRendererDefaultProvider;
 use crate::plugin::renderer::standard_line_renderer::standard_line_renderer_provider::StandardLineRendererProvider;
+use tearchan_core::game::game_cast_manager::GameCastManager;
 use tearchan_core::game::game_context::GameContext;
+use tearchan_core::game::game_object_caster::{GameObjectCaster, GameObjectCasterType};
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::game_object_manager::GameObjectManager;
@@ -21,6 +23,7 @@ pub struct StandardLineRenderer<T: StandardLineRendererProvider> {
     camera_object: Option<GameObject<dyn CameraObject>>,
     camera_label: String,
     batch: BatchLine,
+    cast_manager: GameCastManager,
 }
 
 pub struct Standard2DRenderer {}
@@ -39,11 +42,23 @@ impl<T: StandardLineRendererProvider> StandardLineRenderer<T> {
             camera_object: None,
             camera_label,
             batch,
+            cast_manager: GameCastManager::default(),
         }
     }
 
     pub fn create_batch_queue(&mut self) -> BatchCommandQueue {
         self.batch.create_queue()
+    }
+
+    pub fn register_caster_for_render_object(
+        &mut self,
+        caster: GameObjectCasterType<dyn StandardLineRenderObject>,
+    ) {
+        self.cast_manager.register(GameObjectCaster::new(caster))
+    }
+
+    pub fn register_caster_for_camera(&mut self, caster: GameObjectCasterType<dyn CameraObject>) {
+        self.cast_manager.register(GameObjectCaster::new(caster))
     }
 }
 
@@ -56,14 +71,17 @@ impl StandardLineRenderer<StandardLineRendererDefaultProvider> {
 
 impl<T: StandardLineRendererProvider> GamePlugin for StandardLineRenderer<T> {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut render_object) = game_object.cast::<dyn StandardLineRenderObject>() {
+        if let Some(mut render_object) = self
+            .cast_manager
+            .cast::<dyn StandardLineRenderObject>(game_object)
+        {
             render_object
                 .borrow_mut()
                 .attach_queue(self.batch.create_queue());
             self.object_manager.add(render_object);
         }
 
-        if let Some(camera_object) = game_object.cast::<dyn CameraObject>() {
+        if let Some(camera_object) = self.cast_manager.cast::<dyn CameraObject>(game_object) {
             if self.camera_label == camera_object.borrow().label() {
                 self.camera_object = Some(camera_object);
             }
@@ -71,7 +89,10 @@ impl<T: StandardLineRendererProvider> GamePlugin for StandardLineRenderer<T> {
     }
 
     fn on_remove(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut render_object) = game_object.cast::<dyn StandardLineRenderObject>() {
+        if let Some(mut render_object) = self
+            .cast_manager
+            .cast::<dyn StandardLineRenderObject>(game_object)
+        {
             render_object.borrow_mut().detach();
             self.object_manager.remove(&game_object.id());
         }

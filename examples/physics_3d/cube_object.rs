@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use nalgebra_glm::Mat4;
 use serde::export::Option::Some;
 use tearchan::batch::batch3d::{BATCH_3D_ATTRIB_NOM, BATCH_3D_ATTRIB_POS};
@@ -30,10 +29,8 @@ impl Default for CubeObject {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for CubeObject {}
 
-#[cast_to]
 impl Standard3DRenderObject for CubeObject {
     fn attach_queue(&mut self, mut queue: BatchCommandQueue) {
         let (indices, positions, colors, texcoords, normals) = MeshBuilder::new()
@@ -59,7 +56,6 @@ impl Standard3DRenderObject for CubeObject {
     }
 }
 
-#[cast_to]
 impl TransformObject for CubeObject {
     fn set_transform(&mut self, transform: Mat4) {
         if let Some(queue) = &mut self.batch_queue {

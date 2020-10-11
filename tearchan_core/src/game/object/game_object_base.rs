@@ -1,3 +1,4 @@
-use intertrait::CastFrom;
+use downcast_rs::Downcast;
 
-pub trait GameObjectBase: CastFrom {}
+pub trait GameObjectBase: Downcast {}
+impl_downcast!(GameObjectBase);

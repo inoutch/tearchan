@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use tearchan::plugin::animation::animation_object::AnimationObject;
 use tearchan::plugin::renderer::standard_font_renderer::standard_font_command_queue::StandardFontCommandQueue;
 use tearchan::plugin::renderer::standard_font_renderer::standard_font_render_object::StandardFontRenderObject;
@@ -12,7 +11,6 @@ pub struct TextObject {
     duration: f32,
 }
 
-#[cast_to]
 impl GameObjectBase for TextObject {}
 
 impl TextObject {
@@ -33,7 +31,6 @@ impl TextObject {
     }
 }
 
-#[cast_to]
 impl StandardFontRenderObject for TextObject {
     fn attach_queue(&mut self, mut queue: StandardFontCommandQueue) {
         self.batch_object_id = Some(queue.create_text(self.text.to_string(), None));
@@ -41,7 +38,6 @@ impl StandardFontRenderObject for TextObject {
     }
 }
 
-#[cast_to]
 impl AnimationObject for TextObject {
     fn update(&mut self, delta: f32) {
         self.duration += delta;

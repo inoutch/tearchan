@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use nalgebra_glm::{vec2, vec3};
 use serde::export::Option::Some;
 use tearchan::plugin::renderer::billboard_renderer::billboard_command_queue::BillboardCommandQueue;
@@ -28,10 +27,8 @@ impl Default for SkeletonBillboard {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for SkeletonBillboard {}
 
-#[cast_to]
 impl BillboardRenderObject for SkeletonBillboard {
     fn attach_queue(&mut self, mut queue: BillboardCommandQueue) {
         self.sprite.set_scale(vec3(0.005f32, 0.005f32, 0.005f32));

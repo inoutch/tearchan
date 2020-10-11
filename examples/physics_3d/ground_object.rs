@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use tearchan::plugin::renderer::standard_3d_renderer::standard_3d_render_object::Standard3DRenderObject;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::EMPTY_ID;
@@ -10,10 +9,8 @@ use tearchan_utility::rect::rect3;
 #[derive(Default)]
 pub struct GroundObject {}
 
-#[cast_to]
 impl GameObjectBase for GroundObject {}
 
-#[cast_to]
 impl Standard3DRenderObject for GroundObject {
     fn attach_queue(&mut self, mut queue: BatchCommandQueue) {
         let (indices, positions, colors, texcoords, normals) = MeshBuilder::new()

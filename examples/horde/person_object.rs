@@ -1,5 +1,4 @@
-use crate::person_object_store::PersonObjectStoreBehavior;
-use intertrait::{cast_to, CastFrom};
+use crate::person_object_store::PersonObjectStore;
 use nalgebra_glm::{rotate, translate, vec2, vec2_to_vec3, vec3, Mat4, Vec2};
 use std::f32::consts::PI;
 use std::option::Option::Some;
@@ -17,24 +16,15 @@ use tearchan_horde::object::Object;
 use tearchan_utility::mesh::MeshBuilder;
 
 pub struct PersonObject {
-    store: ObjectStore<dyn PersonObjectStoreBehavior>,
+    store: ObjectStore<PersonObjectStore>,
     batch_queue: Option<BatchCommandQueue>,
     batch_object_id: Option<BatchObjectId>,
 }
 
-pub trait PersonBehavior: CastFrom {
-    fn set_position(&mut self, position: Vec2);
-    fn set_rotation(&mut self, angle: f32);
-    fn update_transform(&mut self);
-}
-
-#[cast_to]
 impl GameObjectBase for PersonObject {}
 
-#[cast_to]
 impl Object for PersonObject {}
 
-#[cast_to]
 impl Standard2DRenderObject for PersonObject {
     fn attach_queue(&mut self, mut queue: BatchCommandQueue) {
         let mesh = MeshBuilder::new()
@@ -79,7 +69,7 @@ impl PersonObject {
         "person"
     }
 
-    pub fn new(store: ObjectStore<dyn PersonObjectStoreBehavior>) -> Self {
+    pub fn new(store: ObjectStore<PersonObjectStore>) -> Self {
         PersonObject {
             store,
             batch_queue: None,
@@ -88,17 +78,16 @@ impl PersonObject {
     }
 }
 
-#[cast_to]
-impl PersonBehavior for PersonObject {
-    fn set_position(&mut self, position: Vec2) {
+impl PersonObject {
+    pub fn set_position(&mut self, position: Vec2) {
         self.store.borrow_mut().set_position(position);
     }
 
-    fn set_rotation(&mut self, rotation: f32) {
+    pub fn set_rotation(&mut self, rotation: f32) {
         self.store.borrow_mut().set_rotation(rotation);
     }
 
-    fn update_transform(&mut self) {
+    pub fn update_transform(&mut self) {
         if let Some(queue) = &mut self.batch_queue {
             queue.queue(BatchCommand::Transform {
                 id: self.batch_object_id.unwrap(),

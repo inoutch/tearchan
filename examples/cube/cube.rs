@@ -1,4 +1,3 @@
-use intertrait::cast_to;
 use nalgebra_glm::{rotate, vec3, Mat4};
 use serde::export::Option::Some;
 use tearchan::batch::batch3d::{BATCH_3D_ATTRIB_NOM, BATCH_3D_ATTRIB_POS};
@@ -29,10 +28,8 @@ impl Default for Cube {
     }
 }
 
-#[cast_to]
 impl GameObjectBase for Cube {}
 
-#[cast_to]
 impl Standard3DRenderObject for Cube {
     fn attach_queue(&mut self, mut queue: BatchCommandQueue) {
         let (indices, positions, colors, texcoords, normals) = MeshBuilder::new()
@@ -58,7 +55,6 @@ impl Standard3DRenderObject for Cube {
     }
 }
 
-#[cast_to]
 impl AnimationObject for Cube {
     fn update(&mut self, delta: f32) {
         self.rotation += delta;

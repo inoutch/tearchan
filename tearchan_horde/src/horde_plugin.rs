@@ -7,7 +7,9 @@ use crate::object::object_store::{ObjectStore, ObjectStoreBase};
 use crate::object::Object;
 use serde::export::fmt::Debug;
 use std::collections::{HashMap, HashSet};
+use tearchan_core::game::game_cast_manager::GameCastManager;
 use tearchan_core::game::game_context::GameContext;
+use tearchan_core::game::game_object_caster::{GameObjectCaster, GameObjectCasterType};
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::game_plugin_command::GamePluginCommand;
 use tearchan_core::game::game_plugin_operator::GamePluginOperator;
@@ -53,18 +55,25 @@ pub struct HordePlugin<T: HordePluginProvider> {
     object_stores: Vec<ObjectStore<dyn ObjectStoreBase>>,
     operator: GamePluginOperator,
     provider: T,
+    cast_manager: GameCastManager,
+}
+
+impl<T: HordePluginProvider> HordePlugin<T> {
+    pub fn register_caster(&mut self, caster: GameObjectCasterType<dyn Object>) {
+        self.cast_manager.register(GameObjectCaster::new(caster));
+    }
 }
 
 impl<T: HordePluginProvider> GamePlugin for HordePlugin<T> {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(horde_object) = game_object.cast::<dyn Object>() {
+        if let Some(horde_object) = self.cast_manager.cast::<dyn Object>(game_object) {
             self.action_objects.insert(horde_object.id());
             self.object_manager.add(horde_object);
         }
     }
 
     fn on_remove(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(horde_object) = game_object.cast::<dyn Object>() {
+        if let Some(horde_object) = self.cast_manager.cast::<dyn Object>(game_object) {
             self.action_objects.remove(&horde_object.id());
             self.object_manager.remove(&horde_object.id());
         }
@@ -108,6 +117,7 @@ impl<T: HordePluginProvider> HordePlugin<T> {
             object_stores: vec![],
             operator,
             provider,
+            cast_manager: GameCastManager::default(),
         }
     }
 
@@ -166,10 +176,8 @@ impl<T: HordePluginProvider> HordePlugin<T> {
         let object_id = object.id();
         store.set_id(object_id);
 
-        let game_object = object.cast().ok_or(ObjectError::InvalidType)?;
-        self.operator.queue(GamePluginCommand::CreateGameObject {
-            object: game_object,
-        });
+        self.operator
+            .queue(GamePluginCommand::CreateGameObject { object });
         self.object_stores.push(store);
 
         Ok(object_id)

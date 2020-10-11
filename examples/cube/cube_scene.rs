@@ -23,16 +23,27 @@ impl CubeScene {
         |ctx, _| {
             let image = Image::new_empty();
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
-            let plugin =
+            let mut render_plugin =
                 Standard3DRenderer::from_texture(&mut ctx.g.r, texture, PRIMARY_CAMERA.to_string());
-            ctx.plugin_manager_mut()
-                .add(Box::new(plugin), "renderer".to_string(), 0);
+            render_plugin.register_caster_for_render_object(|object| {
+                let casted = object.downcast_rc::<Cube>().ok()?;
+                Some(casted)
+            });
+            render_plugin.register_caster_for_camera_3d(|object| {
+                let casted = object.downcast_rc::<Camera3DDefaultObject>().ok()?;
+                Some(casted)
+            });
 
-            ctx.plugin_manager_mut().add(
-                Box::new(AnimationRunner::new()),
-                "animation".to_string(),
-                0,
-            );
+            ctx.plugin_manager_mut()
+                .add(Box::new(render_plugin), "renderer".to_string(), 0);
+
+            let mut animation_plugin = AnimationRunner::new();
+            animation_plugin.register(|object| {
+                let casted = object.downcast_rc::<Cube>().ok()?;
+                Some(casted)
+            });
+            ctx.plugin_manager_mut()
+                .add(Box::new(animation_plugin), "animation".to_string(), 0);
 
             let aspect = ctx.g.r.render_bundle().display_size().logical.x
                 / ctx.g.r.render_bundle().display_size().logical.y;

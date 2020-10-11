@@ -1,8 +1,8 @@
+use crate::game::object::game_object_base::GameObjectBase;
 use crate::ui::ui_touch::UITouch;
-use intertrait::CastFrom;
 use winit::event::KeyboardInput;
 
-pub trait UIObject: CastFrom {
+pub trait UIObject: GameObjectBase {
     fn z_index(&self) -> i32 {
         0
     }

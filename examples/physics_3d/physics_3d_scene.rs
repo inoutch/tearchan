@@ -43,10 +43,22 @@ impl Physics3DScene {
         |ctx, _| {
             let image = Image::new_empty();
             let texture = Texture::new(ctx.g.r.render_bundle(), &image, TextureConfig::default());
-            let plugin =
+            let mut render_plugin =
                 Standard3DRenderer::from_texture(&mut ctx.g.r, texture, PRIMARY_CAMERA.to_string());
+            render_plugin.register_caster_for_render_object(|object| {
+                let casted = object.downcast_rc::<CubeObject>().ok()?;
+                Some(casted)
+            });
+            render_plugin.register_caster_for_render_object(|object| {
+                let casted = object.downcast_rc::<GroundObject>().ok()?;
+                Some(casted)
+            });
+            render_plugin.register_caster_for_camera_3d(|object| {
+                let casted = object.downcast_rc::<Camera3DDefaultObject>().ok()?;
+                Some(casted)
+            });
             ctx.plugin_manager_mut()
-                .add(Box::new(plugin), "renderer".to_string(), 0);
+                .add(Box::new(render_plugin), "renderer".to_string(), 0);
 
             let mechanical_world = DefaultMechanicalWorld::new(vec3(0.0, -9.81, 0.0));
             let geometrical_world = DefaultGeometricalWorld::new();
@@ -127,7 +139,7 @@ impl Scene for Physics3DScene {
         let mut cube_object = context
             .find_by_id(self.cube_id)
             .unwrap()
-            .cast::<dyn TransformObject>()
+            .cast::<CubeObject>()
             .unwrap();
         cube_object
             .borrow_mut()

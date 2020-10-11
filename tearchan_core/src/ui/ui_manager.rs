@@ -92,12 +92,12 @@ impl UIManager {
 }
 
 impl GamePlugin for UIManager {
-    fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(ui_object) = game_object.cast::<dyn UIObject>() {
-            self.object_manager.add(ui_object);
-            self.object_manager
-                .sort_by(|a, b| a.borrow().z_index().cmp(&b.borrow().z_index()))
-        }
+    fn on_add(&mut self, _game_object: &GameObject<dyn GameObjectBase>) {
+        // if let Some(ui_object) = GameObject::new(game_object.clone_inner_object()) {
+        //     self.object_manager.add(ui_object);
+        //     self.object_manager
+        //         .sort_by(|a, b| a.borrow().z_index().cmp(&b.borrow().z_index()))
+        // }
     }
 
     fn on_remove(&mut self, game_object: &GameObject<dyn GameObjectBase>) {

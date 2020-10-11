@@ -6,7 +6,9 @@ use crate::plugin::renderer::standard_font_renderer::standard_font_renderer_prov
     StandardFontRendererDefaultProvider, StandardFontRendererProvider,
 };
 use std::sync::mpsc::{channel, Receiver, Sender};
+use tearchan_core::game::game_cast_manager::GameCastManager;
 use tearchan_core::game::game_context::GameContext;
+use tearchan_core::game::game_object_caster::{GameObjectCaster, GameObjectCasterType};
 use tearchan_core::game::game_plugin::GamePlugin;
 use tearchan_core::game::object::game_object_base::GameObjectBase;
 use tearchan_core::game::object::game_object_manager::GameObjectManager;
@@ -29,6 +31,7 @@ pub struct StandardFontRenderer<T: StandardFontRendererProvider> {
     sender: Sender<StandardFontCommand>,
     receiver: Receiver<StandardFontCommand>,
     provider: T,
+    cast_manager: GameCastManager,
 }
 
 impl<T: StandardFontRendererProvider> StandardFontRenderer<T> {
@@ -45,7 +48,15 @@ impl<T: StandardFontRendererProvider> StandardFontRenderer<T> {
             sender,
             receiver,
             provider,
+            cast_manager: GameCastManager::default(),
         }
+    }
+
+    pub fn register_caster_for_render_object(
+        &mut self,
+        caster: GameObjectCasterType<dyn StandardFontRenderObject>,
+    ) {
+        self.cast_manager.register(GameObjectCaster::new(caster))
     }
 }
 
@@ -79,7 +90,10 @@ impl<T: StandardFontRendererProvider> StandardFontRenderer<T> {
 
 impl<T: StandardFontRendererProvider> GamePlugin for StandardFontRenderer<T> {
     fn on_add(&mut self, game_object: &GameObject<dyn GameObjectBase>) {
-        if let Some(mut render_object) = game_object.cast::<dyn StandardFontRenderObject>() {
+        if let Some(mut render_object) = self
+            .cast_manager
+            .cast::<dyn StandardFontRenderObject>(game_object)
+        {
             render_object
                 .borrow_mut()
                 .attach_queue(StandardFontCommandQueue::new(

@@ -5,6 +5,14 @@ publish = false
 workspace = ".."
 edition = "2018"
 
+[features]
+default = []
+metal = ["tearchan_graphics/metal"]
+wgl = ["tearchan_graphics/wgl"]
+dx11 = ["tearchan_graphics/dx11"]
+dx12 = ["tearchan_graphics/dx12"]
+vulkan = ["tearchan_graphics/vulkan"]
+
 [[bin]]
 name = "cube"
 path = "cube/main.rs"
@@ -42,8 +50,7 @@ serde = "1.0.116"
 serde_json = "1.0.58"
 image = "0.23.10"
 winit = { version = "0.22.2", features = ["web-sys"] }
-intertrait = "0.2.0"
-linkme = "0.2"
+log = "0.4.11"
 tearchan = { path = ".." }
 tearchan_core = { path = "../tearchan_core" }
 tearchan_graphics = { path = "../tearchan_graphics" }
@@ -54,6 +61,15 @@ nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 env_logger = "0.7.1"
 ncollide3d = "0.24.0"
 nphysics3d = "0.17.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2.55"
+console_error_panic_hook = "0.1.6"
+console_log = "0.1.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3.45"
+features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
 
 [build-dependencies]
 serde = "1.0.116"

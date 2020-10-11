@@ -5,8 +5,7 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.18"
-intertrait = "0.2.0"
-linkme = "0.2"
+downcast-rs = "1.2.0"
 tearchan_core = { path = "../tearchan_core" }
 tearchan_utility = { path = "../tearchan_utility" }
 
