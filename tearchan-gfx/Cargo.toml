@@ -1,0 +1,60 @@
+[package]
+name = "tearchan-gfx"
+version = "0.0.1"
+edition = "2018"
+
+[features]
+default = []
+metal = ["gfx-backend-metal"]
+webgl = ["gfx-backend-gl"]
+dx11 = ["gfx-backend-dx11"]
+dx12 = ["gfx-backend-dx12"]
+vulkan = ["gfx-backend-vulkan"]
+
+[dependencies]
+# utils
+nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
+image = "0.23.4"
+tearchan-util = { path = "../tearchan-util" }
+
+# frameworks
+winit = { version = "0.23.0", features = ["web-sys"] }
+gfx-hal = { path = "../../gfx/src/hal" }
+gfx-auxil = { path = "../../gfx/src/auxil/auxil" }
+gfx-backend-empty = { path = "../../gfx/src/backend/empty" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.68", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.19"
+
+[dependencies.gfx-backend-gl]
+path = "../../gfx/src/backend/gl"
+version = "0.6.0"
+optional = true
+
+[dependencies.gfx-backend-vulkan]
+path = "../../gfx/src/backend/vulkan"
+version = "0.6.1"
+optional = true
+
+[target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies.gfx-backend-metal]
+path = "../../gfx/src/backend/metal"
+version = "0.6.0"
+optional = true
+
+[target.'cfg(windows)'.dependencies.gfx-backend-dx11]
+path = "../../gfx/src/backend/dx11"
+version = "0.6.0"
+optional = true
+
+[target.'cfg(windows)'.dependencies.gfx-backend-dx12]
+path = "../../gfx/src/backend/dx12"
+version = "0.6.0"
+optional = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3.45"
+features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
+
+[build-dependencies]
+shaderc = "0.6.2"

@@ -1,0 +1,24 @@
+[package]
+name = "examples"
+version = "0.0.1"
+publish = false
+workspace = ".."
+edition = "2018"
+
+[features]
+default = []
+metal = ["tearchan-gfx/metal"]
+webgl = ["tearchan-gfx/webgl"]
+dx11 = ["tearchan-gfx/dx11"]
+dx12 = ["tearchan-gfx/dx12"]
+vulkan = ["tearchan-gfx/vulkan"]
+
+[[bin]]
+name = "quad"
+path = "quad/main.rs"
+
+[dependencies]
+winit = { version = "0.23.0", features = ["web-sys"] }
+tearchan = { path = ".." }
+tearchan-gfx = { path = "../tearchan-gfx" }
+gfx-hal = { path = "../../gfx/src/hal" }

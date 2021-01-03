@@ -1,0 +1,8 @@
+[package]
+name = "tearchan-horde"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+tearchan-ecs = { path = "../tearchan-ecs" }
+tearchan-util = { path = "../tearchan-util" }

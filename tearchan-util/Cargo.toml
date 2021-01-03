@@ -1,0 +1,8 @@
+[package]
+name = "tearchan-util"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+instant = "0.1.9"
+serde = { version = "1.0.118", features = ["derive"] }

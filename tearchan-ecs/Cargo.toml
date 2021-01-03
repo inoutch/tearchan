@@ -1,0 +1,9 @@
+[package]
+name = "tearchan-ecs"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+derive-new = "0.5"
+# Internal modules
+tearchan-core = { path = "../tearchan-core" }
