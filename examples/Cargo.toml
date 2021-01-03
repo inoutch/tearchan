@@ -45,6 +45,10 @@ path = "line/main.rs"
 name = "physics_3d"
 path = "physics_3d/main.rs"
 
+[[bin]]
+name = "quad"
+path = "quad/main.rs"
+
 [dependencies]
 serde = "1.0.116"
 serde_json = "1.0.58"

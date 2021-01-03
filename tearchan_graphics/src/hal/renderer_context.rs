@@ -76,6 +76,7 @@ impl<'a, B: gfx_hal::Backend> RendererContextCommon<'a, B> {
                     range: SubRange::WHOLE,
                     index_type: IndexType::U32,
                 });
+            #[cfg(not(target_arch = "wasm32"))]
             self.frame_resource
                 .command_buffer_mut()
                 .set_depth_bounds(-1.0..1.0);
