@@ -18,7 +18,7 @@ image = "0.23.4"
 tearchan-util = { path = "../tearchan-util" }
 
 # frameworks
-winit = { version = "0.23.0", features = ["web-sys"] }
+winit = { version = "0.24.0", features = ["web-sys"] }
 gfx-hal = { path = "../../gfx/src/hal" }
 gfx-auxil = { path = "../../gfx/src/auxil/auxil" }
 gfx-backend-empty = { path = "../../gfx/src/backend/empty" }

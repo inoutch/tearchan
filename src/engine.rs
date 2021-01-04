@@ -3,7 +3,7 @@ use crate::scene::context::{SceneContext, SceneRenderContext};
 use crate::scene::manager::SceneManager;
 use instant::Instant;
 use std::time::Duration;
-use tearchan_gfx::setup::Setup;
+use tearchan_gfx::setup::LazySetup;
 use tearchan_util::time::DurationWatch;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -26,7 +26,11 @@ impl Engine {
 
         let event_loop = EventLoop::new();
         let window = startup_config.window_builder.build(&event_loop).unwrap();
-        let mut setup = Setup::new(window);
+        let mut setup = LazySetup::new(window);
+
+        #[cfg(not(target_os = "android"))]
+        setup.setup();
+
         let mut scene_manager = SceneManager::default();
         scene_manager.set_current_scene(startup_config.scene_factory, None);
 
@@ -35,6 +39,10 @@ impl Engine {
         let mut duration_watcher = DurationWatch::default();
 
         event_loop.run(move |event, _, control_flow| match event {
+            #[cfg(target_os = "android")]
+            Event::Resumed => {
+                setup.setup();
+            }
             Event::WindowEvent { event, window_id } => match event {
                 WindowEvent::Resized(_) => {}
                 WindowEvent::CloseRequested => {

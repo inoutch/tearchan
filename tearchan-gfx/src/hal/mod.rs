@@ -3,6 +3,7 @@ use crate::hal::global::{
     ImageViewId, MemoryId, MemoryMapId, QueueGroupId, RenderPassId, SemaphoreId, ShaderModuleId,
     SurfaceId,
 };
+use crate::hal::swapchain::SwapchainFrameCommon;
 use crate::registry::Registry;
 use crate::utils::find_memory_type;
 use gfx_hal::command::{ClearValue, CommandBufferFlags, Level, SubpassContents};
@@ -114,7 +115,7 @@ where
         }));
 
         let adapters = {
-            let mut write = global.try_lock().unwrap();
+            let write = global.try_lock().unwrap();
             adapters
                 .into_iter()
                 .map(|adapter| {
@@ -142,7 +143,7 @@ where
             write.surface_id = surface_id;
             SurfaceCommon {
                 global: Arc::clone(&global),
-                id: surface_id,
+                _id: surface_id,
             }
         };
 
@@ -236,7 +237,7 @@ where
     B: Backend,
 {
     global: Arc<Mutex<Global<B>>>,
-    id: SurfaceId,
+    _id: SurfaceId,
 }
 
 impl<B> SurfaceCommon<B>
@@ -491,23 +492,66 @@ where
         }
     }
 
-    pub fn create_framebuffer(
+    pub fn create_framebuffer<I>(
         &self,
         render_pass: &RenderPassCommon<B>,
-        attachments: Vec<&ImageViewCommon<B>>,
+        attachments: I,
         extent: Extent,
-    ) -> FramebufferCommon<B> {
+    ) -> FramebufferCommon<B>
+    where
+        I: IntoIterator,
+        I::Item: Borrow<ImageViewCommon<B>>,
+    {
         let global = self.global.try_lock().unwrap();
         let device = global.devices.read(self.id);
         let render_pass = global.render_passes.read(render_pass.id);
         let id = global.framebuffers.gen_id();
-        let image_views = attachments
-            .iter()
-            .map(|image_view| global.image_views.read(image_view.id))
-            .collect::<Vec<_>>();
+        let image_views = global.image_views.read_storage();
         global.framebuffers.register(
             id,
-            device.create_framebuffer(id, &render_pass, image_views, extent),
+            device.create_framebuffer(
+                id,
+                &render_pass,
+                attachments
+                    .into_iter()
+                    .map(|x| &image_views.read(x.borrow().id).raw),
+                extent,
+            ),
+        );
+        FramebufferCommon {
+            global: Arc::clone(&self.global),
+            id,
+        }
+    }
+
+    pub fn create_framebuffer_with_frame<I>(
+        &self,
+        render_pass: &RenderPassCommon<B>,
+        frame: &SwapchainFrameCommon<B>,
+        attachments: I,
+        extent: Extent,
+    ) -> FramebufferCommon<B>
+    where
+        I: IntoIterator,
+        I::Item: Borrow<ImageViewCommon<B>>,
+    {
+        let global = self.global.try_lock().unwrap();
+        let device = global.devices.read(self.id);
+        let render_pass = global.render_passes.read(render_pass.id);
+        let id = global.framebuffers.gen_id();
+        let image_views = global.image_views.read_storage();
+        global.framebuffers.register(
+            id,
+            device.create_framebuffer(
+                id,
+                &render_pass,
+                frame.image().map(|x| x.borrow()).into_iter().chain(
+                    attachments
+                        .into_iter()
+                        .map(|x| &image_views.read(x.borrow().id).raw),
+                ),
+                extent,
+            ),
         );
         FramebufferCommon {
             global: Arc::clone(&self.global),
@@ -1059,6 +1103,7 @@ where
     id: RenderPassId,
 }
 
+#[allow(dead_code)]
 pub struct FramebufferCommon<B>
 where
     B: Backend,

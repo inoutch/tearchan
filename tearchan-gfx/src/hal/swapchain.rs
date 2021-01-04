@@ -25,6 +25,10 @@ impl<B> SwapchainFrameCommon<B>
 where
     B: Backend,
 {
+    pub fn image(&self) -> Option<&<B::Surface as PresentationSurface<B>>::SwapchainImage> {
+        self.image.as_ref()
+    }
+
     pub fn pop_image(&mut self) -> Option<<B::Surface as PresentationSurface<B>>::SwapchainImage> {
         std::mem::replace(&mut self.image, None)
     }

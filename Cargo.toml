@@ -10,7 +10,7 @@ instant = "0.1.9"
 log = "0.4.11"
 downcast-rs = "1.2.0"
 # framework
-winit = { version = "0.23.0", features = ["web-sys"] }
+winit = { version = "0.24.0", features = ["web-sys"] }
 tearchan-core = { path = "tearchan-core" }
 tearchan-gfx = { path = "tearchan-gfx" }
 tearchan-util = { path = "tearchan-util" }

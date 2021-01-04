@@ -12,7 +12,6 @@ use gfx_hal::window::{
 };
 use gfx_hal::{pass, pso, Backend, Features, Limits, MemoryTypeId};
 use std::borrow::Borrow;
-use std::cell::Ref;
 
 pub type AdapterId = u64;
 pub type SurfaceId = u64;
@@ -340,23 +339,21 @@ where
         }
     }
 
-    pub fn create_framebuffer(
+    pub fn create_framebuffer<I>(
         &self,
         id: FramebufferId,
         render_pass: &RenderPass<B>,
-        attachments: Vec<Ref<ImageView<B>>>,
+        attachments: I,
         extent: Extent,
-    ) -> Framebuffer<B> {
+    ) -> Framebuffer<B>
+    where
+        I: IntoIterator,
+        I::Item: Borrow<B::ImageView>,
+    {
         use gfx_hal::device::Device;
         let framebuffer = unsafe {
-            self.raw.create_framebuffer(
-                &render_pass.raw,
-                attachments
-                    .iter()
-                    .map(|attachment| attachment.raw.borrow())
-                    .collect::<Vec<_>>(),
-                extent,
-            )
+            self.raw
+                .create_framebuffer(&render_pass.raw, attachments, extent)
         }
         .expect("Failed to create Framebuffer");
         Framebuffer {
@@ -378,7 +375,7 @@ where
 
     pub fn wait_idle(&self) -> Result<(), OutOfMemory> {
         use gfx_hal::device::Device;
-        unsafe { self.raw.wait_idle() }
+        self.raw.wait_idle()
     }
 }
 

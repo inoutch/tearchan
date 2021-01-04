@@ -82,8 +82,9 @@ impl Scene for QuadScene {
             gfx.device()
                 .create_render_pass(&[attachment, depth_attachment], &[subpass], &[])
         };
-        let framebuffer = context.gfx().device().create_framebuffer(
+        let framebuffer = context.gfx().device().create_framebuffer_with_frame(
             &render_pass,
+            &frame,
             vec![frame.depth_texture().image_view()],
             extent,
         );
