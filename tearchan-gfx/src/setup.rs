@@ -54,17 +54,32 @@ where
     }
 
     pub fn flush(&mut self, frame: &mut SwapchainFrameCommon<B>) {
-        self.queue
-            .present(
-                frame.pop_image().expect("Already pop image"),
-                Some(frame.submission_complete_semaphore()),
-            )
-            .unwrap();
+        let result = self.queue.present(
+            frame.pop_image().expect("Already pop image"),
+            Some(frame.submission_complete_semaphore()),
+        );
+        if result.is_err() {
+            self.recreate_swapchain();
+        }
         self.swapchain.flush();
     }
 
     pub fn window(&self) -> &Window {
         &self.window
+    }
+
+    fn recreate_swapchain(&mut self) {
+        self.swapchain_desc = SwapchainDescriptor::new(
+            self.instance.surface(),
+            &self.instance.adapters()[0],
+            &self.window,
+        );
+        self.swapchain = SwapchainCommon::new(
+            &self.device,
+            self.instance.surface(),
+            &self.swapchain_desc,
+            self.queue_group.family(),
+        );
     }
 }
 
@@ -83,17 +98,7 @@ impl Setup<crate::hal::backend::Backend> {
         let frame = match self.swapchain.get_current_frame(self.instance.surface()) {
             Ok(frame) => frame,
             Err(_) => {
-                self.swapchain_desc = SwapchainDescriptor::new(
-                    self.instance.surface(),
-                    &self.instance.adapters()[0],
-                    &self.window,
-                );
-                self.swapchain = SwapchainCommon::new(
-                    &self.device,
-                    self.instance.surface(),
-                    &self.swapchain_desc,
-                    self.queue_group.family(),
-                );
+                self.recreate_swapchain();
                 self.swapchain
                     .get_current_frame(self.instance.surface())
                     .expect("Failed to get current frame")
