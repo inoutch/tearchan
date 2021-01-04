@@ -1,4 +1,6 @@
-use gfx_hal::command::{ClearColor, ClearDepthStencil, ClearValue, Level, SubpassContents};
+use gfx_hal::command::{
+    ClearColor, ClearDepthStencil, ClearValue, CommandBufferFlags, Level, SubpassContents,
+};
 use gfx_hal::image::{Extent, Layout};
 use gfx_hal::pass::{Attachment, AttachmentLoadOp, AttachmentOps, AttachmentStoreOp, SubpassDesc};
 use gfx_hal::pso::{PipelineStage, Rect};
@@ -51,6 +53,8 @@ impl Scene for QuadScene {
         frame.submission_complete_fence().reset_fence();
 
         let command_buffer = frame.command_pool().allocate_one(Level::Primary);
+        command_buffer.begin_primary(CommandBufferFlags::ONE_TIME_SUBMIT);
+
         let render_pass = {
             let color_load_op = AttachmentLoadOp::Clear;
             let depth_load_op = AttachmentLoadOp::Clear;
@@ -114,9 +118,7 @@ impl Scene for QuadScene {
             wait_semaphores: vec![],
             signal_semaphores: vec![frame.submission_complete_semaphore()],
         };
-        gfx.queue_group()
-            .get_command_queue(0)
-            .unwrap()
+        gfx.queue()
             .submit(submission, Some(frame.submission_complete_fence()));
 
         SceneControlFlow::None
