@@ -1,9 +1,9 @@
 use crate::hal::backend::Backend;
 use crate::hal::swapchain::{SwapchainCommon, SwapchainFrameCommon};
 use crate::hal::{
-    AdapterCommon, CommandBufferCommon, CommandPoolCommon, DeviceCommon, FenceCommon, ImageCommon,
-    ImageViewCommon, InstanceCommon, MemoryCommon, MemoryMapCommon, QueueGroupCommon,
-    SemaphoreCommon, ShaderModuleCommon, SurfaceCommon, TextureCommon,
+    AdapterCommon, CommandBufferCommon, CommandPoolCommon, CommandQueueCommon, DeviceCommon,
+    FenceCommon, ImageCommon, ImageViewCommon, InstanceCommon, MemoryCommon, MemoryMapCommon,
+    QueueGroupCommon, SemaphoreCommon, ShaderModuleCommon, SurfaceCommon, TextureCommon,
 };
 
 pub mod bitmap;
@@ -19,6 +19,7 @@ pub type Adapter = AdapterCommon<Backend>;
 pub type Surface = SurfaceCommon<Backend>;
 pub type Device = DeviceCommon<Backend>;
 pub type QueueGroup = QueueGroupCommon<Backend>;
+pub type CommandQueue = CommandQueueCommon<Backend>;
 pub type CommandPool = CommandPoolCommon<Backend>;
 pub type CommandBuffer = CommandBufferCommon<Backend>;
 pub type Semaphore = SemaphoreCommon<Backend>;

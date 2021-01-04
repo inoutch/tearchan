@@ -1,11 +1,12 @@
 use crate::hal::global::{
     AdapterId, BufferId, CommandBufferId, CommandPoolId, DeviceId, FenceId, FramebufferId, ImageId,
     ImageViewId, MemoryId, MemoryMapId, QueueGroupId, RenderPassId, SemaphoreId, ShaderModuleId,
+    SurfaceId,
 };
 use crate::registry::Registry;
 use crate::utils::find_memory_type;
 use gfx_hal::command::{ClearValue, CommandBufferFlags, Level, SubpassContents};
-use gfx_hal::device::WaitError;
+use gfx_hal::device::{OutOfMemory, WaitError};
 use gfx_hal::format::{Format, Swizzle};
 use gfx_hal::image::{Extent, Kind, SubresourceRange, Tiling, Usage, ViewCapabilities, ViewKind};
 use gfx_hal::memory::{Properties, Requirements, Segment};
@@ -17,7 +18,6 @@ use gfx_hal::window::{
 };
 use gfx_hal::{pass, pso, Backend, Features, MemoryTypeId};
 use std::borrow::Borrow;
-use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use winit::window::Window;
 
@@ -32,7 +32,8 @@ where
 {
     instance: global::Instance<B>,
     adapters: Registry<global::Adapter<B>>,
-    surface: Option<RefCell<global::Surface<B>>>,
+    surfaces: Registry<global::Surface<B>>,
+    surface_id: SurfaceId,
     devices: Registry<global::Device<B>>,
     queue_groups: Registry<global::QueueGroup<B>>,
     command_pools: Registry<global::CommandPool<B>>,
@@ -94,7 +95,8 @@ where
         let global = Arc::new(Mutex::new(Global {
             instance: global::Instance { raw: instance },
             adapters: Registry::default(),
-            surface: None,
+            surfaces: Registry::default(),
+            surface_id: 0,
             devices: Registry::default(),
             queue_groups: Registry::default(),
             command_pools: Registry::default(),
@@ -113,7 +115,6 @@ where
 
         let adapters = {
             let mut write = global.try_lock().unwrap();
-            write.surface = Some(RefCell::new(global::Surface { raw: surface }));
             adapters
                 .into_iter()
                 .map(|adapter| {
@@ -128,8 +129,21 @@ where
                 })
                 .collect()
         };
-        let surface = SurfaceCommon {
-            global: Arc::clone(&global),
+        let surface = {
+            let mut write = global.try_lock().unwrap();
+            let surface_id = write.surfaces.gen_id();
+            write.surfaces.register(
+                surface_id,
+                global::Surface {
+                    raw: surface,
+                    id: surface_id,
+                },
+            );
+            write.surface_id = surface_id;
+            SurfaceCommon {
+                global: Arc::clone(&global),
+                id: surface_id,
+            }
         };
 
         InstanceCommon {
@@ -148,6 +162,19 @@ where
     }
 }
 
+impl<B> Drop for InstanceCommon<B>
+where
+    B: Backend,
+{
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            let global = self.global.try_lock().unwrap();
+            let surface = global.surfaces.unregister(global.surface_id).unwrap();
+            global.instance.destroy_surface(surface);
+        }
+    }
+}
+
 pub struct AdapterCommon<B>
 where
     B: Backend,
@@ -163,7 +190,7 @@ where
     pub fn find_queue_family(&self) -> QueueFamilyId {
         let global = self.global.try_lock().unwrap();
         let adapter = global.adapters.read(self.id);
-        let surface = global.surface.as_ref().unwrap().borrow();
+        let surface = global.surfaces.read(global.surface_id);
         adapter.find_queue_family(&surface)
     }
 
@@ -209,6 +236,7 @@ where
     B: Backend,
 {
     global: Arc<Mutex<Global<B>>>,
+    id: SurfaceId,
 }
 
 impl<B> SurfaceCommon<B>
@@ -218,14 +246,14 @@ where
     pub fn capabilities(&self, adapter: &AdapterCommon<B>) -> SurfaceCapabilities {
         let global = self.global.try_lock().unwrap();
         let adapter = global.adapters.read(adapter.id);
-        let surface = global.surface.as_ref().unwrap().borrow();
+        let surface = global.surfaces.read(global.surface_id);
         surface.capabilities(&adapter)
     }
 
     pub fn find_support_format(&self, adapter: &AdapterCommon<B>) -> Format {
         let global = self.global.try_lock().unwrap();
         let adapter = global.adapters.read(adapter.id);
-        let surface = global.surface.as_ref().unwrap().borrow();
+        let surface = global.surfaces.read(global.surface_id);
         surface.find_support_format(&adapter)
     }
 
@@ -235,7 +263,7 @@ where
         swap_config: SwapchainConfig,
     ) -> Result<(), SwapchainError> {
         let global = self.global.try_lock().unwrap();
-        let mut surface = global.surface.as_ref().unwrap().borrow_mut();
+        let mut surface = global.surfaces.write(global.surface_id);
         let device = global.devices.read(device.id);
         surface.configure_swapchain(&device, swap_config)
     }
@@ -251,7 +279,7 @@ where
         AcquireError,
     > {
         let global = self.global.try_lock().unwrap();
-        let mut surface = global.surface.as_ref().unwrap().borrow_mut();
+        let mut surface = global.surfaces.write(global.surface_id);
         surface.acquire_image(timeout_ns)
     }
 }
@@ -486,6 +514,12 @@ where
             id,
         }
     }
+
+    pub fn wait_idle(&self) -> Result<(), OutOfMemory> {
+        let global = self.global.try_lock().unwrap();
+        let device = global.devices.read(self.id);
+        device.wait_idle()
+    }
 }
 
 pub struct QueueGroupCommon<B>
@@ -576,7 +610,7 @@ where
     ) -> Result<Option<Suboptimal>, PresentError> {
         let global = self.global.try_lock().unwrap();
         let mut queue_group = global.queue_groups.write(self.queue_group_id);
-        let mut surface = global.surface.as_ref().unwrap().borrow_mut();
+        let mut surface = global.surfaces.write(global.surface_id);
         let mut semaphore_storage = global.semaphores.write_storage();
         queue_group.present(
             self.index,
@@ -756,7 +790,9 @@ where
         let global = self.global.try_lock().unwrap();
         let mut fence = global.fences.write(self.id);
         let device = global.devices.read(fence.device_id);
-        device.reset_fence(&mut fence);
+        device
+            .reset_fence(&mut fence)
+            .expect("Failed to reset fence");
     }
 }
 

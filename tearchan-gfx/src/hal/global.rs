@@ -15,6 +15,7 @@ use std::borrow::Borrow;
 use std::cell::Ref;
 
 pub type AdapterId = u64;
+pub type SurfaceId = u64;
 pub type DeviceId = u64;
 pub type CommandPoolId = u64;
 pub type CommandBufferId = u64;
@@ -35,6 +36,16 @@ where
     B: Backend,
 {
     pub raw: B::Instance,
+}
+
+impl<B> Instance<B>
+where
+    B: Backend,
+{
+    pub fn destroy_surface(&self, surface: Surface<B>) {
+        use gfx_hal::Instance;
+        unsafe { self.raw.destroy_surface(surface.raw) };
+    }
 }
 
 pub struct Adapter<B>
@@ -107,6 +118,7 @@ where
     B: Backend,
 {
     pub raw: B::Surface,
+    pub id: SurfaceId,
 }
 
 impl<B> Surface<B>
@@ -362,6 +374,11 @@ where
     pub fn reset_fence(&self, fence: &mut Fence<B>) -> Result<(), OutOfMemory> {
         use gfx_hal::device::Device;
         unsafe { self.raw.reset_fence(&mut fence.raw) }
+    }
+
+    pub fn wait_idle(&self) -> Result<(), OutOfMemory> {
+        use gfx_hal::device::Device;
+        unsafe { self.raw.wait_idle() }
     }
 }
 

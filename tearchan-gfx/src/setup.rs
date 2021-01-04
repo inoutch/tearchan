@@ -68,6 +68,10 @@ where
         &self.window
     }
 
+    pub fn wait_idle(&self) {
+        self.device.wait_idle().expect("Failed to wait idle");
+    }
+
     fn recreate_swapchain(&mut self) {
         self.swapchain_desc = SwapchainDescriptor::new(
             self.instance.surface(),
@@ -89,7 +93,7 @@ impl Setup<crate::hal::backend::Backend> {
             self.instance.surface(),
             self.instance.adapters(),
             &self.device,
-            &self.queue_group,
+            &self.queue,
             &self.swapchain_desc,
         )
     }
@@ -109,7 +113,7 @@ impl Setup<crate::hal::backend::Backend> {
                 self.instance.surface(),
                 self.instance.adapters(),
                 &self.device,
-                &self.queue_group,
+                &self.queue,
                 &self.swapchain_desc,
             ),
             GfxRenderingContext::new(frame),
