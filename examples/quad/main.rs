@@ -1,10 +1,16 @@
-use gfx_hal::image::Layout;
+use gfx_hal::command::{ClearColor, ClearDepthStencil, ClearValue, Level, SubpassContents};
+use gfx_hal::image::{Extent, Layout};
 use gfx_hal::pass::{Attachment, AttachmentLoadOp, AttachmentOps, AttachmentStoreOp, SubpassDesc};
+use gfx_hal::pso::{PipelineStage, Rect};
+use gfx_hal::queue::Submission;
+use std::iter;
+use std::iter::Once;
 use tearchan::engine::Engine;
 use tearchan::engine_config::EngineStartupConfigBuilder;
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
+use tearchan_gfx::{CommandBuffer, Semaphore};
 use winit::event::WindowEvent;
 use winit::window::WindowBuilder;
 
@@ -23,10 +29,29 @@ impl Scene for QuadScene {
 
     fn render(&mut self, context: &mut SceneRenderContext) -> SceneControlFlow {
         let frame = context.gfx_rendering().frame();
-        let color_format = context.gfx().find_support_format();
+        let gfx = context.gfx();
+        let color_format = gfx.find_support_format();
         let depth_stencil_format = frame.depth_texture().format().clone();
+        let extent = Extent {
+            width: gfx.swapchain_desc().config.extent.width,
+            height: gfx.swapchain_desc().config.extent.height,
+            depth: 1,
+        };
+        let render_area = Rect {
+            x: 0,
+            y: 0,
+            w: context.gfx().swapchain_desc().config.extent.width as _,
+            h: context.gfx().swapchain_desc().config.extent.height as _,
+        };
 
-        {
+        frame
+            .submission_complete_fence()
+            .wait_for_fence(!0)
+            .unwrap();
+        frame.submission_complete_fence().reset_fence();
+
+        let command_buffer = frame.command_pool().allocate_one(Level::Primary);
+        let render_pass = {
             let color_load_op = AttachmentLoadOp::Clear;
             let depth_load_op = AttachmentLoadOp::Clear;
             let attachment = Attachment {
@@ -50,12 +75,49 @@ impl Scene for QuadScene {
                 resolves: &[],
                 preserves: &[],
             };
-            context.gfx().device().create_render_pass(
-                &[attachment, depth_attachment],
-                &[subpass],
-                &[],
-            );
-        }
+            gfx.device()
+                .create_render_pass(&[attachment, depth_attachment], &[subpass], &[])
+        };
+        let framebuffer = context.gfx().device().create_framebuffer(
+            &render_pass,
+            vec![frame.depth_texture().image_view()],
+            extent,
+        );
+
+        command_buffer.begin_render_pass(
+            &render_pass,
+            &framebuffer,
+            render_area,
+            &[
+                ClearValue {
+                    color: ClearColor {
+                        float32: [0.3, 0.3, 0.3, 1.0],
+                    },
+                },
+                ClearValue {
+                    depth_stencil: ClearDepthStencil {
+                        depth: 1.0f32,
+                        stencil: 0,
+                    },
+                },
+            ],
+            SubpassContents::Inline,
+        );
+        command_buffer.end_render_pass();
+        command_buffer.finish();
+        let submission: Submission<
+            Once<&CommandBuffer>,
+            Vec<(&Semaphore, PipelineStage)>,
+            Vec<&Semaphore>,
+        > = Submission {
+            command_buffers: iter::once(&command_buffer),
+            wait_semaphores: vec![],
+            signal_semaphores: vec![frame.submission_complete_semaphore()],
+        };
+        gfx.queue_group()
+            .get_command_queue(0)
+            .unwrap()
+            .submit(submission, Some(frame.submission_complete_fence()));
 
         SceneControlFlow::None
     }

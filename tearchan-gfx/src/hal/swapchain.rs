@@ -6,9 +6,8 @@ use gfx_hal::format::{Aspects, Format};
 use gfx_hal::image::{SubresourceRange, Usage};
 use gfx_hal::pool::CommandPoolCreateFlags;
 use gfx_hal::queue::QueueFamilyId;
-use gfx_hal::window::{AcquireError, Extent2D, SwapchainConfig};
+use gfx_hal::window::{AcquireError, Extent2D, PresentationSurface, SwapchainConfig};
 use gfx_hal::Backend;
-use std::borrow::Borrow;
 use std::ops::Deref;
 use std::rc::Rc;
 use winit::window::Window;
@@ -17,9 +16,18 @@ pub struct SwapchainFrameCommon<B>
 where
     B: Backend,
 {
-    image: Box<dyn Borrow<B::ImageView>>,
+    image: Option<<B::Surface as PresentationSurface<B>>::SwapchainImage>,
     frame_index: usize,
     resource: Rc<SwapchainFrameResource<B>>,
+}
+
+impl<B> SwapchainFrameCommon<B>
+where
+    B: Backend,
+{
+    pub fn pop_image(&mut self) -> Option<<B::Surface as PresentationSurface<B>>::SwapchainImage> {
+        std::mem::replace(&mut self.image, None)
+    }
 }
 
 impl<B> Deref for SwapchainFrameCommon<B>
@@ -34,9 +42,7 @@ where
 }
 
 pub struct SwapchainDescriptor {
-    pub format: Format,
-    pub width: u32,
-    pub height: u32,
+    pub config: SwapchainConfig,
 }
 
 impl SwapchainDescriptor {
@@ -46,11 +52,16 @@ impl SwapchainDescriptor {
     {
         let size = window.inner_size();
         let format = surface.find_support_format(adapter);
-        SwapchainDescriptor {
+        let capabilities = surface.capabilities(adapter);
+        let config = SwapchainConfig::from_caps(
+            &capabilities,
             format,
-            width: size.width,
-            height: size.height,
-        }
+            Extent2D {
+                width: size.width,
+                height: size.height,
+            },
+        );
+        SwapchainDescriptor { config }
     }
 }
 
@@ -69,21 +80,11 @@ where
     pub fn new(
         device: &DeviceCommon<B>,
         surface: &SurfaceCommon<B>,
-        adapter: &AdapterCommon<B>,
         desc: &SwapchainDescriptor,
         queue_family_id: QueueFamilyId,
     ) -> SwapchainCommon<B> {
-        let capabilities = surface.capabilities(adapter);
-        let swap_config = SwapchainConfig::from_caps(
-            &capabilities,
-            desc.format,
-            Extent2D {
-                width: desc.width,
-                height: desc.height,
-            },
-        );
         surface
-            .configure_swapchain(device, swap_config)
+            .configure_swapchain(device, desc.config.clone())
             .expect("Can't configure swapchain");
 
         let frame_in_flight = 3;
@@ -101,8 +102,8 @@ where
                         aspects: Aspects::DEPTH,
                         ..SubresourceRange::default()
                     },
-                    desc.width,
-                    desc.height,
+                    desc.config.extent.width,
+                    desc.config.extent.height,
                 ),
             }));
         }
@@ -119,7 +120,7 @@ where
     ) -> Result<SwapchainFrameCommon<B>, AcquireError> {
         let (image, _) = surface.acquire_image(!0)?;
         Ok(SwapchainFrameCommon {
-            image: Box::new(image),
+            image: Some(image),
             frame_index: self.frame_index,
             resource: Rc::clone(&self.frame_resources[self.frame_index]),
         })
@@ -144,5 +145,17 @@ where
 {
     pub fn depth_texture(&self) -> &TextureCommon<B> {
         &self.depth_texture
+    }
+
+    pub fn command_pool(&self) -> &CommandPoolCommon<B> {
+        &self.command_pool
+    }
+
+    pub fn submission_complete_fence(&self) -> &FenceCommon<B> {
+        &self.submission_complete_fence
+    }
+
+    pub fn submission_complete_semaphore(&self) -> &SemaphoreCommon<B> {
+        &self.submission_complete_semaphore
     }
 }

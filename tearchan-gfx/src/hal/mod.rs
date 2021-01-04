@@ -1,20 +1,21 @@
 use crate::hal::global::{
-    AdapterId, BufferId, CommandBufferId, CommandPoolId, DeviceId, FenceId, ImageId, ImageViewId,
-    MemoryId, MemoryMapId, QueueGroupId, RenderPassId, SemaphoreId, ShaderModuleId,
+    AdapterId, BufferId, CommandBufferId, CommandPoolId, DeviceId, FenceId, FramebufferId, ImageId,
+    ImageViewId, MemoryId, MemoryMapId, QueueGroupId, RenderPassId, SemaphoreId, ShaderModuleId,
 };
 use crate::registry::Registry;
 use crate::utils::find_memory_type;
-use gfx_hal::command::Level;
+use gfx_hal::command::{ClearValue, CommandBufferFlags, Level, SubpassContents};
+use gfx_hal::device::WaitError;
 use gfx_hal::format::{Format, Swizzle};
-use gfx_hal::image::{Kind, SubresourceRange, Tiling, Usage, ViewCapabilities, ViewKind};
+use gfx_hal::image::{Extent, Kind, SubresourceRange, Tiling, Usage, ViewCapabilities, ViewKind};
 use gfx_hal::memory::{Properties, Requirements, Segment};
 use gfx_hal::pool::CommandPoolCreateFlags;
-use gfx_hal::queue::{QueueFamilyId, QueuePriority};
+use gfx_hal::queue::{QueueFamilyId, QueuePriority, Submission};
 use gfx_hal::window::{
-    AcquireError, PresentationSurface, Suboptimal, SurfaceCapabilities, SwapchainConfig,
-    SwapchainError,
+    AcquireError, PresentError, PresentationSurface, Suboptimal, SurfaceCapabilities,
+    SwapchainConfig, SwapchainError,
 };
-use gfx_hal::{pass, Backend, Features, MemoryTypeId};
+use gfx_hal::{pass, pso, Backend, Features, MemoryTypeId};
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
@@ -45,6 +46,7 @@ where
     buffers: Registry<global::Buffer<B>>,
     memory_maps: Registry<global::MemoryMap>,
     render_passes: Registry<global::RenderPass<B>>,
+    framebuffers: Registry<global::Framebuffer<B>>,
 }
 
 mod global;
@@ -106,6 +108,7 @@ where
             buffers: Registry::default(),
             memory_maps: Registry::default(),
             render_passes: Registry::default(),
+            framebuffers: Registry::default(),
         }));
 
         let adapters = {
@@ -459,6 +462,30 @@ where
             id,
         }
     }
+
+    pub fn create_framebuffer(
+        &self,
+        render_pass: &RenderPassCommon<B>,
+        attachments: Vec<&ImageViewCommon<B>>,
+        extent: Extent,
+    ) -> FramebufferCommon<B> {
+        let global = self.global.try_lock().unwrap();
+        let device = global.devices.read(self.id);
+        let render_pass = global.render_passes.read(render_pass.id);
+        let id = global.framebuffers.gen_id();
+        let image_views = attachments
+            .iter()
+            .map(|image_view| global.image_views.read(image_view.id))
+            .collect::<Vec<_>>();
+        global.framebuffers.register(
+            id,
+            device.create_framebuffer(id, &render_pass, image_views, extent),
+        );
+        FramebufferCommon {
+            global: Arc::clone(&self.global),
+            id,
+        }
+    }
 }
 
 pub struct QueueGroupCommon<B>
@@ -477,6 +504,88 @@ where
         let global = self.global.try_lock().unwrap();
         let queue_group = global.queue_groups.read(self.id);
         queue_group.family()
+    }
+
+    pub fn get_command_queue(&self, index: usize) -> Option<CommandQueueCommon<B>> {
+        let global = self.global.try_lock().unwrap();
+        let queue_group = global.queue_groups.read(self.id);
+        if queue_group.raw.queues.len() <= index {
+            return None;
+        }
+        Some(CommandQueueCommon {
+            global: Arc::clone(&self.global),
+            index,
+            queue_group_id: self.id,
+        })
+    }
+}
+
+pub struct CommandQueueCommon<B>
+where
+    B: Backend,
+{
+    global: Arc<Mutex<Global<B>>>,
+    queue_group_id: QueueGroupId,
+    index: usize,
+}
+
+impl<B> CommandQueueCommon<B>
+where
+    B: Backend,
+{
+    pub fn submit<'a, T, Ic, S, Iw, Is>(
+        &self,
+        submission: Submission<Ic, Iw, Is>,
+        fence: Option<&FenceCommon<B>>,
+    ) where
+        T: 'a + Borrow<CommandBufferCommon<B>>,
+        Ic: IntoIterator<Item = &'a T>,
+        S: 'a + Borrow<SemaphoreCommon<B>>,
+        Iw: IntoIterator<Item = (&'a S, pso::PipelineStage)>,
+        Is: IntoIterator<Item = &'a S>,
+    {
+        let global = self.global.try_lock().unwrap();
+        let command_buffer_storage = global.command_buffers.read_storage();
+        let semaphore_storage = global.semaphores.read_storage();
+        let mut queue_group = global.queue_groups.write(self.queue_group_id);
+
+        queue_group.submit(
+            self.index,
+            gfx_hal::queue::Submission {
+                command_buffers: submission
+                    .command_buffers
+                    .into_iter()
+                    .map(|x| &command_buffer_storage.read(x.borrow().id).raw),
+                wait_semaphores: submission
+                    .wait_semaphores
+                    .into_iter()
+                    .map(|(x, y)| (&semaphore_storage.read(x.borrow().id).raw, y)),
+                signal_semaphores: submission
+                    .signal_semaphores
+                    .into_iter()
+                    .map(|x| &semaphore_storage.read(x.borrow().id).raw),
+            },
+            fence.map(|x| global.fences.write(x.id)).as_deref_mut(),
+        );
+    }
+
+    pub fn present(
+        &self,
+        image: <B::Surface as PresentationSurface<B>>::SwapchainImage,
+        wait_semaphore: Option<&SemaphoreCommon<B>>,
+    ) -> Result<Option<Suboptimal>, PresentError> {
+        let global = self.global.try_lock().unwrap();
+        let mut queue_group = global.queue_groups.write(self.queue_group_id);
+        let mut surface = global.surface.as_ref().unwrap().borrow_mut();
+        let mut semaphore_storage = global.semaphores.write_storage();
+        queue_group.present(
+            self.index,
+            &mut surface,
+            image,
+            wait_semaphore
+                .map(|x| semaphore_storage.write(x.id))
+                .as_deref_mut(),
+        )
     }
 }
 
@@ -532,6 +641,54 @@ where
     id: CommandBufferId,
 }
 
+impl<B> CommandBufferCommon<B>
+where
+    B: Backend,
+{
+    pub fn begin_render_pass<T>(
+        &self,
+        render_pass: &RenderPassCommon<B>,
+        framebuffer: &FramebufferCommon<B>,
+        render_area: pso::Rect,
+        clear_values: T,
+        first_subpass: SubpassContents,
+    ) where
+        T: IntoIterator,
+        T::Item: Borrow<ClearValue>,
+        T::IntoIter: ExactSizeIterator,
+    {
+        let global = self.global.try_lock().unwrap();
+        let mut command_buffer = global.command_buffers.write(self.id);
+        let render_pass = global.render_passes.read(render_pass.id);
+        let framebuffer = global.framebuffers.read(framebuffer.id);
+        command_buffer.begin_render_pass(
+            &render_pass,
+            &framebuffer,
+            render_area,
+            clear_values,
+            first_subpass,
+        );
+    }
+
+    pub fn end_render_pass(&self) {
+        let global = self.global.try_lock().unwrap();
+        let mut command_buffer = global.command_buffers.write(self.id);
+        command_buffer.end_render_pass();
+    }
+
+    pub fn begin_primary(&self, flags: CommandBufferFlags) {
+        let global = self.global.try_lock().unwrap();
+        let mut command_buffer = global.command_buffers.write(self.id);
+        command_buffer.begin_primary(flags);
+    }
+
+    pub fn finish(&self) {
+        let global = self.global.try_lock().unwrap();
+        let mut command_buffer = global.command_buffers.write(self.id);
+        command_buffer.finish();
+    }
+}
+
 impl<B> Drop for CommandBufferCommon<B>
 where
     B: Backend,
@@ -582,6 +739,25 @@ where
 {
     global: Arc<Mutex<Global<B>>>,
     id: FenceId,
+}
+
+impl<B> FenceCommon<B>
+where
+    B: Backend,
+{
+    pub fn wait_for_fence(&self, timeout_ns: u64) -> Result<bool, WaitError> {
+        let global = self.global.try_lock().unwrap();
+        let fence = global.fences.read(self.id);
+        let device = global.devices.read(fence.device_id);
+        device.wait_for_fence(&fence, timeout_ns)
+    }
+
+    pub fn reset_fence(&self) {
+        let global = self.global.try_lock().unwrap();
+        let mut fence = global.fences.write(self.id);
+        let device = global.devices.read(fence.device_id);
+        device.reset_fence(&mut fence);
+    }
 }
 
 impl<B> Drop for FenceCommon<B>
@@ -845,4 +1021,12 @@ where
 {
     global: Arc<Mutex<Global<B>>>,
     id: RenderPassId,
+}
+
+pub struct FramebufferCommon<B>
+where
+    B: Backend,
+{
+    global: Arc<Mutex<Global<B>>>,
+    id: FramebufferId,
 }

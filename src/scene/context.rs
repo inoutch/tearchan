@@ -17,11 +17,11 @@ impl<'a> SceneContext<'a> {
 
 pub struct SceneRenderContext<'a> {
     scene_context: SceneContext<'a>,
-    rendering_context: GfxRenderingContext,
+    rendering_context: &'a GfxRenderingContext,
 }
 
 impl<'a> SceneRenderContext<'a> {
-    pub fn new(gfx: (GfxContext<'a>, GfxRenderingContext)) -> SceneRenderContext<'a> {
+    pub fn new(gfx: (GfxContext<'a>, &'a GfxRenderingContext)) -> SceneRenderContext<'a> {
         SceneRenderContext {
             scene_context: SceneContext::new(gfx.0),
             rendering_context: gfx.1,

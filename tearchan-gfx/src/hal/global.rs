@@ -1,15 +1,18 @@
 use gfx_hal::adapter::MemoryProperties;
-use gfx_hal::command::Level;
+use gfx_hal::command::{ClearValue, CommandBufferFlags, Level, SubpassContents};
+use gfx_hal::device::{OutOfMemory, WaitError};
 use gfx_hal::format::{ChannelType, Format};
+use gfx_hal::image::Extent;
 use gfx_hal::memory::{Requirements, Segment};
 use gfx_hal::pool::CommandPoolCreateFlags;
-use gfx_hal::queue::{QueueFamily, QueueFamilyId, QueuePriority};
+use gfx_hal::queue::{QueueFamily, QueueFamilyId, QueuePriority, Submission};
 use gfx_hal::window::{
-    AcquireError, PresentationSurface, Suboptimal, SurfaceCapabilities, SwapchainConfig,
-    SwapchainError,
+    AcquireError, PresentError, PresentationSurface, Suboptimal, SurfaceCapabilities,
+    SwapchainConfig, SwapchainError,
 };
-use gfx_hal::{pass, Backend, Features, Limits, MemoryTypeId};
+use gfx_hal::{pass, pso, Backend, Features, Limits, MemoryTypeId};
 use std::borrow::Borrow;
+use std::cell::Ref;
 
 pub type AdapterId = u64;
 pub type DeviceId = u64;
@@ -25,6 +28,7 @@ pub type ShaderModuleId = u64;
 pub type BufferId = u64;
 pub type MemoryMapId = u64;
 pub type RenderPassId = u64;
+pub type FramebufferId = u64;
 
 pub struct Instance<B>
 where
@@ -323,6 +327,42 @@ where
             size: memory.size,
         }
     }
+
+    pub fn create_framebuffer(
+        &self,
+        id: FramebufferId,
+        render_pass: &RenderPass<B>,
+        attachments: Vec<Ref<ImageView<B>>>,
+        extent: Extent,
+    ) -> Framebuffer<B> {
+        use gfx_hal::device::Device;
+        let framebuffer = unsafe {
+            self.raw.create_framebuffer(
+                &render_pass.raw,
+                attachments
+                    .iter()
+                    .map(|attachment| attachment.raw.borrow())
+                    .collect::<Vec<_>>(),
+                extent,
+            )
+        }
+        .expect("Failed to create Framebuffer");
+        Framebuffer {
+            raw: framebuffer,
+            render_pass_id: render_pass.id,
+            id,
+        }
+    }
+
+    pub fn wait_for_fence(&self, fence: &Fence<B>, timeout_ns: u64) -> Result<bool, WaitError> {
+        use gfx_hal::device::Device;
+        unsafe { self.raw.wait_for_fence(&fence.raw, timeout_ns) }
+    }
+
+    pub fn reset_fence(&self, fence: &mut Fence<B>) -> Result<(), OutOfMemory> {
+        use gfx_hal::device::Device;
+        unsafe { self.raw.reset_fence(&mut fence.raw) }
+    }
 }
 
 pub struct QueueGroup<B>
@@ -340,6 +380,35 @@ where
 {
     pub fn family(&self) -> QueueFamilyId {
         self.raw.family
+    }
+
+    #[inline]
+    pub fn submit<'a, T, Ic, S, Iw, Is>(
+        &mut self,
+        index: usize,
+        submission: Submission<Ic, Iw, Is>,
+        fence: Option<&mut Fence<B>>,
+    ) where
+        T: 'a + Borrow<B::CommandBuffer>,
+        Ic: IntoIterator<Item = &'a T>,
+        S: 'a + Borrow<B::Semaphore>,
+        Iw: IntoIterator<Item = (&'a S, pso::PipelineStage)>,
+        Is: IntoIterator<Item = &'a S>,
+    {
+        use gfx_hal::queue::CommandQueue;
+        unsafe { self.raw.queues[index].submit(submission, fence.map(|x| &mut x.raw)) }
+    }
+
+    pub fn present(
+        &mut self,
+        index: usize,
+        surface: &mut Surface<B>,
+        image: <B::Surface as PresentationSurface<B>>::SwapchainImage,
+        wait_semaphore: Option<&mut Semaphore<B>>,
+    ) -> Result<Option<Suboptimal>, PresentError> {
+        use gfx_hal::queue::CommandQueue;
+        let queue = &mut self.raw.queues[index];
+        unsafe { queue.present(&mut surface.raw, image, wait_semaphore.map(|x| &mut x.raw)) }
     }
 }
 
@@ -374,6 +443,56 @@ where
     pub raw: B::CommandBuffer,
     pub id: CommandBufferId,
     pub command_pool_id: CommandPoolId,
+}
+
+impl<B> CommandBuffer<B>
+where
+    B: Backend,
+{
+    pub fn begin_render_pass<T>(
+        &mut self,
+        render_pass: &RenderPass<B>,
+        framebuffer: &Framebuffer<B>,
+        render_area: pso::Rect,
+        clear_values: T,
+        first_subpass: SubpassContents,
+    ) where
+        T: IntoIterator,
+        T::Item: Borrow<ClearValue>,
+        T::IntoIter: ExactSizeIterator,
+    {
+        use gfx_hal::command::CommandBuffer;
+        unsafe {
+            self.raw.begin_render_pass(
+                &render_pass.raw,
+                &framebuffer.raw,
+                render_area,
+                clear_values,
+                first_subpass,
+            );
+        }
+    }
+
+    pub fn end_render_pass(&mut self) {
+        use gfx_hal::command::CommandBuffer;
+        unsafe {
+            self.raw.end_render_pass();
+        };
+    }
+
+    pub fn begin_primary(&mut self, flags: CommandBufferFlags) {
+        use gfx_hal::command::CommandBuffer;
+        unsafe {
+            self.raw.begin_primary(flags);
+        }
+    }
+
+    pub fn finish(&mut self) {
+        use gfx_hal::command::CommandBuffer;
+        unsafe {
+            self.raw.finish();
+        }
+    }
 }
 
 pub struct Semaphore<B>
@@ -454,4 +573,13 @@ where
     pub raw: B::RenderPass,
     pub id: RenderPassId,
     pub device_id: DeviceId,
+}
+
+pub struct Framebuffer<B>
+where
+    B: Backend,
+{
+    pub raw: B::Framebuffer,
+    pub id: FramebufferId,
+    pub render_pass_id: RenderPassId,
 }

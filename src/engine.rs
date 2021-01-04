@@ -69,12 +69,13 @@ impl Engine {
                     *control_flow = ControlFlow::Poll;
                 }
                 // Rendering
-                let context = SceneRenderContext::new(setup.create_render_context());
+                let (context, mut render_context) = setup.create_render_context();
+                let context = SceneRenderContext::new((context, &render_context));
                 if let Some(overwrite) = scene_manager.render(context) {
                     *control_flow = overwrite;
                 };
 
-                setup.flush();
+                setup.flush(render_context.frame_mut());
                 duration_watcher.reset();
             }
             _ => (),

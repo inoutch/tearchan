@@ -1,6 +1,6 @@
 use crate::context::{GfxContext, GfxRenderingContext};
-use crate::hal::swapchain::{SwapchainCommon, SwapchainDescriptor};
-use crate::hal::{DeviceCommon, InstanceCommon, QueueGroupCommon};
+use crate::hal::swapchain::{SwapchainCommon, SwapchainDescriptor, SwapchainFrameCommon};
+use crate::hal::{CommandQueueCommon, DeviceCommon, InstanceCommon, QueueGroupCommon};
 use gfx_hal::Features;
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
@@ -14,6 +14,7 @@ where
     instance: InstanceCommon<B>,
     device: DeviceCommon<B>,
     queue_group: QueueGroupCommon<B>,
+    queue: CommandQueueCommon<B>,
     swapchain: SwapchainCommon<B>,
     swapchain_desc: SwapchainDescriptor,
 }
@@ -32,15 +33,13 @@ where
         let (device, mut queue_groups) =
             adapter.create_device(&[(family, &[1.0])], Features::empty());
         let queue_group = queue_groups.pop().expect("QueueGroup is empty");
+        let queue = queue_group
+            .get_command_queue(0)
+            .expect("Failed to get CommandQueue");
 
         let swapchain_desc = SwapchainDescriptor::new(surface, adapter, &window);
-        let swapchain = SwapchainCommon::new(
-            &device,
-            surface,
-            adapter,
-            &swapchain_desc,
-            queue_group.family(),
-        );
+        let swapchain =
+            SwapchainCommon::new(&device, surface, &swapchain_desc, queue_group.family());
 
         Setup {
             window,
@@ -48,14 +47,22 @@ where
             instance,
             device,
             queue_group,
+            queue,
             swapchain,
             swapchain_desc,
         }
     }
 
-    pub fn flush(&mut self) {
+    pub fn flush(&mut self, frame: &mut SwapchainFrameCommon<B>) {
+        self.queue
+            .present(
+                frame.pop_image().expect("Already pop image"),
+                Some(frame.submission_complete_semaphore()),
+            )
+            .unwrap();
         self.swapchain.flush();
     }
+
     pub fn window(&self) -> &Window {
         &self.window
     }
@@ -68,6 +75,7 @@ impl Setup<crate::hal::backend::Backend> {
             self.instance.adapters(),
             &self.device,
             &self.queue_group,
+            &self.swapchain_desc,
         )
     }
 
@@ -75,10 +83,14 @@ impl Setup<crate::hal::backend::Backend> {
         let frame = match self.swapchain.get_current_frame(self.instance.surface()) {
             Ok(frame) => frame,
             Err(_) => {
+                self.swapchain_desc = SwapchainDescriptor::new(
+                    self.instance.surface(),
+                    &self.instance.adapters()[0],
+                    &self.window,
+                );
                 self.swapchain = SwapchainCommon::new(
                     &self.device,
                     self.instance.surface(),
-                    &self.instance.adapters()[0],
                     &self.swapchain_desc,
                     self.queue_group.family(),
                 );
@@ -93,6 +105,7 @@ impl Setup<crate::hal::backend::Backend> {
                 self.instance.adapters(),
                 &self.device,
                 &self.queue_group,
+                &self.swapchain_desc,
             ),
             GfxRenderingContext::new(frame),
         )

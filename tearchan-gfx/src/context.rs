@@ -1,4 +1,4 @@
-use crate::hal::backend::Backend;
+use crate::hal::swapchain::SwapchainDescriptor;
 use crate::{Adapter, Device, QueueGroup, Surface, SwapchainFrame};
 use gfx_hal::format::Format;
 
@@ -7,6 +7,7 @@ pub struct GfxContext<'a> {
     adapters: &'a Vec<Adapter>,
     device: &'a Device,
     queue_group: &'a QueueGroup,
+    swapchain_desc: &'a SwapchainDescriptor,
 }
 
 impl<'a> GfxContext<'a> {
@@ -15,12 +16,14 @@ impl<'a> GfxContext<'a> {
         adapters: &'a Vec<Adapter>,
         device: &'a Device,
         queue_group: &'a QueueGroup,
+        swapchain_desc: &'a SwapchainDescriptor,
     ) -> GfxContext<'a> {
         GfxContext {
             surface,
             adapters,
             device,
             queue_group,
+            swapchain_desc,
         }
     }
 
@@ -39,6 +42,10 @@ impl<'a> GfxContext<'a> {
     pub fn find_support_format(&self) -> Format {
         self.surface.find_support_format(&self.adapters[0])
     }
+
+    pub fn swapchain_desc(&self) -> &SwapchainDescriptor {
+        &self.swapchain_desc
+    }
 }
 
 pub struct GfxRenderingContext {
@@ -52,5 +59,9 @@ impl GfxRenderingContext {
 
     pub fn frame(&self) -> &SwapchainFrame {
         &self.frame
+    }
+
+    pub fn frame_mut(&mut self) -> &mut SwapchainFrame {
+        &mut self.frame
     }
 }
