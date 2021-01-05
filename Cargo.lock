@@ -1816,6 +1816,7 @@ dependencies = [
  "gfx-backend-vulkan",
  "gfx-hal",
  "image",
+ "log",
  "nalgebra-glm",
  "shaderc",
  "tearchan-util",

@@ -13,6 +13,7 @@ vulkan = ["gfx-backend-vulkan"]
 
 [dependencies]
 # utils
+log = "0.4.11"
 nalgebra-glm = { version = "0.8.0", features = ["serde-serialize"] }
 image = "0.23.4"
 tearchan-util = { path = "../tearchan-util" }
