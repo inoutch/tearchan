@@ -3,7 +3,8 @@ use crate::hal::swapchain::{SwapchainCommon, SwapchainFrameCommon};
 use crate::hal::{
     AdapterCommon, CommandBufferCommon, CommandPoolCommon, CommandQueueCommon, DeviceCommon,
     FenceCommon, ImageCommon, ImageViewCommon, InstanceCommon, MemoryCommon, MemoryMapCommon,
-    QueueGroupCommon, SemaphoreCommon, ShaderModuleCommon, SurfaceCommon, TextureCommon,
+    QueueGroupCommon, RenderPassCommon, RenderPipelineCommon, RenderPipelineDescCommon,
+    SemaphoreCommon, ShaderModuleCommon, SurfaceCommon, TextureCommon,
 };
 
 pub mod bitmap;
@@ -32,3 +33,6 @@ pub type Texture = TextureCommon<Backend>;
 pub type MemoryMap = MemoryMapCommon<Backend>;
 pub type Swapchain = SwapchainCommon<Backend>;
 pub type SwapchainFrame = SwapchainFrameCommon<Backend>;
+pub type RenderPass = RenderPassCommon<Backend>;
+pub type RenderPipeline = RenderPipelineCommon<Backend>;
+pub type RenderPipelineDesc<'a> = RenderPipelineDescCommon<'a, Backend>;

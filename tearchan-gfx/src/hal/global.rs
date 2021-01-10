@@ -1,3 +1,4 @@
+use crate::hal::AttributeDesc;
 use gfx_hal::adapter::MemoryProperties;
 use gfx_hal::command::{ClearValue, CommandBufferFlags, Level, SubpassContents};
 use gfx_hal::device::{OutOfMemory, WaitError};
@@ -5,6 +6,10 @@ use gfx_hal::format::{ChannelType, Format};
 use gfx_hal::image::Extent;
 use gfx_hal::memory::{Requirements, Segment};
 use gfx_hal::pool::CommandPoolCreateFlags;
+use gfx_hal::pso::{
+    DescriptorSetLayoutBinding, InputAssemblerDesc, Primitive, PrimitiveAssemblerDesc, Rasterizer,
+    VertexBufferDesc,
+};
 use gfx_hal::queue::{QueueFamily, QueueFamilyId, QueuePriority, Submission};
 use gfx_hal::window::{
     AcquireError, PresentError, PresentationSurface, Suboptimal, SurfaceCapabilities,
@@ -12,6 +17,10 @@ use gfx_hal::window::{
 };
 use gfx_hal::{pass, pso, Backend, Features, Limits, MemoryTypeId};
 use std::borrow::Borrow;
+
+const RENDER_PIPELINE_DESCRIPTOR_RANGE_MAX: usize = 32;
+const RENDER_PIPELINE_DESCRIPTOR_SET_MAX: usize = 64;
+const SHADER_MODULE_ENTRY_NAME: &str = "main";
 
 pub type AdapterId = u64;
 pub type SurfaceId = u64;
@@ -29,6 +38,8 @@ pub type BufferId = u64;
 pub type MemoryMapId = u64;
 pub type RenderPassId = u64;
 pub type FramebufferId = u64;
+pub type RenderPipelineId = u64;
+pub type DescriptorSetId = u64;
 
 pub struct Instance<B>
 where
@@ -377,6 +388,118 @@ where
         use gfx_hal::device::Device;
         self.raw.wait_idle()
     }
+
+    pub fn create_render_pipeline(
+        &self,
+        id: RenderPipelineId,
+        desc: RenderPipelineDesc<B>,
+    ) -> RenderPipeline<B> {
+        use gfx_hal::device::Device;
+        use gfx_hal::pso::DescriptorPool;
+        let descriptor_ranges = vec![
+            gfx_hal::pso::DescriptorRangeDesc {
+                ty: gfx_hal::pso::DescriptorType::Buffer {
+                    ty: gfx_hal::pso::BufferDescriptorType::Uniform,
+                    format: gfx_hal::pso::BufferDescriptorFormat::Structured {
+                        dynamic_offset: false,
+                    },
+                },
+                count: RENDER_PIPELINE_DESCRIPTOR_RANGE_MAX,
+            },
+            gfx_hal::pso::DescriptorRangeDesc {
+                ty: gfx_hal::pso::DescriptorType::Sampler,
+                count: RENDER_PIPELINE_DESCRIPTOR_RANGE_MAX,
+            },
+            gfx_hal::pso::DescriptorRangeDesc {
+                ty: gfx_hal::pso::DescriptorType::Image {
+                    ty: gfx_hal::pso::ImageDescriptorType::Sampled { with_sampler: true },
+                },
+                count: RENDER_PIPELINE_DESCRIPTOR_RANGE_MAX,
+            },
+        ];
+        let mut descriptor_pool = unsafe {
+            self.raw.create_descriptor_pool(
+                RENDER_PIPELINE_DESCRIPTOR_SET_MAX,
+                descriptor_ranges,
+                gfx_hal::pso::DescriptorPoolCreateFlags::empty(),
+            )
+        }
+        .expect("Failed to create DescriptorPool");
+
+        let descriptor_set_layout = unsafe {
+            self.raw
+                .create_descriptor_set_layout(desc.shader.bindings, &[])
+        }
+        .expect("Failed to create DescriptorSetLayout");
+
+        let descriptor_set = unsafe { descriptor_pool.allocate_set(&descriptor_set_layout) }
+            .expect("Failed to DescriptorSet");
+
+        let mut descriptor_set_layouts = vec![descriptor_set_layout];
+        let pipeline_layout = unsafe {
+            self.raw
+                .create_pipeline_layout(&descriptor_set_layouts, &[])
+        }
+        .expect("Failed to create PipelineLayout");
+
+        let subpass = gfx_hal::pass::Subpass {
+            index: 0,
+            main_pass: &desc.main_pass.raw,
+        };
+
+        let buffers = desc.shader.create_vertex_buffers();
+        let attributes = desc.shader.create_attribute();
+        let mut pipeline_desc = gfx_hal::pso::GraphicsPipelineDesc::new(
+            PrimitiveAssemblerDesc::Vertex {
+                buffers: &buffers,
+                attributes: &attributes,
+                input_assembler: InputAssemblerDesc {
+                    primitive: desc.primitive,
+                    with_adjacency: false,
+                    restart_index: None,
+                },
+                vertex: gfx_hal::pso::EntryPoint {
+                    entry: SHADER_MODULE_ENTRY_NAME,
+                    module: &desc.shader.vertex_module.raw,
+                    specialization: gfx_hal::pso::Specialization::default(),
+                },
+                geometry: None,
+                tessellation: None,
+            },
+            desc.rasterization,
+            Some(gfx_hal::pso::EntryPoint {
+                entry: SHADER_MODULE_ENTRY_NAME,
+                module: &desc.shader.fragment_module.raw,
+                specialization: gfx_hal::pso::Specialization::default(),
+            }),
+            &pipeline_layout,
+            subpass,
+        );
+
+        // TODO: Set by desc
+        pipeline_desc
+            .blender
+            .targets
+            .push(gfx_hal::pso::ColorBlendDesc {
+                mask: gfx_hal::pso::ColorMask::ALL,
+                blend: Some(gfx_hal::pso::BlendState::ALPHA),
+            });
+        pipeline_desc.depth_stencil.depth = Some(gfx_hal::pso::DepthTest {
+            fun: gfx_hal::pso::Comparison::LessEqual,
+            write: true,
+        });
+
+        let pipeline = unsafe { self.raw.create_graphics_pipeline(&pipeline_desc, None) }
+            .expect("Failed to create GraphicsPipeline");
+        RenderPipeline {
+            id,
+            device_id: self.id,
+            raw_pipeline: pipeline,
+            raw_descriptor_pool: descriptor_pool,
+            raw_descriptor_set_layout: descriptor_set_layouts.remove(0),
+            raw_descriptor_set: descriptor_set,
+        }
+    }
 }
 
 pub struct QueueGroup<B>
@@ -596,4 +719,66 @@ where
     pub raw: B::Framebuffer,
     pub id: FramebufferId,
     pub render_pass_id: RenderPassId,
+}
+
+pub struct RenderPipelineDesc<'a, B>
+where
+    B: Backend,
+{
+    pub shader: ShaderDesc<'a, B>,
+    pub main_pass: &'a RenderPass<B>,
+    pub rasterization: Rasterizer,
+    pub primitive: Primitive,
+}
+
+pub struct RenderPipeline<B>
+where
+    B: Backend,
+{
+    pub raw_pipeline: B::GraphicsPipeline,
+    pub raw_descriptor_pool: B::DescriptorPool,
+    pub raw_descriptor_set: B::DescriptorSet,
+    pub raw_descriptor_set_layout: B::DescriptorSetLayout,
+    pub id: RenderPipelineId,
+    pub device_id: DeviceId,
+}
+
+pub struct ShaderDesc<'a, B>
+where
+    B: Backend,
+{
+    pub vertex_module: &'a ShaderModule<B>,
+    pub fragment_module: &'a ShaderModule<B>,
+    pub attributes: &'a Vec<AttributeDesc>,
+    pub bindings: &'a Vec<DescriptorSetLayoutBinding>,
+}
+
+impl<'a, B> ShaderDesc<'a, B>
+where
+    B: Backend,
+{
+    pub fn create_vertex_buffers(&self) -> Vec<gfx_hal::pso::VertexBufferDesc> {
+        self.attributes
+            .iter()
+            .enumerate()
+            .map(|(i, attr)| VertexBufferDesc {
+                binding: i as u32,
+                stride: attr.stride,
+                rate: gfx_hal::pso::VertexInputRate::Vertex,
+            })
+            .collect()
+    }
+
+    pub fn create_attribute(&self) -> Vec<gfx_hal::pso::AttributeDesc> {
+        self.attributes.iter().map(|x| x.desc).collect::<Vec<_>>()
+    }
+}
+
+pub struct DescriptorSet<B>
+where
+    B: Backend,
+{
+    pub raw: B::DescriptorSet,
+    pub id: DescriptorSetId,
+    pub device_id: DeviceId,
 }

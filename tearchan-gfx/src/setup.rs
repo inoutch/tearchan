@@ -35,7 +35,7 @@ where
     }
 
     pub fn flush(&mut self, frame: &mut SwapchainFrameCommon<B>) {
-        self.setup.as_mut().unwrap().flush(frame, &self.window);
+        self.setup.as_mut().unwrap().finish(frame, &self.window);
     }
 
     pub fn wait_idle(&self) {
@@ -102,7 +102,7 @@ where
         }
     }
 
-    pub fn flush(&mut self, frame: &mut SwapchainFrameCommon<B>, window: &Window) {
+    pub fn finish(&mut self, frame: &mut SwapchainFrameCommon<B>, window: &Window) {
         let result = self.queue.present(
             frame.pop_image().expect("Already pop image"),
             Some(frame.submission_complete_semaphore()),
@@ -110,7 +110,7 @@ where
         if result.is_err() {
             self.recreate_swapchain(window);
         }
-        self.swapchain.flush();
+        self.swapchain.finish();
     }
 
     pub fn wait_idle(&self) {

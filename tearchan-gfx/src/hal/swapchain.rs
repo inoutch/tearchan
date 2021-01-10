@@ -47,6 +47,7 @@ where
 
 pub struct SwapchainDescriptor {
     pub config: SwapchainConfig,
+    pub depth_color_format: Format,
 }
 
 impl SwapchainDescriptor {
@@ -65,7 +66,10 @@ impl SwapchainDescriptor {
                 height: size.height,
             },
         );
-        SwapchainDescriptor { config }
+        SwapchainDescriptor {
+            config,
+            depth_color_format: Format::D32Sfloat,
+        }
     }
 }
 
@@ -100,7 +104,7 @@ where
                 submission_complete_fence: device.create_fence(true),
                 submission_complete_semaphore: device.create_semaphore(),
                 depth_texture: device.create_texture(
-                    Format::D32Sfloat,
+                    desc.depth_color_format,
                     Usage::DEPTH_STENCIL_ATTACHMENT,
                     SubresourceRange {
                         aspects: Aspects::DEPTH,
@@ -130,7 +134,7 @@ where
         })
     }
 
-    pub fn flush(&mut self) {
+    pub fn finish(&mut self) {
         self.frame_index += 1;
         self.frame_index = self.frame_resources.len() % self.frame_index;
     }

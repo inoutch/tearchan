@@ -1,7 +1,7 @@
 use crate::hal::global::{
     AdapterId, BufferId, CommandBufferId, CommandPoolId, DeviceId, FenceId, FramebufferId, ImageId,
-    ImageViewId, MemoryId, MemoryMapId, QueueGroupId, RenderPassId, SemaphoreId, ShaderModuleId,
-    SurfaceId,
+    ImageViewId, MemoryId, MemoryMapId, QueueGroupId, RenderPassId, RenderPipelineDesc,
+    RenderPipelineId, SemaphoreId, ShaderDesc, ShaderModuleId, SurfaceId,
 };
 use crate::hal::swapchain::SwapchainFrameCommon;
 use crate::registry::Registry;
@@ -12,6 +12,7 @@ use gfx_hal::format::{Format, Swizzle};
 use gfx_hal::image::{Extent, Kind, SubresourceRange, Tiling, Usage, ViewCapabilities, ViewKind};
 use gfx_hal::memory::{Properties, Requirements, Segment};
 use gfx_hal::pool::CommandPoolCreateFlags;
+use gfx_hal::pso::{DescriptorSetLayoutBinding, Primitive, Rasterizer};
 use gfx_hal::queue::{QueueFamilyId, QueuePriority, Submission};
 use gfx_hal::window::{
     AcquireError, PresentError, PresentationSurface, Suboptimal, SurfaceCapabilities,
@@ -49,6 +50,7 @@ where
     memory_maps: Registry<global::MemoryMap>,
     render_passes: Registry<global::RenderPass<B>>,
     framebuffers: Registry<global::Framebuffer<B>>,
+    render_pipelines: Registry<global::RenderPipeline<B>>,
 }
 
 mod global;
@@ -112,6 +114,7 @@ where
             memory_maps: Registry::default(),
             render_passes: Registry::default(),
             framebuffers: Registry::default(),
+            render_pipelines: Registry::default(),
         }));
 
         let adapters = {
@@ -563,6 +566,37 @@ where
         let global = self.global.try_lock().unwrap();
         let device = global.devices.read(self.id);
         device.wait_idle()
+    }
+
+    pub fn create_render_pipeline(
+        &self,
+        desc: RenderPipelineDescCommon<B>,
+    ) -> RenderPipelineCommon<B> {
+        let global = self.global.try_lock().unwrap();
+        let shaders = global.shader_modules.read_storage();
+        let device = global.devices.read(self.id);
+        let main_pass = global.render_passes.read(desc.main_pass.id);
+        let shader = ShaderDesc {
+            vertex_module: shaders.read(desc.shader.vertex_module.id),
+            fragment_module: shaders.read(desc.shader.fragment_module.id),
+            attributes: &desc.shader.attributes,
+            bindings: &desc.shader.bindings,
+        };
+        let desc = RenderPipelineDesc {
+            shader,
+            main_pass: &main_pass,
+            rasterization: desc.rasterization,
+            primitive: desc.primitive,
+        };
+
+        let id = global.render_pipelines.gen_id();
+        let render_pipeline = device.create_render_pipeline(id, desc);
+        global.render_pipelines.register(id, render_pipeline);
+
+        RenderPipelineCommon {
+            global: Arc::clone(&self.global),
+            id,
+        }
     }
 }
 
@@ -1110,4 +1144,38 @@ where
 {
     global: Arc<Mutex<Global<B>>>,
     id: FramebufferId,
+}
+
+pub struct RenderPipelineDescCommon<'a, B>
+where
+    B: Backend,
+{
+    pub label: Option<&'a str>,
+    pub shader: &'a ShaderDescCommon<B>,
+    pub main_pass: &'a RenderPassCommon<B>,
+    pub rasterization: Rasterizer,
+    pub primitive: Primitive,
+}
+
+pub struct RenderPipelineCommon<B>
+where
+    B: Backend,
+{
+    global: Arc<Mutex<Global<B>>>,
+    id: RenderPipelineId,
+}
+
+pub struct AttributeDesc {
+    pub desc: gfx_hal::pso::AttributeDesc,
+    pub stride: u32,
+}
+
+pub struct ShaderDescCommon<B>
+where
+    B: Backend,
+{
+    pub vertex_module: ShaderModuleCommon<B>,
+    pub fragment_module: ShaderModuleCommon<B>,
+    pub attributes: Vec<AttributeDesc>,
+    pub bindings: Vec<DescriptorSetLayoutBinding>,
 }
