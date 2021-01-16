@@ -194,13 +194,30 @@ where
         unsafe { self.raw.get_image_requirements(&image.raw) }
     }
 
-    pub fn bind_image_memory(&self, memory: &Memory<B>, offset: u64, image: &mut Image<B>) {
+    pub fn bind_image_memory(
+        &self,
+        memory: &Memory<B>,
+        offset: u64,
+        image: &mut Image<B>,
+    ) -> Result<(), gfx_hal::device::BindError> {
         use gfx_hal::device::Device;
         unsafe {
             self.raw
                 .bind_image_memory(&memory.raw, offset, &mut image.raw)
         }
-        .expect("Failed to bind ImageMemory");
+    }
+
+    pub fn bind_buffer_memory(
+        &self,
+        memory: &Memory<B>,
+        offset: u64,
+        buffer: &mut Buffer<B>,
+    ) -> Result<(), gfx_hal::device::BindError> {
+        use gfx_hal::device::Device;
+        unsafe {
+            self.raw
+                .bind_buffer_memory(&memory.raw, offset, &mut buffer.raw)
+        }
     }
 
     pub fn create_command_pool(
@@ -500,6 +517,26 @@ where
             raw_descriptor_set: descriptor_set,
         }
     }
+
+    pub fn create_buffer(
+        &self,
+        id: BufferId,
+        size: u64,
+        usage: gfx_hal::buffer::Usage,
+    ) -> Result<Buffer<B>, gfx_hal::buffer::CreationError> {
+        use gfx_hal::device::Device;
+        let buffer = unsafe { self.raw.create_buffer(size, usage) }?;
+        Ok(Buffer {
+            raw: buffer,
+            id,
+            device_id: self.id,
+        })
+    }
+
+    pub fn get_buffer_requirements(&self, buffer: &Buffer<B>) -> Requirements {
+        use gfx_hal::device::Device;
+        unsafe { self.raw.get_buffer_requirements(&buffer.raw) }
+    }
 }
 
 pub struct QueueGroup<B>
@@ -731,6 +768,7 @@ where
     pub primitive: Primitive,
 }
 
+// TODO: Expand to each native element
 pub struct RenderPipeline<B>
 where
     B: Backend,

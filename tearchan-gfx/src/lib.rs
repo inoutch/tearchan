@@ -4,7 +4,8 @@ use crate::hal::{
     AdapterCommon, CommandBufferCommon, CommandPoolCommon, CommandQueueCommon, DeviceCommon,
     FenceCommon, ImageCommon, ImageViewCommon, InstanceCommon, MemoryCommon, MemoryMapCommon,
     QueueGroupCommon, RenderPassCommon, RenderPipelineCommon, RenderPipelineDescCommon,
-    SemaphoreCommon, ShaderModuleCommon, SurfaceCommon, TextureCommon,
+    SemaphoreCommon, ShaderDescCommon, ShaderModuleCommon, SurfaceCommon, TextureCommon,
+    UniformBufferCommon,
 };
 
 pub mod bitmap;
@@ -12,6 +13,7 @@ pub mod context;
 pub mod hal;
 pub mod registry;
 pub mod setup;
+pub mod shader_program;
 pub mod types;
 pub mod utils;
 
@@ -36,3 +38,5 @@ pub type SwapchainFrame = SwapchainFrameCommon<Backend>;
 pub type RenderPass = RenderPassCommon<Backend>;
 pub type RenderPipeline = RenderPipelineCommon<Backend>;
 pub type RenderPipelineDesc<'a> = RenderPipelineDescCommon<'a, Backend>;
+pub type ShaderDesc = ShaderDescCommon<Backend>;
+pub type UniformBuffer<T> = UniformBufferCommon<Backend, T>;

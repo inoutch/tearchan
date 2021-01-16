@@ -20,6 +20,7 @@ use gfx_hal::window::{
 };
 use gfx_hal::{pass, pso, Backend, Features, MemoryTypeId};
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use winit::window::Window;
 
@@ -598,6 +599,53 @@ where
             id,
         }
     }
+
+    pub fn create_buffer(&self, size: u64, usage: gfx_hal::buffer::Usage) -> BufferCommon<B> {
+        let global = self.global.try_lock().unwrap();
+        let device = global.devices.read(self.id);
+        let id = global.buffers.gen_id();
+        let buffer = device
+            .create_buffer(id, size, usage)
+            .expect("Failed to create Buffer");
+        global.buffers.register(id, buffer);
+        BufferCommon {
+            global: Arc::clone(&self.global),
+            id,
+            size,
+        }
+    }
+
+    pub fn create_uniform_buffer<T>(&self, data: &[T]) -> UniformBufferCommon<B> {
+        let global = self.global.try_lock().unwrap();
+        let device = global.devices.read(self.id);
+
+        let upload_size = data.len() * std::mem::size_of::<T>();
+        let buffer_id = global.buffers.gen_id();
+        let mut buffer = device
+            .create_buffer(buffer_id, upload_size as _, gfx_hal::buffer::Usage::UNIFORM)
+            .expect("Failed to create Buffer");
+        global.buffers.register(buffer_id, buffer);
+        let buffer_req = device.get_buffer_requirements(&buffer);
+        let upload_type = find_memory_type(
+            &device.memory_properties.memory_types,
+            &buffer_req,
+            Properties::CPU_VISIBLE,
+        );
+
+        let buffer_memory_id = global.buffers.gen_id();
+        let mut buffer_memory =
+            unsafe { device.allocate_memory(buffer_memory_id, upload_type, buffer_req.size) };
+        device
+            .bind_buffer_memory(&buffer_memory, 0, &mut buffer)
+            .expect("Failed to bind BufferMemory");
+
+        let memory_map_id = global.memories.gen_id();
+        let memory_map = device.map_memory(memory_map_id, &mut buffer_memory, Segment::ALL);
+
+        UniformBufferCommon {
+            buffer: BufferCommon { id: buffer_id },
+        }
+    }
 }
 
 pub struct QueueGroupCommon<B>
@@ -973,7 +1021,9 @@ where
         let memory = global.memories.read(self.id);
         let device = global.devices.read(memory.device_id);
         let mut image = global.images.write(image.id);
-        device.bind_image_memory(&memory, offset, &mut image)
+        device
+            .bind_image_memory(&memory, offset, &mut image)
+            .expect("Failed to bind ImageMemory")
     }
 
     pub fn map_memory(&self, segment: Segment) -> MemoryMapCommon<B> {
@@ -1081,7 +1131,6 @@ where
     B: Backend,
 {
     global: Arc<Mutex<Global<B>>>,
-    device_id: DeviceId,
     id: BufferId,
     size: u64,
 }
@@ -1094,8 +1143,8 @@ where
         if !std::thread::panicking() {
             use gfx_hal::device::Device;
             let global = self.global.try_lock().unwrap();
-            let device = global.devices.write(self.device_id);
             let buffer = global.buffers.unregister(self.id).unwrap();
+            let device = global.devices.write(buffer.device_id);
             unsafe {
                 device.raw.destroy_buffer(buffer.raw);
             }
@@ -1179,3 +1228,15 @@ where
     pub attributes: Vec<AttributeDesc>,
     pub bindings: Vec<DescriptorSetLayoutBinding>,
 }
+
+pub struct UniformBufferCommon<B, T>
+where
+    B: Backend,
+{
+    buffer: BufferCommon<B>,
+    buffer_memory: MemoryCommon<B>,
+    len: usize,
+    _ty: PhantomData<T>,
+}
+
+impl<B, T> UniformBufferCommon<B, T> where B: Backend {}
