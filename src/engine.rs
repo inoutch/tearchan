@@ -81,6 +81,9 @@ impl Engine {
             Event::MainEventsCleared => {
                 start_time = Instant::now();
                 setup.window().request_redraw();
+
+                #[cfg(target_os = "android")]
+                request_redraw_for_android();
             }
             Event::RedrawRequested(_) => {
                 let elapsed_time = Instant::now().duration_since(start_time).as_millis() as u64;
@@ -109,5 +112,24 @@ impl Engine {
             }
             _ => (),
         });
+    }
+}
+
+// HACK: https://github.com/rust-windowing/winit/pull/1822
+#[cfg(target_os = "android")]
+fn request_redraw_for_android() {
+    match ndk_glue::native_window().as_ref() {
+        Some(native_window) => {
+            let a_native_window: *mut ndk_sys::ANativeWindow = native_window.ptr().as_ptr();
+            let a_native_activity: *mut ndk_sys::ANativeActivity =
+                ndk_glue::native_activity().ptr().as_ptr();
+            unsafe {
+                match (*(*a_native_activity).callbacks).onNativeWindowRedrawNeeded {
+                    Some(callback) => callback(a_native_activity, a_native_window),
+                    None => (),
+                };
+            };
+        }
+        None => (),
     }
 }

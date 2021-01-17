@@ -18,6 +18,10 @@ tearchan-core = { path = "tearchan-core" }
 tearchan-gfx = { path = "tearchan-gfx" }
 tearchan-util = { path = "tearchan-util" }
 
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-sys = "0.2.1"
+ndk-glue = "0.2.1"
+
 [workspace]
 members = [
     "tearchan-core",

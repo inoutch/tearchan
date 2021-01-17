@@ -1926,6 +1926,8 @@ dependencies = [
  "futures",
  "instant",
  "log",
+ "ndk-glue",
+ "ndk-sys",
  "tearchan-core",
  "tearchan-gfx",
  "tearchan-util",
