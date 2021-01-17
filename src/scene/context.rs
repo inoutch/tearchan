@@ -1,5 +1,5 @@
-use downcast_rs::__std::ops::{Deref, DerefMut};
-use tearchan_gfx::context::{GfxContext, GfxRenderingContext};
+use std::ops::{Deref, DerefMut};
+use tearchan_gfx::context::{GfxContext, GfxRenderContext};
 
 pub struct SceneContext<'a> {
     gfx: GfxContext<'a>,
@@ -17,18 +17,18 @@ impl<'a> SceneContext<'a> {
 
 pub struct SceneRenderContext<'a> {
     scene_context: SceneContext<'a>,
-    rendering_context: &'a GfxRenderingContext,
+    rendering_context: GfxRenderContext,
 }
 
 impl<'a> SceneRenderContext<'a> {
-    pub fn new(gfx: (GfxContext<'a>, &'a GfxRenderingContext)) -> SceneRenderContext<'a> {
+    pub fn new(gfx: (GfxContext<'a>, GfxRenderContext)) -> SceneRenderContext<'a> {
         SceneRenderContext {
             scene_context: SceneContext::new(gfx.0),
             rendering_context: gfx.1,
         }
     }
 
-    pub fn gfx_rendering(&self) -> &GfxRenderingContext {
+    pub fn gfx_rendering(&self) -> &GfxRenderContext {
         &self.rendering_context
     }
 }

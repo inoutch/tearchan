@@ -3,7 +3,7 @@ use crate::scene::context::{SceneContext, SceneRenderContext};
 use crate::scene::manager::SceneManager;
 use instant::Instant;
 use std::time::Duration;
-use tearchan_gfx::setup::LazySetup;
+use tearchan_gfx::renderer::RendererLazySetup;
 use tearchan_util::time::DurationWatch;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -26,10 +26,17 @@ impl Engine {
 
         let event_loop = EventLoop::new();
         let window = startup_config.window_builder.build(&event_loop).unwrap();
-        let mut setup = LazySetup::new(window);
 
-        #[cfg(not(target_os = "android"))]
-        setup.setup();
+        let mut setup = RendererLazySetup::new(window);
+        if !cfg!(target_os = "android") {
+            setup
+                .setup(
+                    wgpu::Features::empty(),
+                    wgpu::Features::empty(),
+                    wgpu::Limits::default(),
+                )
+                .await;
+        }
 
         let mut scene_manager = SceneManager::default();
         scene_manager.set_current_scene(startup_config.scene_factory, None);
@@ -41,20 +48,34 @@ impl Engine {
         event_loop.run(move |event, _, control_flow| match event {
             #[cfg(target_os = "android")]
             Event::Resumed => {
-                setup.setup();
+                let executor = async_executor::LocalExecutor::new();
+                executor
+                    .spawn(setup.setup(
+                        wgpu::Features::empty(),
+                        wgpu::Features::empty(),
+                        wgpu::Limits::default(),
+                    ))
+                    .detach();
+                while executor.try_tick() {}
             }
             Event::WindowEvent { event, window_id } => match event {
-                WindowEvent::Resized(_) => {}
+                WindowEvent::Resized(size) => {
+                    if let Some(renderer) = setup.renderer_mut() {
+                        renderer.resize(size);
+                    }
+                }
                 WindowEvent::CloseRequested => {
                     if window_id == setup.window().id() {
                         *control_flow = ControlFlow::Exit;
                     }
                 }
                 _ => {
-                    let context = SceneContext::new(setup.create_context());
-                    if let Some(overwrite) = scene_manager.update(event, context) {
-                        *control_flow = overwrite;
-                    };
+                    if let Some(renderer) = setup.renderer_mut() {
+                        let context = SceneContext::new(renderer.create_context());
+                        if let Some(overwrite) = scene_manager.update(event, context) {
+                            *control_flow = overwrite;
+                        };
+                    }
                 }
             },
             Event::MainEventsCleared => {
@@ -77,13 +98,13 @@ impl Engine {
                     *control_flow = ControlFlow::Poll;
                 }
                 // Rendering
-                let (context, mut render_context) = setup.create_render_context();
-                let context = SceneRenderContext::new((context, &render_context));
-                if let Some(overwrite) = scene_manager.render(context) {
-                    *control_flow = overwrite;
-                };
-
-                setup.flush(render_context.frame_mut());
+                if let Some(x) = setup.renderer_mut() {
+                    let (context, render_context) = x.create_render_context();
+                    let context = SceneRenderContext::new((context, render_context));
+                    if let Some(overwrite) = scene_manager.render(context) {
+                        *control_flow = overwrite;
+                    };
+                }
                 duration_watcher.reset();
             }
             _ => (),
