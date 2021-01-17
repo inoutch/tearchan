@@ -1,67 +1,19 @@
-use crate::hal::swapchain::SwapchainDescriptor;
-use crate::{Adapter, CommandQueue, Device, Surface, SwapchainFrame};
-use gfx_hal::format::Format;
-
 pub struct GfxContext<'a> {
-    surface: &'a Surface,
-    adapters: &'a Vec<Adapter>,
-    device: &'a Device,
-    queue: &'a CommandQueue,
-    swapchain_desc: &'a SwapchainDescriptor,
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+    pub swapchain_desc: &'a wgpu::SwapChainDescriptor,
 }
 
-impl<'a> GfxContext<'a> {
-    pub fn new(
-        surface: &'a Surface,
-        adapters: &'a Vec<Adapter>,
-        device: &'a Device,
-        queue: &'a CommandQueue,
-        swapchain_desc: &'a SwapchainDescriptor,
-    ) -> GfxContext<'a> {
-        GfxContext {
-            surface,
-            adapters,
-            device,
-            queue,
-            swapchain_desc,
-        }
-    }
-
-    pub fn surface(&self) -> &Surface {
-        &self.surface
-    }
-
-    pub fn device(&self) -> &Device {
-        &self.device
-    }
-
-    pub fn queue(&self) -> &CommandQueue {
-        &self.queue
-    }
-
-    pub fn find_support_format(&self) -> Format {
-        self.surface.find_support_format(&self.adapters[0])
-    }
-
-    pub fn swapchain_desc(&self) -> &SwapchainDescriptor {
-        &self.swapchain_desc
-    }
+pub struct GfxRenderContext {
+    frame: wgpu::SwapChainFrame,
 }
 
-pub struct GfxRenderingContext {
-    frame: SwapchainFrame,
-}
-
-impl GfxRenderingContext {
-    pub fn new(frame: SwapchainFrame) -> GfxRenderingContext {
-        GfxRenderingContext { frame }
+impl GfxRenderContext {
+    pub fn new(frame: wgpu::SwapChainFrame) -> Self {
+        GfxRenderContext { frame }
     }
 
-    pub fn frame(&self) -> &SwapchainFrame {
-        &self.frame
-    }
-
-    pub fn frame_mut(&mut self) -> &mut SwapchainFrame {
-        &mut self.frame
+    pub fn frame(&self) -> &wgpu::SwapChainTexture {
+        &self.frame.output
     }
 }
