@@ -5,14 +5,6 @@ publish = false
 workspace = ".."
 edition = "2018"
 
-[features]
-default = []
-metal = ["tearchan-gfx/metal"]
-webgl = ["tearchan-gfx/webgl"]
-dx11 = ["tearchan-gfx/dx11"]
-dx12 = ["tearchan-gfx/dx12"]
-vulkan = ["tearchan-gfx/vulkan"]
-
 [[bin]]
 name = "quad"
 path = "quad/main.rs"
@@ -21,4 +13,4 @@ path = "quad/main.rs"
 winit = { version = "0.24.0", features = ["web-sys"] }
 tearchan = { path = ".." }
 tearchan-gfx = { path = "../tearchan-gfx" }
-gfx-hal = { path = "../../gfx/src/hal" }
+wgpu = { path = "../../wgpu-rs" }
