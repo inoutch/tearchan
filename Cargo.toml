@@ -1,61 +1,33 @@
 [package]
 name = "tearchan"
 version = "0.0.1"
-authors = ["inoutch <akiandaki@gmail.com>"]
 edition = "2018"
 
-[features]
-default = []
-metal = ["gfx-backend-metal"]
-gl = ["gfx-backend-gl", "gfx-backend-gl/glutin"]
-dx11 = ["gfx-backend-dx11"]
-dx12 = ["gfx-backend-dx12"]
-vulkan = ["gfx-backend-vulkan"]
-
 [dependencies]
-env_logger = "0.7.1"
+# utils
 derive_builder = "0.9.0"
-image = "0.23.4"
-winit = { version = "0.22.2", features = ["web-sys"] }
-gfx-hal = "0.6.0"
-gfx-auxil = "0.5"
-gfx-backend-empty = "0.6.0"
-nalgebra-glm = { version = "0.7.0", features = ["serde-serialize"] }
-serde = { version = "1.0.111", features = ["derive", "rc"] }
-serde_json = "1.0.53"
-tobj = "2.0.1"
-texture_packer = "0.21.1"
+instant = "0.1.9"
+log = "0.4.11"
+downcast-rs = "1.2.0"
+wgpu = { path = "../wgpu-rs" }
+futures = "0.3.12"
+async-executor = "1.4.0"
+# framework
+winit = { version = "0.24.0", features = ["web-sys"] }
+tearchan-core = { path = "tearchan-core" }
+tearchan-gfx = { path = "tearchan-gfx" }
+tearchan-util = { path = "tearchan-util" }
 
-[dependencies.gfx-backend-gl]
-version = "0.5.1"
-optional = true
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-sys = "0.2.1"
+ndk-glue = "0.2.1"
 
-[dependencies.gfx-backend-vulkan]
-version = "0.6.0"
-features = ["x11"]
-optional = true
-
-[target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies.gfx-backend-metal]
-version = "0.6.0"
-optional = true
-
-[target.'cfg(windows)'.dependencies.gfx-backend-dx11]
-version = "0.6.0"
-optional = true
-
-[target.'cfg(windows)'.dependencies.gfx-backend-dx12]
-version = "0.6.0"
-optional = true
-
-[target.'cfg(any(target_os = "macos", all(target_os = "ios", target_arch = "aarch64")))'.dependencies]
-objc = "0.2.7"
-objc-foundation = "0.1.1"
-
-[dev-dependencies]
-float-cmp = "0.7.0"
-nearly_eq = "0.2.4"
-rand = "0.7.3"
-palette = "0.5.0"
-
-[build-dependencies]
-shaderc = "0.6.2"
+[workspace]
+members = [
+    "tearchan-core",
+    "tearchan-ecs",
+    "tearchan-gfx",
+    "tearchan-horde",
+    "tearchan-util",
+    "examples",
+]

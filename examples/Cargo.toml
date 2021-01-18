@@ -1,0 +1,16 @@
+[package]
+name = "examples"
+version = "0.0.1"
+publish = false
+workspace = ".."
+edition = "2018"
+
+[[bin]]
+name = "quad"
+path = "quad/main.rs"
+
+[dependencies]
+winit = { version = "0.24.0", features = ["web-sys"] }
+tearchan = { path = ".." }
+tearchan-gfx = { path = "../tearchan-gfx" }
+wgpu = { path = "../../wgpu-rs" }

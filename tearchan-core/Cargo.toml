@@ -1,0 +1,19 @@
+[package]
+name = "tearchan-core"
+version = "0.0.1"
+edition = "2018"
+
+[dependencies]
+futures = "0.3.8"
+downcast-rs = "1.2.0"
+threadpool = "1.8.1"
+async-executor = "1.4.0"
+tearchan-util = { path = "../tearchan-util" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.68", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.19"
+web-sys = { version = "0.3.45", features = ["Request", "RequestInit", "RequestMode", "Response", "Window", "Headers", "FileReader", "ProgressEvent", "Event", "Blob"] }
+js-sys = "0.3.46"
+wasm-logger = "0.2.0"
+console_error_panic_hook = "0.1.6"

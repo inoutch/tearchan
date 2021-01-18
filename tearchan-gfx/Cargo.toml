@@ -1,0 +1,29 @@
+[package]
+name = "tearchan-gfx"
+version = "0.0.1"
+edition = "2018"
+
+[features]
+webgl = ["wgpu/webgl"]
+
+[dependencies]
+# utils
+log = "0.4.11"
+nalgebra-glm = { version = "0.10.0", features = ["serde-serialize"] }
+image = "0.23.4"
+tearchan-util = { path = "../tearchan-util" }
+
+# frameworks
+winit = { version = "0.24.0", features = ["web-sys"] }
+wgpu = { path = "../../wgpu-rs" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.68", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.19"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3.45"
+features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
+
+[build-dependencies]
+shaderc = "0.6.2"
