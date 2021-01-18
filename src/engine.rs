@@ -2,6 +2,7 @@ use crate::engine_config::EngineStartupConfig;
 use crate::scene::context::{SceneContext, SceneRenderContext};
 use crate::scene::manager::SceneManager;
 use instant::Instant;
+use std::future::Future;
 use std::time::Duration;
 use tearchan_gfx::renderer::RendererLazySetup;
 use tearchan_util::time::DurationWatch;
@@ -23,6 +24,7 @@ impl Engine {
 
     async fn start(self) {
         let startup_config = self.startup_config;
+        let spawner = Spawner::default();
 
         let event_loop = EventLoop::new();
         let window = startup_config.window_builder.build(&event_loop).unwrap();
@@ -71,7 +73,7 @@ impl Engine {
                 }
                 _ => {
                     if let Some(renderer) = setup.renderer_mut() {
-                        let context = SceneContext::new(renderer.create_context());
+                        let context = SceneContext::new(renderer.create_context(), &spawner);
                         if let Some(overwrite) = scene_manager.update(event, context) {
                             *control_flow = overwrite;
                         };
@@ -103,15 +105,46 @@ impl Engine {
                 // Rendering
                 if let Some(x) = setup.renderer_mut() {
                     let (context, render_context) = x.create_render_context();
-                    let context = SceneRenderContext::new((context, render_context));
+                    let context = SceneRenderContext::new((context, render_context), &spawner);
                     if let Some(overwrite) = scene_manager.render(context) {
                         *control_flow = overwrite;
                     };
                 }
                 duration_watcher.reset();
+                spawner.run_until_stalled();
             }
             _ => (),
         });
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+pub struct Spawner<'a> {
+    executor: async_executor::LocalExecutor<'a>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl<'a> Spawner<'a> {
+    #[allow(dead_code)]
+    pub fn spawn_local(&self, future: impl Future<Output = ()> + 'a) {
+        self.executor.spawn(future).detach();
+    }
+
+    fn run_until_stalled(&self) {
+        while self.executor.try_tick() {}
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[derive(Default)]
+pub struct Spawner {}
+
+#[cfg(target_arch = "wasm32")]
+impl Spawner {
+    #[allow(dead_code)]
+    pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) {
+        wasm_bindgen_futures::spawn_local(future);
     }
 }
 

@@ -1939,6 +1939,7 @@ dependencies = [
 name = "tearchan-core"
 version = "0.0.1"
 dependencies = [
+ "async-executor",
  "console_error_panic_hook",
  "downcast-rs",
  "futures",
