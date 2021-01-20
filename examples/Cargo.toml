@@ -9,8 +9,16 @@ edition = "2018"
 name = "quad"
 path = "quad/main.rs"
 
+[[bin]]
+name = "file"
+path = "file/main.rs"
+
 [dependencies]
 winit = { version = "0.24.0", features = ["web-sys"] }
 tearchan = { path = ".." }
+tearchan-core = { path = "../tearchan-core" }
 tearchan-gfx = { path = "../tearchan-gfx" }
 wgpu = { path = "../../wgpu-rs" }
+
+[build-dependencies]
+tearchan-tools = { path = "../tearchan-tools" }

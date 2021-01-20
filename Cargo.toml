@@ -28,6 +28,7 @@ members = [
     "tearchan-ecs",
     "tearchan-gfx",
     "tearchan-horde",
+    "tearchan-tools",
     "tearchan-util",
     "examples",
 ]
