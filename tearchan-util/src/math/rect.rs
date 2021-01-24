@@ -67,7 +67,7 @@ pub fn pick_rect3_i32(rect: &Rect3<i32>, p: &TVec3<i32>) -> TVec3<i32> {
 
 #[cfg(test)]
 mod test {
-    use crate::rect::{intersect_rect2_i32, intersect_rect3_i32, Rect2, Rect3};
+    use crate::math::rect::{intersect_rect2_i32, intersect_rect3_i32, Rect2, Rect3};
     use nalgebra_glm::{vec2, vec3};
 
     #[test]
