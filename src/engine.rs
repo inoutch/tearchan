@@ -138,10 +138,12 @@ impl<'a> Spawner<'a> {
 
 #[cfg(target_arch = "wasm32")]
 #[derive(Default)]
-pub struct Spawner {}
+pub struct Spawner<'a> {
+    _phantom: std::marker::PhantomData<&'a ()>,
+}
 
 #[cfg(target_arch = "wasm32")]
-impl Spawner {
+impl<'a> Spawner<'a> {
     #[allow(dead_code)]
     pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) {
         wasm_bindgen_futures::spawn_local(future);

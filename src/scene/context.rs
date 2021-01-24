@@ -15,6 +15,10 @@ impl<'a, 'b, 'c> SceneContext<'a, 'b, 'c> {
     pub fn gfx(&self) -> &GfxContext {
         &self.gfx
     }
+
+    pub fn spawner(&self) -> &'b Spawner<'c> {
+        &self.spawner
+    }
 }
 
 pub struct SceneRenderContext<'a, 'b, 'c> {

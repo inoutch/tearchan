@@ -8,10 +8,12 @@ edition = "2018"
 derive_builder = "0.9.0"
 instant = "0.1.9"
 log = "0.4.11"
-downcast-rs = "1.2.0"
 wgpu = { path = "../wgpu-rs" }
 futures = "0.3.12"
 async-executor = "1.4.0"
+async-std = "1.9.0"
+once_cell = "1.5.2"
+thiserror = "1.0.23"
 # framework
 winit = { version = "0.24.0", features = ["web-sys"] }
 tearchan-core = { path = "tearchan-core" }
@@ -22,12 +24,17 @@ tearchan-util = { path = "tearchan-util" }
 ndk-sys = "0.2.1"
 ndk-glue = "0.2.1"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "0.2.68", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.19"
+
 [workspace]
 members = [
     "tearchan-core",
     "tearchan-ecs",
     "tearchan-gfx",
     "tearchan-horde",
+    "tearchan-tools",
     "tearchan-util",
     "examples",
 ]
