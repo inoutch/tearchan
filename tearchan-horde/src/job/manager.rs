@@ -1,5 +1,6 @@
 use crate::action::manager::{ActionManager, TimeMilliseconds};
 use crate::action::result::ActionResult;
+use crate::action::ActionType;
 use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
@@ -84,7 +85,7 @@ where
         while let Some(result) = results.pop_first_back() {
             match result {
                 ActionResult::Start { action } => {
-                    self.inner.on_start(action.deref());
+                    self.inner.on_action(action.deref(), ActionType::Start);
                 }
                 ActionResult::Update {
                     action,
@@ -92,10 +93,11 @@ where
                 } => {
                     let duration = action.end_time() - action.start_time();
                     let ratio = (current_time - action.start_time()) as f32 / duration as f32;
-                    self.inner.on_update(action.deref(), ratio);
+                    self.inner
+                        .on_action(action.deref(), ActionType::Update { ratio });
                 }
                 ActionResult::End { action } => {
-                    self.inner.on_end(action.deref());
+                    self.inner.on_action(action.deref(), ActionType::End);
                 }
             }
         }
@@ -104,7 +106,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::action::Action;
+    use crate::action::{Action, ActionType};
     use crate::job::manager::JobManager;
     use crate::job::result::JobResult;
     use crate::HordeInterface;
@@ -164,16 +166,8 @@ mod test {
         type ActionState = CustomActionState;
         type Job = CustomActionCreator;
 
-        fn on_start(&mut self, _action: &Action<Self::ActionState>) {
-            println!("start  : {:?}", _action);
-        }
-
-        fn on_update(&mut self, _action: &Action<Self::ActionState>, _ratio: f32) {
-            println!("update : {:?}", _action);
-        }
-
-        fn on_end(&mut self, _action: &Action<Self::ActionState>) {
-            println!("end    : {:?}", _action);
+        fn on_action(&mut self, action: &Action<Self::ActionState>, action_type: ActionType) {
+            println!("on_action: {:?}, {:?}", action, action_type);
         }
 
         fn on_first(&self, entity_id: u32) -> Self::Job {
