@@ -20,6 +20,7 @@ impl<T> Default for ComponentGroup<T> {
 
 impl<T> ComponentGroup<T> {
     pub fn push(&mut self, entity_id: EntityId, inner: T) {
+        debug_assert!(!self.indices.contains_key(&entity_id));
         self.components.push(Component::new(entity_id, inner));
         self.indices.insert(entity_id, self.components.len() - 1);
     }
@@ -167,10 +168,10 @@ mod test {
         group.push(4, Inner("ex4"));
 
         let mut iter = group.iter();
-        assert_eq!(iter.next().unwrap().1.0, "ex1");
-        assert_eq!(iter.next().unwrap().1.0, "ex2");
-        assert_eq!(iter.next().unwrap().1.0, "ex3");
-        assert_eq!(iter.next().unwrap().1.0, "ex4");
+        assert_eq!(iter.next().unwrap().1 .0, "ex1");
+        assert_eq!(iter.next().unwrap().1 .0, "ex2");
+        assert_eq!(iter.next().unwrap().1 .0, "ex3");
+        assert_eq!(iter.next().unwrap().1 .0, "ex4");
     }
 
     #[test]
