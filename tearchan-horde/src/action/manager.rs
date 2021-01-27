@@ -132,6 +132,9 @@ where
         results
     }
 
+    /**
+     * Get free entity ids after update_actions
+     */
     pub fn clean_pending_entity_ids(&mut self) -> HashSet<EntityId> {
         std::mem::replace(&mut self.pending_cache, HashSet::new())
     }
@@ -154,6 +157,23 @@ where
     pub fn detach(&mut self, entity_id: EntityId) {
         self.contexts.remove(&entity_id);
         self.pending_cache.remove(&entity_id);
+    }
+
+    pub fn cancel(&mut self, entity_id: EntityId) {
+        let context = self
+            .contexts
+            .get_mut(&entity_id)
+            .expect("invalid entity_id");
+        context.last_time = self.current_time;
+        context.state_len = 0;
+        self.pending_cache.insert(entity_id);
+
+        for (_, pending_actions) in self.pending_actions.iter_mut() {
+            pending_actions.retain(|action| action.entity_id != entity_id);
+        }
+        for (_, running_actions) in self.running_actions.iter_mut() {
+            running_actions.retain(|action| action.entity_id != entity_id);
+        }
     }
 
     fn get_context_mut(&mut self, entity_id: EntityId) -> &mut ActionContext {
