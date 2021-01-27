@@ -1,4 +1,5 @@
 use crate::action::manager::TimeMilliseconds;
+use std::rc::Rc;
 use tearchan_ecs::component::EntityId;
 
 pub mod context;
@@ -10,7 +11,7 @@ pub struct Action<T> {
     entity_id: EntityId,
     start_time: TimeMilliseconds,
     end_time: TimeMilliseconds,
-    inner: T,
+    inner: Rc<T>,
 }
 
 impl<T> Action<T> {
@@ -24,7 +25,7 @@ impl<T> Action<T> {
             entity_id,
             start_time: start,
             end_time: end,
-            inner,
+            inner: Rc::new(inner),
         }
     }
 }
@@ -42,7 +43,7 @@ impl<T> Action<T> {
         self.end_time
     }
 
-    pub fn inner(&self) -> &T {
+    pub fn inner(&self) -> &Rc<T> {
         &self.inner
     }
 }
