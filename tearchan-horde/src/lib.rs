@@ -1,4 +1,4 @@
-use crate::action::{Action, ActionType};
+use crate::action::Action;
 use crate::job::result::JobResult;
 use tearchan_ecs::component::EntityId;
 
@@ -9,7 +9,11 @@ pub trait HordeInterface {
     type ActionState;
     type Job;
 
-    fn on_action(&mut self, action: &Action<Self::ActionState>, action_type: ActionType);
+    fn on_start(&mut self, action: &Action<Self::ActionState>);
+
+    fn on_update(&mut self, action: &Action<Self::ActionState>, ratio: f32);
+
+    fn on_end(&mut self, action: &Action<Self::ActionState>);
 
     fn on_first(&self, entity_id: u32) -> Self::Job;
 

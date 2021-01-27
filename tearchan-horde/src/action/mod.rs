@@ -47,10 +47,3 @@ impl<T> Action<T> {
         &self.inner
     }
 }
-
-#[derive(Debug)]
-pub enum ActionType {
-    Start,
-    Update { ratio: f32 },
-    End,
-}
