@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
-use std::collections::btree_map::{Iter, Range, RangeMut};
+use std::collections::btree_map::{Iter, IterMut, Range, RangeMut};
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::RangeBounds;
 
@@ -75,18 +75,20 @@ where
     where
         K: Ord,
     {
-        match self.btree.pop_first() {
-            None => None,
-            Some((key, mut queue)) => {
-                let ret = match queue.pop_front() {
-                    None => panic!("Illegal state"),
-                    Some(x) => x,
-                };
-                if !queue.is_empty() {
-                    self.btree.insert(key, queue);
+        loop {
+            return match self.btree.pop_first() {
+                None => None,
+                Some((key, mut queue)) => {
+                    let ret = match queue.pop_front() {
+                        None => continue,
+                        Some(x) => x,
+                    };
+                    if !queue.is_empty() {
+                        self.btree.insert(key, queue);
+                    }
+                    Some(ret)
                 }
-                Some(ret)
-            }
+            };
         }
     }
 
@@ -131,6 +133,11 @@ where
     #[inline]
     pub fn iter(&self) -> Iter<'_, K, VecDeque<V>> {
         self.btree.iter()
+    }
+
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, VecDeque<V>> {
+        self.btree.iter_mut()
     }
 
     #[inline]
