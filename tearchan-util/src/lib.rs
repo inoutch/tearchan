@@ -7,4 +7,5 @@ pub mod math;
 pub mod mesh;
 pub mod string;
 pub mod texture;
+pub mod thread;
 pub mod time;

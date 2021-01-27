@@ -1,6 +1,6 @@
 use crate::component::group::ComponentGroup;
 use crate::component::group_sync::{ComponentGroupSyncReader, ComponentGroupSyncWriter};
-use tearchan_core::thread::ThreadPool;
+use tearchan_util::thread::ThreadPool;
 
 pub trait SystemJob<TW, TR>
 where
@@ -26,7 +26,7 @@ mod test {
     use crate::component::group_sync::ComponentGroupSync;
     use crate::component::zip::ZipEntity1;
     use crate::system::SystemJob;
-    use tearchan_core::thread::ThreadPool;
+    use tearchan_util::thread::ThreadPool;
 
     struct CustomSystem;
 
