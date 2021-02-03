@@ -11,34 +11,37 @@ where
     T: HordeInterface,
 {
     action_manager: ActionManager<T>,
-    inner: T,
+}
+
+impl<T> Default for JobManager<T>
+where
+    T: HordeInterface,
+{
+    fn default() -> Self {
+        JobManager {
+            action_manager: ActionManager::default(),
+        }
+    }
 }
 
 impl<T> JobManager<T>
 where
     T: HordeInterface,
 {
-    pub fn new(provider: T) -> JobManager<T> {
-        JobManager {
-            action_manager: ActionManager::default(),
-            inner: provider,
-        }
-    }
-
-    pub fn run(&mut self, elapsed_time: TimeMilliseconds) {
+    pub fn run(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
         self.action_manager.update(elapsed_time);
 
         loop {
-            self.update_action();
+            self.update_action(provider);
 
             let mut is_changed = false;
             let entity_ids = self.action_manager.clean_pending_entity_ids();
             for entity_id in entity_ids {
                 let mut job_queue: VecDeque<T::Job> = VecDeque::new();
-                job_queue.push_front(self.inner.on_first(entity_id));
+                job_queue.push_front(provider.on_first(entity_id));
 
                 while let Some(job) = job_queue.pop_front() {
-                    let result = self.inner.on_next(entity_id, job);
+                    let result = provider.on_next(entity_id, job);
                     // Update actions
                     is_changed |= !result.states.is_empty();
 
@@ -66,25 +69,14 @@ where
         self.action_manager.detach(entity_id);
     }
 
-    pub fn inner(&self) -> &T {
-        &self.inner
-    }
-
-    pub fn inner_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-}
-
-impl<T> JobManager<T>
-where
-    T: HordeInterface,
-{
-    pub fn update_action(&mut self) {
+    pub fn update_action(&mut self, provider: &mut T) {
         let mut results = self.action_manager.pull();
+        let mut buffer = CommandBuffer::default();
+
         while let Some(result) = results.pop_first_back() {
             match result {
                 ActionResult::Start { action } => {
-                    self.inner.on_start(action.deref());
+                    provider.on_start(action.deref(), &mut buffer);
                 }
                 ActionResult::Update {
                     action,
@@ -92,20 +84,54 @@ where
                 } => {
                     let duration = action.end_time() - action.start_time();
                     let ratio = (current_time - action.start_time()) as f32 / duration as f32;
-                    self.inner.on_update(action.deref(), ratio);
+                    provider.on_update(action.deref(), ratio, &mut buffer);
                 }
                 ActionResult::End { action } => {
-                    self.inner.on_end(action.deref());
+                    provider.on_end(action.deref(), &mut buffer);
+                }
+            }
+        }
+        self.run_commands(buffer);
+    }
+
+    pub fn run_commands(&mut self, mut buffer: CommandBuffer) {
+        while let Some(command) = buffer.commands.pop_front() {
+            match command {
+                Command::AttachEntity { entity_id } => {
+                    self.attach(entity_id);
+                }
+                Command::DetachEntity { entity_id } => {
+                    self.detach(entity_id);
+                }
+                Command::CancelAction { entity_id } => {
+                    self.action_manager.cancel(entity_id);
                 }
             }
         }
     }
 }
 
+pub enum Command {
+    AttachEntity { entity_id: EntityId },
+    DetachEntity { entity_id: EntityId },
+    CancelAction { entity_id: EntityId }, // Only host command
+}
+
+#[derive(Default)]
+pub struct CommandBuffer {
+    commands: VecDeque<Command>,
+}
+
+impl CommandBuffer {
+    pub fn push(&mut self, command: Command) {
+        self.commands.push_back(command);
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::action::Action;
-    use crate::job::manager::JobManager;
+    use crate::job::manager::{CommandBuffer, JobManager};
     use crate::job::result::JobResult;
     use crate::HordeInterface;
     use tearchan_ecs::component::group::ComponentGroup;
@@ -164,15 +190,20 @@ mod test {
         type ActionState = CustomActionState;
         type Job = CustomActionCreator;
 
-        fn on_start(&mut self, _action: &Action<Self::ActionState>) {
+        fn on_start(&mut self, _action: &Action<Self::ActionState>, _buffer: &mut CommandBuffer) {
             println!("start  : {:?}", _action);
         }
 
-        fn on_update(&mut self, _action: &Action<Self::ActionState>, _ratio: f32) {
+        fn on_update(
+            &mut self,
+            _action: &Action<Self::ActionState>,
+            _ratio: f32,
+            _buffer: &mut CommandBuffer,
+        ) {
             println!("update : {:?}", _action);
         }
 
-        fn on_end(&mut self, _action: &Action<Self::ActionState>) {
+        fn on_end(&mut self, _action: &Action<Self::ActionState>, _buffer: &mut CommandBuffer) {
             println!("end    : {:?}", _action);
         }
 
@@ -256,78 +287,52 @@ mod test {
         let name_components: ComponentGroup<String> = ComponentGroup::default();
         let position_components: ComponentGroup<Position> = ComponentGroup::default();
 
-        let mut action_creator_manager: JobManager<CustomGame> = JobManager::new(CustomGame {
+        let mut action_creator_manager: JobManager<CustomGame> = JobManager::default();
+        let mut custom_game = CustomGame {
             entity_id_manager,
             kind_components,
             name_components,
             position_components,
-        });
+        };
 
         // Create cat
         {
-            let entity_id = action_creator_manager
-                .inner_mut()
-                .entity_id_manager
-                .create_generator()
-                .gen();
-            action_creator_manager
-                .inner_mut()
-                .kind_components
-                .push(entity_id, Kind::Cat);
-            action_creator_manager
-                .inner_mut()
+            let entity_id = custom_game.entity_id_manager.create_generator().gen();
+            custom_game.kind_components.push(entity_id, Kind::Cat);
+            custom_game
                 .name_components
                 .push(entity_id, "Melon".to_string());
-            action_creator_manager
-                .inner_mut()
+            custom_game
                 .position_components
                 .push(entity_id, Position((0, 0)));
             action_creator_manager.attach(entity_id);
         }
         // Create dog
         {
-            let entity_id = action_creator_manager
-                .inner_mut()
-                .entity_id_manager
-                .create_generator()
-                .gen();
-            action_creator_manager
-                .inner_mut()
-                .kind_components
-                .push(entity_id, Kind::Dog);
-            action_creator_manager
-                .inner_mut()
+            let entity_id = custom_game.entity_id_manager.create_generator().gen();
+            custom_game.kind_components.push(entity_id, Kind::Dog);
+            custom_game
                 .name_components
                 .push(entity_id, "Puffball".to_string());
-            action_creator_manager
-                .inner_mut()
+            custom_game
                 .position_components
                 .push(entity_id, Position((30, 10)));
             action_creator_manager.attach(entity_id);
         }
         // Create human
         {
-            let entity_id = action_creator_manager
-                .inner_mut()
-                .entity_id_manager
-                .create_generator()
-                .gen();
-            action_creator_manager
-                .inner_mut()
-                .kind_components
-                .push(entity_id, Kind::Human);
-            action_creator_manager
-                .inner_mut()
+            let entity_id = custom_game.entity_id_manager.create_generator().gen();
+            custom_game.kind_components.push(entity_id, Kind::Human);
+            custom_game
                 .name_components
                 .push(entity_id, "Jack".to_string());
-            action_creator_manager
-                .inner_mut()
+            custom_game
                 .position_components
                 .push(entity_id, Position((4, 8)));
             action_creator_manager.attach(entity_id);
         }
 
         // Process horde
-        action_creator_manager.run(50000);
+        action_creator_manager.run(&mut custom_game, 50000);
     }
 }
