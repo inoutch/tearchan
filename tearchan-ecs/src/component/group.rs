@@ -44,6 +44,13 @@ impl<T> ComponentGroup<T> {
             .map(|component| component.inner())
     }
 
+    pub fn get_mut(&mut self, entity_id: EntityId) -> Option<&mut T> {
+        let index = self.indices.get(&entity_id)?;
+        self.components
+            .get_mut(*index)
+            .map(|component| component.inner_mut())
+    }
+
     pub fn len(&self) -> usize {
         self.components.len()
     }
