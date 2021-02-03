@@ -12,3 +12,4 @@ texture_packer = "0.21.1"
 
 [dev-dependencies]
 float-cmp = "0.7.0"
+serde_json = "1.0.61"

@@ -22,7 +22,7 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Rect3<T>
 where
     T: 'static + PartialEq + Clone + Copy + Debug,

@@ -3,6 +3,8 @@
 #[macro_use]
 pub mod macros;
 
+pub mod array_2d;
+pub mod array_3d;
 pub mod btree;
 pub mod compare;
 pub mod id_manager;
