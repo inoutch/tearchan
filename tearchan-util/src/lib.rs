@@ -1,5 +1,8 @@
 #![feature(map_first_last)]
 
+#[macro_use]
+pub mod macros;
+
 pub mod btree;
 pub mod compare;
 pub mod id_manager;
