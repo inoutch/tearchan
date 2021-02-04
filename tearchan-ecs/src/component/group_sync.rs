@@ -41,6 +41,14 @@ where
             inner: Arc::clone(&self.inner),
         })
     }
+
+    pub fn read(&self) -> ComponentGroupSyncReader<T> {
+        self.try_read().unwrap()
+    }
+
+    pub fn write(&mut self) -> ComponentGroupSyncWriter<T> {
+        self.try_write().unwrap()
+    }
 }
 
 pub struct ComponentGroupSyncReader<T>
@@ -92,7 +100,7 @@ where
 mod test {
     use crate::component::group_sync::{ComponentGroupSync, ComponentGroupSyncReader};
     use crate::component::zip::ZipEntity1;
-    use tearchan_core::thread::ThreadPool;
+    use tearchan_util::thread::ThreadPool;
 
     #[test]
     fn test_default() {
