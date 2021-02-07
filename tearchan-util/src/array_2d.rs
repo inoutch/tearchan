@@ -63,7 +63,7 @@ where
         self.size_end.y = max(self.size_end.y, position.y + 1);
     }
 
-    pub fn remove(&mut self, position: TVec2<i32>) -> Option<T> {
+    pub fn remove(&mut self, position: &TVec2<i32>) -> Option<T> {
         let data = &mut self.data;
         if let Some(y) = data.get_mut(&position.y) {
             return y.remove(&position.x);
