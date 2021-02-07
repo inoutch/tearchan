@@ -161,6 +161,17 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
+#[allow(clippy::len_without_is_empty)]
+impl<'a, T> Iter<'a, T> {
+    pub fn len(mut self) -> usize {
+        let mut i = 0;
+        while self.next().is_some() {
+            i += 1;
+        }
+        i
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::array_3d::Array3D;
