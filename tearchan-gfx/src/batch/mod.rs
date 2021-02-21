@@ -11,6 +11,7 @@ const DEFAULT_ORDER: i32 = 0;
 pub type BatchObjectId = u64;
 
 pub mod batch2d;
+pub mod batch3d;
 pub mod buffer;
 pub mod object;
 pub mod types;
