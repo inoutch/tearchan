@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .unwrap();
                 let compiled_bytes = compiled_artifact.as_binary_u8();
 
-                let out_path = format!("{}{}", shader_gen_path, file_name);
+                let out_path = format!("{}{}.spv", shader_gen_path, file_name);
 
                 std::fs::write(&out_path, &compiled_bytes)?;
             }
