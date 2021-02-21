@@ -11,6 +11,7 @@ webgl = ["wgpu/webgl"]
 log = "0.4.11"
 nalgebra-glm = { version = "0.10.0", features = ["serde-serialize"] }
 image = "0.23.4"
+bytemuck = "1.5.0"
 tearchan-util = { path = "../tearchan-util" }
 
 # frameworks
