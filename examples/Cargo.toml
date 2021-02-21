@@ -10,15 +10,26 @@ name = "quad"
 path = "quad/main.rs"
 
 [[bin]]
+name = "batch"
+path = "batch/main.rs"
+
+[[bin]]
 name = "file"
 path = "file/main.rs"
 
 [dependencies]
 winit = { version = "0.24.0", features = ["web-sys"] }
+wgpu = { path = "../../wgpu-rs" }
+nalgebra-glm = { version = "0.10.0", features = ["serde-serialize"] }
+image = "0.23.4"
+bytemuck = "1.5.0"
+rand = "0.8.3"
+color-rs = "0.6.1"
 tearchan = { path = ".." }
 tearchan-core = { path = "../tearchan-core" }
 tearchan-gfx = { path = "../tearchan-gfx" }
-wgpu = { path = "../../wgpu-rs" }
+tearchan-util = { path = "../tearchan-util" }
 
 [build-dependencies]
+shaderc = "0.6.2"
 tearchan-tools = { path = "../tearchan-tools" }
