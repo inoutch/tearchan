@@ -208,14 +208,14 @@ impl BatchProvider for Batch3DProvider {
                     queue,
                     encoder,
                     *id,
-                    data[BATCH3D_ATTRIBUTE_COLOR].len() * 4,
+                    data[BATCH3D_ATTRIBUTE_TEXCOORD].len() * 2,
                 );
                 self.color_buffer.allocate(
                     device,
                     queue,
                     encoder,
                     *id,
-                    data[BATCH3D_ATTRIBUTE_TEXCOORD].len() * 2,
+                    data[BATCH3D_ATTRIBUTE_COLOR].len() * 4,
                 );
                 self.normal_buffer.allocate(
                     device,
@@ -251,7 +251,7 @@ impl BatchProvider for Batch3DProvider {
                 }
                 BATCH3D_ATTRIBUTE_COLOR => {
                     self.texcoord_buffer
-                        .reallocate(device, queue, encoder, *id, data.len() * 3)
+                        .reallocate(device, queue, encoder, *id, data.len() * 4)
                 }
                 BATCH3D_ATTRIBUTE_NORMAL => {
                     self.normal_buffer
@@ -321,11 +321,11 @@ impl BatchProvider for Batch3DProvider {
                 );
             }
             BATCH3D_ATTRIBUTE_NORMAL => {
-                let p3 = normal_buffer.get_pointer(&object.id()).unwrap();
-                color_buffer.buffer().write(
+                let p4 = normal_buffer.get_pointer(&object.id()).unwrap();
+                normal_buffer.buffer().write(
                     queue,
                     flatten(object.get_v3f32_data(attribute)),
-                    p3.first,
+                    p4.first,
                 );
             }
             _ => {}
