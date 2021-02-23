@@ -43,7 +43,7 @@ impl Engine {
         let mut scene_manager = SceneManager::default();
         scene_manager.set_current_scene(startup_config.scene_factory, None);
 
-        let duration = Duration::from_millis(1000 / startup_config.fps).as_millis() as u64;
+        let duration = Duration::from_millis(1000 / startup_config.fps).as_nanos() as u64;
         let mut start_time = Instant::now();
         let mut duration_watcher = DurationWatch::default();
 
@@ -81,19 +81,20 @@ impl Engine {
                 }
             },
             Event::MainEventsCleared => {
-                start_time = Instant::now();
                 setup.window().request_redraw();
 
                 #[cfg(target_os = "android")]
                 request_redraw_for_android();
             }
             Event::RedrawRequested(_) => {
-                let elapsed_time = Instant::now().duration_since(start_time).as_millis() as u64;
-                let wait_millis = match duration >= elapsed_time {
+                let elapsed_time = Instant::now().duration_since(start_time).as_micros() as u64;
+                start_time = Instant::now();
+
+                let wait_micros = match duration >= elapsed_time {
                     true => duration - elapsed_time,
                     false => 0,
                 };
-                let new_inst = start_time + std::time::Duration::from_millis(wait_millis);
+                let new_inst = start_time + std::time::Duration::from_nanos(wait_micros);
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     *control_flow = ControlFlow::WaitUntil(new_inst);
@@ -102,10 +103,15 @@ impl Engine {
                 {
                     *control_flow = ControlFlow::Poll;
                 }
+
                 // Rendering
                 if let Some(x) = setup.renderer_mut() {
                     let (context, render_context) = x.create_render_context();
-                    let context = SceneRenderContext::new((context, render_context), &spawner);
+                    let context = SceneRenderContext::new(
+                        (context, render_context),
+                        &spawner,
+                        elapsed_time as f32 / 1000000.0f32,
+                    );
                     if let Some(overwrite) = scene_manager.render(context) {
                         *control_flow = overwrite;
                     };
