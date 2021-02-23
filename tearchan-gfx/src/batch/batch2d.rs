@@ -5,11 +5,18 @@ use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 use tearchan_util::bytes::flatten;
 
+pub const BATCH2D_ATTRIBUTE_INDEX: usize = 0;
+pub const BATCH2D_ATTRIBUTE_POSITION: usize = 1;
+pub const BATCH2D_ATTRIBUTE_TEXCOORD: usize = 2;
+pub const BATCH2D_ATTRIBUTE_COLOR: usize = 3;
+
 pub type Batch2D = Batch<Batch2DProvider>;
 
 pub struct Batch2DProvider {
     index_buffer: BatchBuffer<Buffer<u32>>,
-    vertex_buffers: Vec<BatchBuffer<Buffer<f32>>>,
+    position_buffer: BatchBuffer<Buffer<f32>>,
+    texcoord_buffer: BatchBuffer<Buffer<f32>>,
+    color_buffer: BatchBuffer<Buffer<f32>>,
 }
 
 impl Batch2DProvider {
@@ -108,7 +115,9 @@ impl Batch2DProvider {
 
         Batch::new(Batch2DProvider {
             index_buffer,
-            vertex_buffers: vec![position_buffer, color_buffer, texcoord_buffer],
+            position_buffer,
+            color_buffer,
+            texcoord_buffer,
         })
     }
 
@@ -121,15 +130,15 @@ impl Batch2DProvider {
     }
 
     pub fn position_buffer(&self) -> &Buffer<f32> {
-        self.vertex_buffers[0].buffer()
+        self.position_buffer.buffer()
     }
 
     pub fn color_buffer(&self) -> &Buffer<f32> {
-        self.vertex_buffers[1].buffer()
+        self.color_buffer.buffer()
     }
 
     pub fn texcoord_buffer(&self) -> &Buffer<f32> {
-        self.vertex_buffers[2].buffer()
+        self.texcoord_buffer.buffer()
     }
 }
 
@@ -150,29 +159,62 @@ impl BatchProvider for Batch2DProvider {
                 debug_assert_eq!(data[1].len(), data[2].len());
                 debug_assert_eq!(data[2].len(), data[3].len());
 
-                self.index_buffer
-                    .allocate(device, queue, encoder, *id, data[0].len());
-                self.vertex_buffers[0].allocate(device, queue, encoder, *id, data[1].len() * 3);
-                self.vertex_buffers[1].allocate(device, queue, encoder, *id, data[2].len() * 4);
-                self.vertex_buffers[2].allocate(device, queue, encoder, *id, data[3].len() * 2);
+                self.index_buffer.allocate(
+                    device,
+                    queue,
+                    encoder,
+                    *id,
+                    data[BATCH2D_ATTRIBUTE_INDEX].len(),
+                );
+                self.position_buffer.allocate(
+                    device,
+                    queue,
+                    encoder,
+                    *id,
+                    data[BATCH2D_ATTRIBUTE_POSITION].len() * 3,
+                );
+                self.color_buffer.allocate(
+                    device,
+                    queue,
+                    encoder,
+                    *id,
+                    data[BATCH2D_ATTRIBUTE_COLOR].len() * 4,
+                );
+                self.texcoord_buffer.allocate(
+                    device,
+                    queue,
+                    encoder,
+                    *id,
+                    data[BATCH2D_ATTRIBUTE_TEXCOORD].len() * 2,
+                );
             }
             BatchProviderCommand::Remove { id } => {
                 self.index_buffer.free(queue, *id);
-                self.vertex_buffers[0].free(queue, *id);
-                self.vertex_buffers[1].free(queue, *id);
-                self.vertex_buffers[2].free(queue, *id);
+                self.position_buffer.free(queue, *id);
+                self.color_buffer.free(queue, *id);
+                self.texcoord_buffer.free(queue, *id);
             }
             BatchProviderCommand::Replace {
                 id,
                 attribute,
                 data,
-            } => match attribute {
-                0 => self
-                    .index_buffer
-                    .reallocate(device, queue, encoder, *id, data.len()),
-                1 => self.vertex_buffers[0].reallocate(device, queue, encoder, *id, data.len() * 3),
-                2 => self.vertex_buffers[1].reallocate(device, queue, encoder, *id, data.len() * 4),
-                3 => self.vertex_buffers[2].reallocate(device, queue, encoder, *id, data.len() * 2),
+            } => match *attribute as usize {
+                BATCH2D_ATTRIBUTE_INDEX => {
+                    self.index_buffer
+                        .reallocate(device, queue, encoder, *id, data.len())
+                }
+                BATCH2D_ATTRIBUTE_POSITION => {
+                    self.position_buffer
+                        .reallocate(device, queue, encoder, *id, data.len() * 3)
+                }
+                BATCH2D_ATTRIBUTE_TEXCOORD => {
+                    self.texcoord_buffer
+                        .reallocate(device, queue, encoder, *id, data.len() * 2)
+                }
+                BATCH2D_ATTRIBUTE_COLOR => {
+                    self.color_buffer
+                        .reallocate(device, queue, encoder, *id, data.len() * 4)
+                }
                 _ => {}
             },
         }
@@ -180,9 +222,9 @@ impl BatchProvider for Batch2DProvider {
 
     fn sort(&mut self, ids: Vec<u64>) -> HashSet<u32, RandomState> {
         self.index_buffer.sort(&ids);
-        self.vertex_buffers[0].sort(&ids);
-        self.vertex_buffers[1].sort(&ids);
-        self.vertex_buffers[2].sort(&ids);
+        self.position_buffer.sort(&ids);
+        self.texcoord_buffer.sort(&ids);
+        self.color_buffer.sort(&ids);
         let mut set = HashSet::with_capacity(4);
         set.insert(0);
         set.insert(1);
@@ -193,13 +235,15 @@ impl BatchProvider for Batch2DProvider {
 
     fn flush(&mut self, queue: &Self::Queue, batch_object_manager: &mut BatchObjectManager) {
         let index_buffer = &self.index_buffer;
-        let vertex_buffers = &self.vertex_buffers;
-        batch_object_manager.flush(|object, attribute| match attribute {
-            0 => {
+        let position_buffer = &self.position_buffer;
+        let texcoord_buffer = &self.texcoord_buffer;
+        let color_buffer = &self.color_buffer;
+        batch_object_manager.flush(|object, attribute| match attribute as usize {
+            BATCH2D_ATTRIBUTE_INDEX => {
                 let p0 = index_buffer.get_pointer(&object.id()).unwrap();
-                let p1 = vertex_buffers[0].get_pointer(&object.id()).unwrap();
+                let p1 = position_buffer.get_pointer(&object.id()).unwrap();
                 let data = object
-                    .get_v1u32_data(0)
+                    .get_v1u32_data(attribute)
                     .into_iter()
                     .map(|v| *v + p1.first as u32 / 3)
                     .collect::<Vec<_>>();
@@ -207,27 +251,27 @@ impl BatchProvider for Batch2DProvider {
                     .buffer()
                     .write(queue, bytemuck::cast_slice(&data), p0.first);
             }
-            1 => {
-                let p1 = vertex_buffers[0].get_pointer(&object.id()).unwrap();
-                vertex_buffers[0].buffer().write(
+            BATCH2D_ATTRIBUTE_POSITION => {
+                let p1 = position_buffer.get_pointer(&object.id()).unwrap();
+                position_buffer.buffer().write(
                     queue,
-                    flatten(object.get_v3f32_data(1)),
+                    flatten(object.get_v3f32_data(attribute)),
                     p1.first,
                 );
             }
-            2 => {
-                let p2 = vertex_buffers[1].get_pointer(&object.id()).unwrap();
-                vertex_buffers[1].buffer().write(
+            BATCH2D_ATTRIBUTE_TEXCOORD => {
+                let p2 = texcoord_buffer.get_pointer(&object.id()).unwrap();
+                texcoord_buffer.buffer().write(
                     queue,
-                    flatten(object.get_v4f32_data(2)),
+                    flatten(object.get_v2f32_data(attribute)),
                     p2.first,
                 );
             }
-            3 => {
-                let p3 = vertex_buffers[2].get_pointer(&object.id()).unwrap();
-                vertex_buffers[2].buffer().write(
+            BATCH2D_ATTRIBUTE_COLOR => {
+                let p3 = color_buffer.get_pointer(&object.id()).unwrap();
+                color_buffer.buffer().write(
                     queue,
-                    flatten(object.get_v2f32_data(3)),
+                    flatten(object.get_v4f32_data(attribute)),
                     p3.first,
                 );
             }
