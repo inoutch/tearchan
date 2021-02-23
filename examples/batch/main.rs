@@ -343,11 +343,11 @@ pub fn create_sprite(
             BatchTypeArray::V3F32 {
                 data: square_positions,
             },
-            BatchTypeArray::V4F32 {
-                data: square_colors,
-            },
             BatchTypeArray::V2F32 {
                 data: square_texcoords,
+            },
+            BatchTypeArray::V4F32 {
+                data: square_colors,
             },
         ],
         None,
