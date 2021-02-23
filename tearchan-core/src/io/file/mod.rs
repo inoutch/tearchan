@@ -9,6 +9,7 @@ mod objc;
 #[cfg(target_arch = "wasm32")]
 mod web;
 
+#[cfg(all(not(target_os = "android"), not(target_arch = "wasm32")))]
 const ASSETS_DIR: &str = "assets";
 
 pub struct FileUtil {
