@@ -12,10 +12,6 @@ use std::task::Waker;
 
 pub const ASSETS_SCHEME: &str = "@assets://";
 
-struct SharedState {
-    waker: Option<Waker>,
-}
-
 pub struct FileReadFuture {
     receiver: Receiver<Result<Vec<u8>, AndroidFileError>>,
     shared_waker: Arc<Mutex<Option<Waker>>>,
