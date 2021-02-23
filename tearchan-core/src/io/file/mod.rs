@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "android")]
 pub mod android;
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "ios"))]
 mod objc;
 #[cfg(target_arch = "wasm32")]
 mod web;
