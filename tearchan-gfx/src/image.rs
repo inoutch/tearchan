@@ -64,4 +64,8 @@ impl Image {
     pub fn stride(&self) -> usize {
         self.stride
     }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.image
+    }
 }
