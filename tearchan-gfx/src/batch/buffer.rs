@@ -8,7 +8,7 @@ pub type BufferFactory<TBuffer> = fn(
     &<TBuffer as BufferInterface>::Device,
     &<TBuffer as BufferInterface>::Queue,
     &mut Option<&mut <TBuffer as BufferInterface>::Encoder>,
-    Option<&TBuffer>,
+    Option<(&TBuffer, usize)>, // (previous buffer, previous buffer used size)
     usize,
 ) -> TBuffer;
 
@@ -36,6 +36,7 @@ where
     buffer_factory: BufferFactory<TBuffer>,
     pointers: HashMap<BatchObjectId, BatchPointer>,
     last: usize,
+    flushed_last: usize,
     pending_pointers: DuplicatableBTreeMap<usize, BatchPointer>,
     fragmentation_size: usize,
 }
@@ -56,6 +57,7 @@ where
             buffer_factory,
             pointers: HashMap::new(),
             last: 0,
+            flushed_last: 0,
             pending_pointers: DuplicatableBTreeMap::default(),
             fragmentation_size: 0,
         }
@@ -186,7 +188,13 @@ where
     ) {
         let new_size = size * 2;
         let factory = &self.buffer_factory;
-        self.buffer = factory(device, queue, encoder, Some(&self.buffer), new_size);
+        self.buffer = factory(
+            device,
+            queue,
+            encoder,
+            Some((&self.buffer, self.flushed_last)),
+            new_size,
+        );
     }
 
     fn allocate_new_pointer(
@@ -219,5 +227,11 @@ where
         }
 
         pointer.size = size;
+    }
+
+    pub fn flush(&mut self) {
+        // Update the size copied to the buffer.
+        // This will determine how much of the existing buffer should be restored when the buffer is recreated.
+        self.flushed_last = self.last;
     }
 }

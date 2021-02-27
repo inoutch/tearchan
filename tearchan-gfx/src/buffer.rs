@@ -65,8 +65,9 @@ impl<T> Buffer<T> {
         label: &str,
         usage: BufferUsage,
         buffer: &Buffer<T>,
+        buffer_len: usize,
     ) -> Buffer<T> {
-        let copy_len = min(len, buffer.len) * size_of::<T>();
+        let copy_len = min(len, min(buffer.len, buffer_len)) * size_of::<T>();
         let new_buffer = Self::new(device, len, label, usage);
         encoder.copy_buffer_to_buffer(&buffer.buffer, 0, &new_buffer.buffer, 0, copy_len as u64);
         new_buffer

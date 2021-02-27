@@ -65,7 +65,8 @@ impl BatchBillboardProvider {
                             len,
                             label,
                             usage,
-                            prev,
+                            prev.0,
+                            prev.1,
                         )
                     }
                 }
@@ -89,7 +90,8 @@ impl BatchBillboardProvider {
                         len,
                         label,
                         usage,
-                        prev,
+                        prev.0,
+                        prev.1,
                     ),
                 }
             },
@@ -111,7 +113,8 @@ impl BatchBillboardProvider {
                         len,
                         label,
                         usage,
-                        prev,
+                        prev.0,
+                        prev.1,
                     ),
                 }
             },
@@ -133,7 +136,8 @@ impl BatchBillboardProvider {
                         len,
                         label,
                         usage,
-                        prev,
+                        prev.0,
+                        prev.1,
                     ),
                 }
             },
@@ -155,7 +159,8 @@ impl BatchBillboardProvider {
                         len,
                         label,
                         usage,
-                        prev,
+                        prev.0,
+                        prev.1,
                     ),
                 }
             },
@@ -302,11 +307,11 @@ impl BatchProvider for BatchBillboardProvider {
     }
 
     fn flush(&mut self, queue: &Self::Queue, manager: &mut BatchObjectManager) {
-        let index_buffer = &self.index_buffer;
-        let position_buffer = &self.position_buffer;
-        let texcoord_buffer = &self.texcoord_buffer;
-        let color_buffer = &self.color_buffer;
-        let origin_buffer = &self.origin_buffer;
+        let index_buffer = &mut self.index_buffer;
+        let position_buffer = &mut self.position_buffer;
+        let texcoord_buffer = &mut self.texcoord_buffer;
+        let color_buffer = &mut self.color_buffer;
+        let origin_buffer = &mut self.origin_buffer;
         manager.flush(|object, attribute| match attribute as usize {
             BATCH_BILLBOARD_ATTRIBUTE_INDEX => {
                 let p0 = index_buffer.get_pointer(&object.id()).unwrap();
@@ -319,6 +324,7 @@ impl BatchProvider for BatchBillboardProvider {
                 index_buffer
                     .buffer()
                     .write(queue, bytemuck::cast_slice(&data), p0.first);
+                index_buffer.flush();
             }
             BATCH_BILLBOARD_ATTRIBUTE_POSITION => {
                 let p1 = position_buffer.get_pointer(&object.id()).unwrap();
@@ -327,6 +333,7 @@ impl BatchProvider for BatchBillboardProvider {
                     flatten(object.get_v3f32_data(attribute)),
                     p1.first,
                 );
+                position_buffer.flush();
             }
             BATCH_BILLBOARD_ATTRIBUTE_TEXCOORD => {
                 let p2 = texcoord_buffer.get_pointer(&object.id()).unwrap();
@@ -335,6 +342,7 @@ impl BatchProvider for BatchBillboardProvider {
                     flatten(object.get_v2f32_data(attribute)),
                     p2.first,
                 );
+                texcoord_buffer.flush();
             }
             BATCH_BILLBOARD_ATTRIBUTE_COLOR => {
                 let p3 = color_buffer.get_pointer(&object.id()).unwrap();
@@ -343,6 +351,7 @@ impl BatchProvider for BatchBillboardProvider {
                     flatten(object.get_v4f32_data(attribute)),
                     p3.first,
                 );
+                color_buffer.flush();
             }
             BATCH_BILLBOARD_ATTRIBUTE_ORIGIN => {
                 let p4 = origin_buffer.get_pointer(&object.id()).unwrap();
@@ -351,6 +360,7 @@ impl BatchProvider for BatchBillboardProvider {
                     flatten(object.get_v3f32_data(attribute)),
                     p4.first,
                 );
+                origin_buffer.flush();
             }
             _ => {}
         });
