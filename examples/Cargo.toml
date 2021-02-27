@@ -17,6 +17,10 @@ path = "batch/main.rs"
 name = "file"
 path = "file/main.rs"
 
+[[bin]]
+name = "font"
+path = "font/main.rs"
+
 [dependencies]
 winit = { version = "0.24.0", features = ["web-sys"] }
 wgpu = { path = "../../wgpu-rs" }
