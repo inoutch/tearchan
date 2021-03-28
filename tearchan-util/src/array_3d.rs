@@ -14,6 +14,13 @@ impl<T> Array3D<T>
 where
     T: Clone,
 {
+    pub fn new() -> Array3D<T> {
+        Array3D {
+            data: HashMap::new(),
+            rect: Rect3::default(),
+        }
+    }
+
     pub fn get(&self, position: &TVec3<i32>) -> Option<&T> {
         if let Some(rows) = self.data.get(&position.z) {
             if let Some(cols) = rows.get(&position.y) {

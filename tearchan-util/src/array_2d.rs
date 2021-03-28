@@ -1,4 +1,4 @@
-use nalgebra_glm::TVec2;
+use nalgebra_glm::{vec2, TVec2};
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 use std::collections::HashMap;
@@ -14,6 +14,14 @@ impl<T> Array2D<T>
 where
     T: Clone,
 {
+    pub fn new() -> Array2D<T> {
+        Array2D {
+            data: HashMap::new(),
+            size_start: vec2(0, 0),
+            size_end: vec2(0, 0),
+        }
+    }
+
     pub fn get(&self, position: &TVec2<i32>) -> Option<&T> {
         if let Some(y) = self.data.get(&position.y) {
             return y.get(&position.x);
