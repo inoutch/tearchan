@@ -269,6 +269,42 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
+    pub fn with_models_and_frames(
+        self,
+        texture_size: Vec2,
+        bundles: Vec<(&TextureFrame, &tobj::Model)>,
+    ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mut indices: Vec<IndexType> = vec![];
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
+        for (frame, model) in bundles {
+            let fx = frame.rect.x as f32 / texture_size.x;
+            let fy = frame.rect.y as f32 / texture_size.y;
+            let fw = frame.rect.w as f32 / texture_size.x;
+            let fh = frame.rect.h as f32 / texture_size.y;
+            create_elements_from_mesh(
+                &mut indices,
+                &mut positions,
+                &mut colors,
+                &mut texcoords,
+                &mut normals,
+                &model.mesh,
+                &rect2(fx, fy, fw, fh),
+            );
+        }
+
+        MeshBuilder {
+            indices,
+            positions,
+            colors,
+            texcoords,
+            normals,
+        }
+    }
+
     pub fn with_grid(
         self,
         interval: f32,
