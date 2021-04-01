@@ -4,7 +4,7 @@ use crate::mesh::cube::{
     create_cube_colors, create_cube_indices, create_cube_normals, create_cube_positions,
     create_cube_texcoords,
 };
-use crate::mesh::obj::create_elements_from_mesh;
+use crate::mesh::obj::{create_elements_from_shade, create_elements_from_shade_with_texture_rect};
 use crate::mesh::square::{
     create_square_colors, create_square_indices, create_square_normals, create_square_positions,
     create_square_positions_from_frame, create_square_texcoords,
@@ -168,9 +168,9 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
-    pub fn with_model(
+    pub fn with_object(
         self,
-        model: &tobj::Model,
+        object: &wavefront_obj::obj::Object,
     ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
         let mut indices: Vec<IndexType> = vec![];
         let mut positions: Vec<Vec3> = vec![];
@@ -178,15 +178,19 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         let mut texcoords: Vec<Vec2> = vec![];
         let mut normals: Vec<Vec3> = vec![];
 
-        create_elements_from_mesh(
-            &mut indices,
-            &mut positions,
-            &mut colors,
-            &mut texcoords,
-            &mut normals,
-            &model.mesh,
-            &rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32),
-        );
+        for geometry in &object.geometry {
+            for shade in &geometry.shapes {
+                create_elements_from_shade(
+                    &mut indices,
+                    &mut positions,
+                    &mut colors,
+                    &mut texcoords,
+                    &mut normals,
+                    &object,
+                    shade,
+                );
+            }
+        }
 
         MeshBuilder {
             indices,
@@ -197,11 +201,11 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
-    pub fn with_model_and_frame(
+    pub fn with_object_and_frame(
         self,
         texture_size: Vec2,
+        object: &wavefront_obj::obj::Object,
         frame: &TextureFrame,
-        model: &tobj::Model,
     ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
         let mut indices: Vec<IndexType> = vec![];
         let mut positions: Vec<Vec3> = vec![];
@@ -213,13 +217,56 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         let fy = frame.rect.y as f32 / texture_size.y;
         let fw = frame.rect.w as f32 / texture_size.x;
         let fh = frame.rect.h as f32 / texture_size.y;
-        create_elements_from_mesh(
+
+        for geometry in &object.geometry {
+            for shade in &geometry.shapes {
+                create_elements_from_shade_with_texture_rect(
+                    &mut indices,
+                    &mut positions,
+                    &mut colors,
+                    &mut texcoords,
+                    &mut normals,
+                    &object,
+                    shade,
+                    &rect2(fx, fy, fw, fh),
+                );
+            }
+        }
+
+        MeshBuilder {
+            indices,
+            positions,
+            colors,
+            texcoords,
+            normals,
+        }
+    }
+
+    pub fn with_shade_and_frame(
+        self,
+        texture_size: Vec2,
+        object: &wavefront_obj::obj::Object,
+        shade: &wavefront_obj::obj::Shape,
+        frame: &TextureFrame,
+    ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mut indices: Vec<IndexType> = vec![];
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
+        let fx = frame.rect.x as f32 / texture_size.x;
+        let fy = frame.rect.y as f32 / texture_size.y;
+        let fw = frame.rect.w as f32 / texture_size.x;
+        let fh = frame.rect.h as f32 / texture_size.y;
+        create_elements_from_shade_with_texture_rect(
             &mut indices,
             &mut positions,
             &mut colors,
             &mut texcoords,
             &mut normals,
-            &model.mesh,
+            object,
+            shade,
             &rect2(fx, fy, fw, fh),
         );
 
@@ -232,11 +279,10 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
-    pub fn with_models_and_frame(
+    pub fn with_objects_and_frames(
         self,
         texture_size: Vec2,
-        frame: &TextureFrame,
-        models: Vec<&tobj::Model>,
+        bundles: Vec<(&wavefront_obj::obj::Object, &TextureFrame)>,
     ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
         let mut indices: Vec<IndexType> = vec![];
         let mut positions: Vec<Vec3> = vec![];
@@ -244,56 +290,26 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         let mut texcoords: Vec<Vec2> = vec![];
         let mut normals: Vec<Vec3> = vec![];
 
-        let fx = frame.rect.x as f32 / texture_size.x;
-        let fy = frame.rect.y as f32 / texture_size.y;
-        let fw = frame.rect.w as f32 / texture_size.x;
-        let fh = frame.rect.h as f32 / texture_size.y;
-        for model in models {
-            create_elements_from_mesh(
-                &mut indices,
-                &mut positions,
-                &mut colors,
-                &mut texcoords,
-                &mut normals,
-                &model.mesh,
-                &rect2(fx, fy, fw, fh),
-            );
-        }
-
-        MeshBuilder {
-            indices,
-            positions,
-            colors,
-            texcoords,
-            normals,
-        }
-    }
-
-    pub fn with_models_and_frames(
-        self,
-        texture_size: Vec2,
-        bundles: Vec<(&TextureFrame, &tobj::Model)>,
-    ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
-        let mut indices: Vec<IndexType> = vec![];
-        let mut positions: Vec<Vec3> = vec![];
-        let mut colors: Vec<Vec4> = vec![];
-        let mut texcoords: Vec<Vec2> = vec![];
-        let mut normals: Vec<Vec3> = vec![];
-
-        for (frame, model) in bundles {
+        for (object, frame) in bundles {
             let fx = frame.rect.x as f32 / texture_size.x;
             let fy = frame.rect.y as f32 / texture_size.y;
             let fw = frame.rect.w as f32 / texture_size.x;
             let fh = frame.rect.h as f32 / texture_size.y;
-            create_elements_from_mesh(
-                &mut indices,
-                &mut positions,
-                &mut colors,
-                &mut texcoords,
-                &mut normals,
-                &model.mesh,
-                &rect2(fx, fy, fw, fh),
-            );
+
+            for geometry in &object.geometry {
+                for shade in &geometry.shapes {
+                    create_elements_from_shade_with_texture_rect(
+                        &mut indices,
+                        &mut positions,
+                        &mut colors,
+                        &mut texcoords,
+                        &mut normals,
+                        &object,
+                        shade,
+                        &rect2(fx, fy, fw, fh),
+                    );
+                }
+            }
         }
 
         MeshBuilder {
@@ -913,100 +929,144 @@ pub mod cube {
 }
 
 pub mod obj {
-    use crate::math::rect::Rect2;
+    use crate::math::rect::{rect2, Rect2};
     use crate::mesh::{convert_texcoord_into_rect, IndexType};
-    use nalgebra_glm::{vec2, vec3, vec4, Vec2, Vec3, Vec4};
+    use nalgebra_glm::{vec3, vec4, Vec2, Vec3, Vec4};
+    use std::option::Option::Some;
+    use wavefront_obj::obj::{Object, Primitive, Shape};
 
-    pub fn create_bundles_from_mesh(
-        positions: &mut Vec<Vec3>,
-        colors: &mut Vec<Vec4>,
-        texcoords: &mut Vec<Vec2>,
-        normals: &mut Vec<Vec3>,
-        mesh: &tobj::Mesh,
-        texture_rect: &Rect2<f32>,
-    ) {
-        let mut next_face = 0;
-        for f in 0..mesh.num_face_indices.len() {
-            let end = next_face + mesh.num_face_indices[f] as usize;
-            let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
-            for idx in face_indices {
-                positions.push(vec3(
-                    mesh.positions[(*idx * 3) as usize],
-                    mesh.positions[(*idx * 3 + 1) as usize],
-                    mesh.positions[(*idx * 3 + 2) as usize],
-                ));
-                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
-                texcoords.push(convert_texcoord_into_rect(
-                    mesh.texcoords[(*idx * 2) as usize],
-                    1.0f32 - mesh.texcoords[(*idx * 2 + 1) as usize],
-                    texture_rect,
-                ));
-                normals.push(vec3(
-                    mesh.normals[(*idx * 3) as usize],
-                    mesh.normals[(*idx * 3 + 1) as usize],
-                    mesh.normals[(*idx * 3 + 2) as usize],
-                ));
-            }
-            next_face = end;
-        }
-    }
-
-    pub fn create_elements_from_mesh(
+    pub fn create_elements_from_shade(
         indices: &mut Vec<IndexType>,
         positions: &mut Vec<Vec3>,
         colors: &mut Vec<Vec4>,
         texcoords: &mut Vec<Vec2>,
         normals: &mut Vec<Vec3>,
-        mesh: &tobj::Mesh,
+        object: &Object,
+        shade: &Shape,
+    ) {
+        create_elements_from_shade_with_texture_rect(
+            indices,
+            positions,
+            colors,
+            texcoords,
+            normals,
+            object,
+            shade,
+            &rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32),
+        )
+    }
+
+    pub fn create_elements_from_shade_with_texture_rect(
+        indices: &mut Vec<IndexType>,
+        positions: &mut Vec<Vec3>,
+        colors: &mut Vec<Vec4>,
+        texcoords: &mut Vec<Vec2>,
+        normals: &mut Vec<Vec3>,
+        object: &Object,
+        shade: &Shape,
         texture_rect: &Rect2<f32>,
     ) {
-        debug_assert!(mesh.positions.len() % 3 == 0);
-        debug_assert!(mesh.texcoords.len() % 2 == 0);
-        debug_assert!(mesh.normals.len() % 3 == 0);
+        let index = positions.len() as u32;
+        match shade.primitive {
+            Primitive::Point((v, tv, n)) => {
+                indices.push(index);
 
-        let index_offset = positions.len();
-        let size = mesh.positions.len() / 3;
-        debug_assert_eq!(
-            size,
-            if mesh.texcoords.is_empty() {
-                size
-            } else {
-                mesh.texcoords.len() / 2
+                let pos = &object.vertices[v];
+                positions.push(vec3(pos.x as f32, pos.y as f32, pos.z as f32));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                if let Some(tv) = tv {
+                    let tex = &object.tex_vertices[tv];
+                    texcoords.push(convert_texcoord_into_rect(
+                        tex.u as f32,
+                        1.0f32 - tex.v as f32,
+                        texture_rect,
+                    ));
+                }
+                if let Some(n) = n {
+                    let nom = &object.normals[n];
+                    normals.push(vec3(nom.x as f32, nom.y as f32, nom.z as f32));
+                }
             }
-        );
-        debug_assert_eq!(size, mesh.normals.len() / 3);
+            Primitive::Line((v0, tv0, n0), (v1, tv1, n1)) => {
+                indices.push(index);
+                indices.push(index + 1);
 
-        for i in 0..size {
-            positions.push(vec3(
-                mesh.positions[i * 3],
-                mesh.positions[i * 3 + 1],
-                mesh.positions[i * 3 + 2],
-            ));
-            colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
-            if mesh.texcoords.is_empty() {
-                texcoords.push(vec2(0.0f32, 0.0f32));
-            } else {
-                texcoords.push(convert_texcoord_into_rect(
-                    mesh.texcoords[i * 2],
-                    1.0f32 - mesh.texcoords[i * 2 + 1], // Need inverse for OBJ
-                    texture_rect,
-                ));
+                let pos0 = &object.vertices[v0];
+                let pos1 = &object.vertices[v1];
+                positions.push(vec3(pos0.x as f32, pos0.y as f32, pos0.z as f32));
+                positions.push(vec3(pos1.x as f32, pos1.y as f32, pos1.z as f32));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                if let Some(tv0) = tv0 {
+                    let tv1 = tv1.unwrap();
+                    let tex0 = &object.tex_vertices[tv0];
+                    let tex1 = &object.tex_vertices[tv1];
+                    texcoords.push(convert_texcoord_into_rect(
+                        tex0.u as f32,
+                        1.0f32 - tex0.v as f32,
+                        texture_rect,
+                    ));
+                    texcoords.push(convert_texcoord_into_rect(
+                        tex1.u as f32,
+                        1.0f32 - tex1.v as f32,
+                        texture_rect,
+                    ));
+                }
+                if let Some(n0) = n0 {
+                    let n1 = n1.unwrap();
+                    let nom0 = &object.normals[n0];
+                    let nom1 = &object.normals[n1];
+                    normals.push(vec3(nom0.x as f32, nom0.y as f32, nom0.z as f32));
+                    normals.push(vec3(nom1.x as f32, nom1.y as f32, nom1.z as f32));
+                }
             }
-            normals.push(vec3(
-                mesh.normals[i * 3],
-                mesh.normals[i * 3 + 1],
-                mesh.normals[i * 3 + 2],
-            ));
-        }
+            Primitive::Triangle((v0, tv0, n0), (v1, tv1, n1), (v2, tv2, n2)) => {
+                indices.push(index);
+                indices.push(index + 1);
+                indices.push(index + 2);
 
-        let mut next_face = 0;
-        for face_num in 0..mesh.num_face_indices.len() {
-            let end = next_face + mesh.num_face_indices[face_num] as usize;
-            let face_indices: Vec<_> = mesh.indices[next_face..end].iter().collect();
-            for idx in face_indices {
-                indices.push(*idx + index_offset as IndexType);
+                let pos0 = &object.vertices[v0];
+                let pos1 = &object.vertices[v1];
+                let pos2 = &object.vertices[v2];
+                positions.push(vec3(pos0.x as f32, pos0.y as f32, pos0.z as f32));
+                positions.push(vec3(pos1.x as f32, pos1.y as f32, pos1.z as f32));
+                positions.push(vec3(pos2.x as f32, pos2.y as f32, pos2.z as f32));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                colors.push(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
+                if let Some(tv0) = tv0 {
+                    let tv1 = tv1.unwrap();
+                    let tv2 = tv2.unwrap();
+                    let tex0 = &object.tex_vertices[tv0];
+                    let tex1 = &object.tex_vertices[tv1];
+                    let tex2 = &object.tex_vertices[tv2];
+                    texcoords.push(convert_texcoord_into_rect(
+                        tex0.u as f32,
+                        1.0f32 - tex0.v as f32,
+                        texture_rect,
+                    ));
+                    texcoords.push(convert_texcoord_into_rect(
+                        tex1.u as f32,
+                        1.0f32 - tex1.v as f32,
+                        texture_rect,
+                    ));
+                    texcoords.push(convert_texcoord_into_rect(
+                        tex2.u as f32,
+                        1.0f32 - tex2.v as f32,
+                        texture_rect,
+                    ));
+                }
+                if let Some(n0) = n0 {
+                    let n1 = n1.unwrap();
+                    let n2 = n2.unwrap();
+                    let nom0 = &object.normals[n0];
+                    let nom1 = &object.normals[n1];
+                    let nom2 = &object.normals[n2];
+                    normals.push(vec3(nom0.x as f32, nom0.y as f32, nom0.z as f32));
+                    normals.push(vec3(nom1.x as f32, nom1.y as f32, nom1.z as f32));
+                    normals.push(vec3(nom2.x as f32, nom2.y as f32, nom2.z as f32));
+                }
             }
-            next_face = end;
         }
     }
 }
