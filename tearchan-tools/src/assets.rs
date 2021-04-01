@@ -43,7 +43,7 @@ where
         if entry.file_type().is_dir() {
             let _ = std::fs::create_dir(dst_full_path);
         } else if entry.file_type().is_file() {
-            std::fs::copy(entry.path(), dst_full_path)?;
+            let _ = std::fs::copy(entry.path(), dst_full_path.clone());
         }
     }
     Ok(())
