@@ -7,8 +7,8 @@ edition = "2018"
 instant = "0.1.9"
 serde = { version = "1.0.118", features = ["derive"] }
 nalgebra-glm = { version = "0.10.0", features = ["serde-serialize"] }
-tobj = "2.0.3"
-texture_packer = "0.21.1"
+tobj = "2.0.4"
+texture_packer = "0.22.0"
 
 [dev-dependencies]
 float-cmp = "0.7.0"
