@@ -375,11 +375,10 @@ pub fn destroy_sprite(
 
 pub fn main() {
     let window_builder = WindowBuilder::new().with_title("quad");
-    let startup_config = EngineStartupConfigBuilder::default()
+    let startup_config = EngineStartupConfigBuilder::new()
         .window_builder(window_builder)
         .scene_factory(BatchScene::factory())
-        .build()
-        .unwrap();
+        .build();
     let engine = Engine::new(startup_config);
     engine.run();
 }

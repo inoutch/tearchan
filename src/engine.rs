@@ -5,6 +5,7 @@ use instant::Instant;
 use std::future::Future;
 use std::time::Duration;
 use tearchan_gfx::renderer::RendererLazySetup;
+use tearchan_util::any::OptAnyBox;
 use tearchan_util::time::DurationWatch;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -24,6 +25,7 @@ impl Engine {
 
     async fn start(self) {
         let startup_config = self.startup_config;
+        let mut custom = OptAnyBox::new(startup_config.custom);
         let spawner = Spawner::default();
 
         let event_loop = EventLoop::new();
@@ -73,7 +75,8 @@ impl Engine {
                 }
                 _ => {
                     if let Some(renderer) = setup.renderer_mut() {
-                        let context = SceneContext::new(renderer.create_context(), &spawner);
+                        let context =
+                            SceneContext::new(renderer.create_context(), &spawner, &mut custom);
                         if let Some(overwrite) = scene_manager.update(event, context) {
                             *control_flow = overwrite;
                         };
@@ -110,6 +113,7 @@ impl Engine {
                     let context = SceneRenderContext::new(
                         (context, render_context),
                         &spawner,
+                        &mut custom,
                         elapsed_time as f32 / 1000000.0f32,
                     );
                     if let Some(overwrite) = scene_manager.render(context) {
