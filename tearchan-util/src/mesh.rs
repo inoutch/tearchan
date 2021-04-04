@@ -21,7 +21,7 @@ pub type ColorArray = Vec<Vec4>;
 pub type TexcoordArray = Vec<Vec2>;
 pub type NormalArray = Vec<Vec3>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Mesh {
     pub indices: IndexArray,
     pub positions: PositionArray,
