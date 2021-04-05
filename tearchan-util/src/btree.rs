@@ -146,13 +146,13 @@ where
     }
 }
 
-impl<K, V> Into<Vec<V>> for DuplicatableBTreeMap<K, V>
+impl<K, V> From<DuplicatableBTreeMap<K, V>> for Vec<V>
 where
     K: Ord,
 {
-    fn into(mut self) -> Vec<V> {
+    fn from(mut map: DuplicatableBTreeMap<K, V>) -> Self {
         let mut ret = vec![];
-        while let Some(x) = self.pop_first_back() {
+        while let Some(x) = map.pop_first_back() {
             ret.push(x);
         }
         ret
