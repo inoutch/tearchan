@@ -255,7 +255,7 @@ impl BatchProvider for Batch3DProvider {
                         .reallocate(device, queue, encoder, *id, data.len() * 2)
                 }
                 BATCH3D_ATTRIBUTE_COLOR => {
-                    self.texcoord_buffer
+                    self.color_buffer
                         .reallocate(device, queue, encoder, *id, data.len() * 4)
                 }
                 BATCH3D_ATTRIBUTE_NORMAL => {
