@@ -4,6 +4,7 @@ use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
 use std::option::Option::Some;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use tearchan_ecs::component::EntityId;
 
 pub struct JobManager<T>
@@ -11,6 +12,8 @@ where
     T: HordeInterface,
 {
     action_manager: ActionManager<T>,
+    sender: Sender<Command>,
+    receiver: Receiver<Command>,
 }
 
 impl<T> Default for JobManager<T>
@@ -18,8 +21,11 @@ where
     T: HordeInterface,
 {
     fn default() -> Self {
+        let (sender, receiver) = channel();
         JobManager {
             action_manager: ActionManager::default(),
+            sender,
+            receiver,
         }
     }
 }
@@ -29,6 +35,8 @@ where
     T: HordeInterface,
 {
     pub fn run(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
+        self.process_commands(None);
+
         self.action_manager.update(elapsed_time);
 
         loop {
@@ -71,7 +79,8 @@ where
 
     pub fn update_action(&mut self, provider: &mut T) {
         let mut results = self.action_manager.pull();
-        let mut buffer = CommandBuffer::default();
+        let (sender, receiver) = channel();
+        let mut buffer = CommandBuffer { sender };
 
         while let Some(result) = results.pop_first_back() {
             match result {
@@ -91,11 +100,17 @@ where
                 }
             }
         }
-        self.run_commands(buffer);
+        self.process_commands(Some(&receiver));
     }
 
-    pub fn run_commands(&mut self, mut buffer: CommandBuffer) {
-        while let Some(command) = buffer.commands.pop_front() {
+    pub fn create_command_buffer(&self) -> CommandBuffer {
+        CommandBuffer {
+            sender: Sender::clone(&self.sender),
+        }
+    }
+
+    fn process_commands(&mut self, receiver: Option<&Receiver<Command>>) {
+        while let Ok(command) = receiver.unwrap_or(&self.receiver).try_recv() {
             match command {
                 Command::AttachEntity { entity_id } => {
                     self.attach(entity_id);
@@ -117,14 +132,13 @@ pub enum Command {
     CancelAction { entity_id: EntityId }, // Only host command
 }
 
-#[derive(Default)]
 pub struct CommandBuffer {
-    commands: VecDeque<Command>,
+    sender: Sender<Command>,
 }
 
 impl CommandBuffer {
     pub fn push(&mut self, command: Command) {
-        self.commands.push_back(command);
+        self.sender.send(command).unwrap();
     }
 }
 
