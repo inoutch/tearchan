@@ -35,7 +35,7 @@ where
     T: HordeInterface,
 {
     pub fn run(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
-        self.process_commands(None);
+        self.process_commands(provider, None);
 
         self.action_manager.update(elapsed_time);
 
@@ -69,14 +69,6 @@ where
         }
     }
 
-    pub fn attach(&mut self, entity_id: EntityId) {
-        self.action_manager.attach(entity_id);
-    }
-
-    pub fn detach(&mut self, entity_id: EntityId) {
-        self.action_manager.detach(entity_id);
-    }
-
     pub fn update_action(&mut self, provider: &mut T) {
         let mut results = self.action_manager.pull();
         let (sender, receiver) = channel();
@@ -100,7 +92,7 @@ where
                 }
             }
         }
-        self.process_commands(Some(&receiver));
+        self.process_commands(provider, Some(&receiver));
     }
 
     pub fn create_command_buffer(&self) -> CommandBuffer {
@@ -109,20 +101,31 @@ where
         }
     }
 
-    fn process_commands(&mut self, receiver: Option<&Receiver<Command>>) {
+    fn process_commands(&mut self, provider: &mut T, receiver: Option<&Receiver<Command>>) {
         while let Ok(command) = receiver.unwrap_or(&self.receiver).try_recv() {
             match command {
                 Command::AttachEntity { entity_id } => {
-                    self.attach(entity_id);
+                    self.attach(provider, entity_id);
                 }
                 Command::DetachEntity { entity_id } => {
-                    self.detach(entity_id);
+                    self.detach(provider, entity_id);
                 }
                 Command::CancelAction { entity_id } => {
                     self.action_manager.cancel(entity_id);
                 }
             }
         }
+        provider.on_process_commands();
+    }
+
+    fn attach(&mut self, provider: &mut T, entity_id: EntityId) {
+        self.action_manager.attach(entity_id);
+        provider.on_attach_entity(entity_id);
+    }
+
+    fn detach(&mut self, provider: &mut T, entity_id: EntityId) {
+        self.action_manager.detach(entity_id);
+        provider.on_detach_entity(entity_id);
     }
 }
 
@@ -145,7 +148,7 @@ impl CommandBuffer {
 #[cfg(test)]
 mod test {
     use crate::action::Action;
-    use crate::job::manager::{CommandBuffer, JobManager};
+    use crate::job::manager::{Command, CommandBuffer, JobManager};
     use crate::job::result::JobResult;
     use crate::HordeInterface;
     use tearchan_ecs::component::group::ComponentGroup;
@@ -309,6 +312,7 @@ mod test {
             position_components,
         };
 
+        let mut command_buffer = action_creator_manager.create_command_buffer();
         // Create cat
         {
             let entity_id = custom_game.entity_id_manager.create_generator().gen();
@@ -319,7 +323,7 @@ mod test {
             custom_game
                 .position_components
                 .push(entity_id, Position((0, 0)));
-            action_creator_manager.attach(entity_id);
+            command_buffer.push(Command::AttachEntity { entity_id });
         }
         // Create dog
         {
@@ -331,7 +335,7 @@ mod test {
             custom_game
                 .position_components
                 .push(entity_id, Position((30, 10)));
-            action_creator_manager.attach(entity_id);
+            command_buffer.push(Command::AttachEntity { entity_id });
         }
         // Create human
         {
@@ -343,7 +347,7 @@ mod test {
             custom_game
                 .position_components
                 .push(entity_id, Position((4, 8)));
-            action_creator_manager.attach(entity_id);
+            command_buffer.push(Command::AttachEntity { entity_id });
         }
 
         // Process horde
