@@ -62,27 +62,28 @@ impl Engine {
                     .detach();
                 while executor.try_tick() {}
             }
-            Event::WindowEvent { event, window_id } => match event {
-                WindowEvent::Resized(size) => {
-                    if let Some(renderer) = setup.renderer_mut() {
-                        renderer.resize(size);
+            Event::WindowEvent { event, window_id } => {
+                match &event {
+                    WindowEvent::Resized(size) => {
+                        if let Some(renderer) = setup.renderer_mut() {
+                            renderer.resize(*size);
+                        }
                     }
-                }
-                WindowEvent::CloseRequested => {
-                    if window_id == setup.window().id() {
-                        *control_flow = ControlFlow::Exit;
+                    WindowEvent::CloseRequested => {
+                        if window_id == setup.window().id() {
+                            *control_flow = ControlFlow::Exit;
+                        }
                     }
+                    _ => {}
                 }
-                _ => {
-                    if let Some(renderer) = setup.renderer_mut() {
-                        let context =
-                            SceneContext::new(renderer.create_context(), &spawner, &mut custom);
-                        if let Some(overwrite) = scene_manager.update(event, context) {
-                            *control_flow = overwrite;
-                        };
-                    }
+                if let Some(renderer) = setup.renderer_mut() {
+                    let context =
+                        SceneContext::new(renderer.create_context(), &spawner, &mut custom);
+                    if let Some(overwrite) = scene_manager.update(event, context) {
+                        *control_flow = overwrite;
+                    };
                 }
-            },
+            }
             Event::MainEventsCleared => {
                 setup.window().request_redraw();
 
