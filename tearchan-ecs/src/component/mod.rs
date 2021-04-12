@@ -1,9 +1,12 @@
+use serde::{Deserialize, Serialize};
+
 pub mod group;
 pub mod group_sync;
 pub mod zip;
 
 pub type EntityId = u32;
 
+#[derive(Serialize, Deserialize)]
 pub struct Component<T> {
     entity_id: EntityId,
     inner: T,

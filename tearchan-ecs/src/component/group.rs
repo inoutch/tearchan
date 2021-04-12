@@ -1,9 +1,11 @@
 use crate::component::zip::{ZipEntityBase, ZipEntityIter, ZipEntityIterMut};
 use crate::component::{Component, EntityId};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub type ComponentIndex = usize;
 
+#[derive(Serialize, Deserialize)]
 pub struct ComponentGroup<T> {
     indices: HashMap<EntityId, ComponentIndex>,
     components: Vec<Component<T>>,
@@ -120,10 +122,14 @@ impl<'a, T> IterMut<'a, T> {
 mod test {
     use crate::component::group::ComponentGroup;
     use crate::component::zip::ZipEntity2;
+    use serde::{Deserialize, Serialize};
     use std::cell::RefCell;
     use std::rc::Rc;
 
     struct Inner(&'static str);
+
+    #[derive(Serialize, Deserialize)]
+    struct SerializationInner(String);
 
     #[test]
     fn test_len() {
@@ -212,5 +218,19 @@ mod test {
         );
 
         assert_eq!(*counter.borrow(), 2);
+    }
+
+    #[test]
+    fn test_serialization() {
+        let mut group = ComponentGroup::default();
+        group.push(0, SerializationInner("entity 0".to_string()));
+        group.push(1, SerializationInner("entity 1".to_string()));
+        group.push(2, SerializationInner("entity 2".to_string()));
+
+        let str = serde_json::to_string(&group).unwrap();
+        let group: ComponentGroup<SerializationInner> = serde_json::from_str(&str).unwrap();
+        assert_eq!(group.get(0).as_ref().unwrap().0, "entity 0");
+        assert_eq!(group.get(1).as_ref().unwrap().0, "entity 1");
+        assert_eq!(group.get(2).as_ref().unwrap().0, "entity 2");
     }
 }

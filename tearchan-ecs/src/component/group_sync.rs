@@ -24,6 +24,12 @@ impl<T> ComponentGroupSync<T>
 where
     T: Sync,
 {
+    pub fn new(component_group: ComponentGroup<T>) -> ComponentGroupSync<T> {
+        ComponentGroupSync {
+            inner: Arc::new(UnsafeCell::new(component_group)),
+        }
+    }
+
     pub fn try_read(&self) -> Option<ComponentGroupSyncReader<T>> {
         if Arc::strong_count(&self.inner) != 1 {
             return None;
@@ -98,6 +104,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use crate::component::group::ComponentGroup;
     use crate::component::group_sync::{ComponentGroupSync, ComponentGroupSyncReader};
     use crate::component::zip::ZipEntity1;
     use tearchan_util::thread::ThreadPool;
@@ -253,5 +260,21 @@ mod test {
         assert_eq!(read1.get().get(2).unwrap(), &48);
         assert_eq!(read1.get().get(3).unwrap(), &180);
         assert_eq!(read1.get().get(4).unwrap(), &268);
+    }
+
+    #[test]
+    fn test_serialization() {
+        let mut group: ComponentGroupSync<i32> = ComponentGroupSync::default();
+        group.write().get_mut().push(0, 0);
+        group.write().get_mut().push(1, 11);
+        group.write().get_mut().push(2, 22);
+
+        let str = serde_json::to_string(group.read().get()).unwrap();
+        let component_group: ComponentGroup<i32> = serde_json::from_str(&str).unwrap();
+        let component_group_sync = ComponentGroupSync::new(component_group);
+
+        assert_eq!(*component_group_sync.read().get().get(0).unwrap(), 0);
+        assert_eq!(*component_group_sync.read().get().get(1).unwrap(), 11);
+        assert_eq!(*component_group_sync.read().get().get(2).unwrap(), 22);
     }
 }
