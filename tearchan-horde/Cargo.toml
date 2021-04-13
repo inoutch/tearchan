@@ -4,5 +4,6 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
+serde = { version = "1.0.125", features = ["rc"] }
 tearchan-ecs = { path = "../tearchan-ecs" }
 tearchan-util = { path = "../tearchan-util" }

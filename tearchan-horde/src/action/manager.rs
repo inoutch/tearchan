@@ -2,6 +2,7 @@ use crate::action::context::ActionContext;
 use crate::action::result::ActionResult;
 use crate::action::Action;
 use crate::HordeInterface;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use tearchan_ecs::component::EntityId;
@@ -41,6 +42,56 @@ impl<T> ActionManager<T>
 where
     T: HordeInterface,
 {
+    pub fn new(data: ActionManagerData<T::ActionState>) -> ActionManager<T> {
+        let mut pending_actions = DuplicatableBTreeMap::default();
+        let mut running_actions = DuplicatableBTreeMap::default();
+        let mut contexts = HashMap::new();
+        let mut pending_cache = HashSet::new();
+
+        for entity_id in data.entity_ids {
+            contexts.insert(
+                entity_id,
+                ActionContext {
+                    last_time: data.current_time,
+                    state_len: 0,
+                },
+            );
+        }
+
+        for action in data.actions {
+            let context = contexts
+                .entry(action.entity_id)
+                .or_insert_with(|| ActionContext {
+                    last_time: action.end_time,
+                    state_len: 0,
+                });
+            context.state_len += 1;
+            if context.last_time < action.end_time {
+                context.last_time = action.end_time;
+            }
+
+            if data.current_time >= action.start_time {
+                running_actions.push_back(action.start_time, action);
+            } else {
+                pending_actions.push_back(action.start_time, action);
+            }
+        }
+
+        for (entity_id, context) in &contexts {
+            if context.state_len == 0 {
+                pending_cache.insert(*entity_id);
+            }
+        }
+
+        ActionManager {
+            pending_actions,
+            running_actions,
+            current_time: data.current_time,
+            contexts,
+            pending_cache,
+        }
+    }
+
     pub fn update(&mut self, elapsed_time: TimeMilliseconds) {
         self.current_time += elapsed_time;
     }
@@ -176,6 +227,30 @@ where
         }
     }
 
+    pub fn create_data(&self) -> ActionManagerData<T::ActionState> {
+        let mut actions = vec![];
+        for (_, pending_actions) in self.pending_actions.iter() {
+            for pending_action in pending_actions {
+                actions.push(Rc::clone(&pending_action));
+            }
+        }
+        for (_, running_actions) in self.running_actions.iter() {
+            for running_action in running_actions {
+                actions.push(Rc::clone(&running_action));
+            }
+        }
+
+        ActionManagerData {
+            actions,
+            entity_ids: self
+                .contexts
+                .iter()
+                .map(|(entity_id, _)| *entity_id)
+                .collect(),
+            current_time: self.current_time,
+        }
+    }
+
     fn get_context_mut(&mut self, entity_id: EntityId) -> &mut ActionContext {
         debug_assert!(
             self.contexts.contains_key(&entity_id),
@@ -194,4 +269,11 @@ where
         self.contexts.insert(entity_id, context);
         self.contexts.get_mut(&entity_id).unwrap()
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ActionManagerData<T> {
+    pub actions: Vec<Rc<Action<T>>>,
+    pub entity_ids: HashSet<EntityId>,
+    pub current_time: TimeMilliseconds,
 }

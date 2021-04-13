@@ -1,4 +1,5 @@
 use crate::action::manager::TimeMilliseconds;
+use serde::{Deserialize, Serialize};
 use std::rc::Rc;
 use tearchan_ecs::component::EntityId;
 
@@ -6,7 +7,7 @@ pub mod context;
 pub mod manager;
 pub mod result;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Action<T> {
     entity_id: EntityId,
     start_time: TimeMilliseconds,
