@@ -10,7 +10,7 @@ where
     }
 }
 
-pub fn flatten<N: RealField, D: Dimension>(x: &Vec<TVec<N, D>>) -> &[N]
+pub fn flatten<N: RealField, D: Dimension>(x: &[TVec<N, D>]) -> &[N]
 where
     DefaultAllocator: Alloc<N, D>,
 {

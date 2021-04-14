@@ -956,6 +956,7 @@ pub mod obj {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_elements_from_shade_with_texture_rect(
         indices: &mut Vec<IndexType>,
         positions: &mut Vec<Vec3>,
