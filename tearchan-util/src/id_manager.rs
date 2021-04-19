@@ -14,11 +14,11 @@ impl<T> IdManager<T> {
         }
     }
 
-    pub fn gen(&mut self) -> T
-        where
-            T: Copy,
+    pub fn gen(&self) -> T
+    where
+        T: Copy,
     {
-        gen(&mut self.current, &self.incrementer)
+        gen(&self.current, &self.incrementer)
     }
 
     pub fn reset(&mut self, first: T) {
@@ -33,22 +33,23 @@ impl<T> IdManager<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct IdGenerator<T> {
     current: Arc<Mutex<T>>,
     incrementer: Arc<fn(val: &T) -> T>,
 }
 
 impl<T> IdGenerator<T> {
-    pub fn gen(&mut self) -> T
-        where
-            T: Copy,
+    pub fn gen(&self) -> T
+    where
+        T: Copy,
     {
-        gen(&mut self.current, &self.incrementer)
+        gen(&self.current, &self.incrementer)
     }
 }
 
 #[inline]
-fn gen<T: Copy>(current: &mut Arc<Mutex<T>>, incrementer: &Arc<fn(val: &T) -> T>) -> T {
+fn gen<T: Copy>(current: &Arc<Mutex<T>>, incrementer: &Arc<fn(val: &T) -> T>) -> T {
     let mut current = current.lock().unwrap();
     let next = *current;
     *current = incrementer(current.deref());
@@ -74,8 +75,8 @@ mod test {
 
     #[test]
     fn test_in_multi_thread() {
-        let mut id_manager = IdManager::new(0u64, |id| id + 1u64);
-        let mut getter = id_manager.create_generator();
+        let id_manager = IdManager::new(0u64, |id| id + 1u64);
+        let getter = id_manager.create_generator();
 
         let thread = std::thread::spawn(move || {
             for _ in 0..1000 {
