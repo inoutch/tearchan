@@ -1,7 +1,7 @@
 use nalgebra_glm::{Alloc, DefaultAllocator, Dimension, RealField, TVec, TVec1};
 use std::mem::size_of;
 
-pub fn vec_to_bytes<N: RealField, D: Dimension>(x: &Vec<TVec<N, D>>) -> &[u8]
+pub fn vec_to_bytes<N: RealField, D: Dimension>(x: &[TVec<N, D>]) -> &[u8]
 where
     DefaultAllocator: Alloc<N, D>,
 {
