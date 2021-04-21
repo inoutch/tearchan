@@ -13,6 +13,7 @@ pub type BatchObjectId = u64;
 pub mod batch2d;
 pub mod batch3d;
 pub mod batch_billboard;
+pub mod batch_line;
 pub mod buffer;
 pub mod object;
 pub mod types;
