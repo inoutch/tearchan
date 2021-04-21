@@ -395,6 +395,32 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
         }
     }
 
+    pub fn with_lines_with_colors(
+        self,
+        lines: Vec<(Vec3, Vec3, Vec4)>,
+    ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mut indices = vec![];
+        let mut positions = vec![];
+        let mut colors = vec![];
+
+        for (start, end, color) in lines {
+            indices.push(indices.len() as IndexType);
+            indices.push(indices.len() as IndexType);
+            positions.push(start);
+            positions.push(end);
+            colors.push(color.clone_owned());
+            colors.push(color);
+        }
+
+        MeshBuilder {
+            indices,
+            positions,
+            colors,
+            texcoords: vec![],
+            normals: vec![],
+        }
+    }
+
     pub fn indices(
         self,
         indices: Vec<IndexType>,
