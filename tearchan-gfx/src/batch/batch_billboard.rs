@@ -279,7 +279,7 @@ impl BatchProvider for BatchBillboardProvider {
                         .reallocate(device, queue, encoder, *id, data.len() * 2)
                 }
                 BATCH_BILLBOARD_ATTRIBUTE_COLOR => {
-                    self.texcoord_buffer
+                    self.color_buffer
                         .reallocate(device, queue, encoder, *id, data.len() * 4)
                 }
                 BATCH_BILLBOARD_ATTRIBUTE_ORIGIN => {
