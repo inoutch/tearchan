@@ -8,7 +8,7 @@ use tearchan::engine_config::EngineStartupConfigBuilder;
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
-use tearchan_gfx::batch::batch2d::{Batch2D, Batch2DProvider};
+use tearchan_gfx::batch::batch2d::Batch2D;
 use tearchan_gfx::batch::types::{BatchTypeArray, BatchTypeTransform};
 use tearchan_gfx::batch::{BatchCommandBuffer, BatchObjectId};
 use tearchan_gfx::camera::Camera3D;
@@ -42,7 +42,7 @@ impl BatchScene {
             let aspect = width / height;
 
             let mut sprites = VecDeque::new();
-            let mut batch = Batch2DProvider::new(device, queue);
+            let mut batch = Batch2D::new(device, queue);
             let mut batch_command_buffer = batch.create_command_buffer();
             create_sprite(&mut batch_command_buffer, &mut sprites);
 

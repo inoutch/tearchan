@@ -3,6 +3,7 @@ use crate::batch::{Batch, BatchObjectManager, BatchProvider, BatchProviderComman
 use crate::buffer::{Buffer, BufferInterface};
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 use tearchan_util::bytes::flatten;
 
 pub const BATCH2D_ATTRIBUTE_INDEX: usize = 0;
@@ -10,7 +11,30 @@ pub const BATCH2D_ATTRIBUTE_POSITION: usize = 1;
 pub const BATCH2D_ATTRIBUTE_TEXCOORD: usize = 2;
 pub const BATCH2D_ATTRIBUTE_COLOR: usize = 3;
 
-pub type Batch2D = Batch<Batch2DProvider>;
+pub struct Batch2D {
+    batch: Batch<Batch2DProvider>,
+}
+
+impl Batch2D {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+        let batch = Batch::new(Batch2DProvider::new(device, queue));
+        Batch2D { batch }
+    }
+}
+
+impl Deref for Batch2D {
+    type Target = Batch<Batch2DProvider>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.batch
+    }
+}
+
+impl DerefMut for Batch2D {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.batch
+    }
+}
 
 pub struct Batch2DProvider {
     index_buffer: BatchBuffer<Buffer<u32>>,
@@ -20,7 +44,7 @@ pub struct Batch2DProvider {
 }
 
 impl Batch2DProvider {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Batch2D {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
         let index_buffer: BatchBuffer<Buffer<u32>> = BatchBuffer::new(
             device,
             queue,
@@ -117,12 +141,12 @@ impl Batch2DProvider {
             },
         );
 
-        Batch::new(Batch2DProvider {
+        Batch2DProvider {
             index_buffer,
             position_buffer,
             color_buffer,
             texcoord_buffer,
-        })
+        }
     }
 
     pub fn index_count(&self) -> usize {
