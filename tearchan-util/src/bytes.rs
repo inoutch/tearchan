@@ -1,19 +1,13 @@
-use nalgebra_glm::{Alloc, DefaultAllocator, Dimension, RealField, TVec, TVec1};
+use nalgebra_glm::{RealField, TVec, TVec1};
 use std::mem::size_of;
 
-pub fn vec_to_bytes<N: RealField, D: Dimension>(x: &[TVec<N, D>]) -> &[u8]
-where
-    DefaultAllocator: Alloc<N, D>,
-{
+pub fn vec_to_bytes<N: RealField, const D: usize>(x: &[TVec<N, D>]) -> &[u8] {
     unsafe {
         std::slice::from_raw_parts(x.as_ptr() as *const u8, x.len() * size_of::<TVec<N, D>>())
     }
 }
 
-pub fn flatten<N: RealField, D: Dimension>(x: &[TVec<N, D>]) -> &[N]
-where
-    DefaultAllocator: Alloc<N, D>,
-{
+pub fn flatten<N: RealField, const D: usize>(x: &[TVec<N, D>]) -> &[N] {
     unsafe {
         std::slice::from_raw_parts(
             x.as_ptr() as *const N,
