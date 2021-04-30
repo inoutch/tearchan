@@ -10,7 +10,7 @@ use tearchan_util::math::rect::{rect2, Rect2};
 use tearchan_util::math::vec::vec4_white;
 use tearchan_util::mesh::square::{
     create_square_colors, create_square_indices_with_offset, create_square_positions,
-    create_square_texcoords,
+    create_square_texcoords, create_square_texcoords_inv,
 };
 use tearchan_util::mesh::{IndexType, Mesh, MeshBuilder};
 use wgpu::{Extent3d, TextureDataLayout};
@@ -128,7 +128,6 @@ impl FontTexture {
                 self.h_max = self.h_max.max(height);
 
                 if self.virtual_size.y as f32 + self.h_max >= self.actual_size.y as f32 {
-                    println!("resize");
                     // Create new texture
                     self.actual_size = vec2(self.actual_size.x * 2, self.actual_size.y * 2);
                     let (texture, view) = create_texture_bundle(
@@ -262,6 +261,86 @@ impl FontTexture {
         for position in &mut positions {
             position.y += size.y;
         }
+        Ok((
+            MeshBuilder::new()
+                .indices(indices)
+                .positions(positions)
+                .colors(colors)
+                .texcoords(texcoords)
+                .normals(vec![])
+                .build()
+                .unwrap(),
+            size,
+        ))
+    }
+
+    pub fn create_mesh_inv(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        characters: &str,
+    ) -> Result<(Mesh, Vec2), FontTextureError> {
+        self.write_characters(device, queue, characters)?;
+
+        let mut size = vec2(0.0f32, 0.0f32);
+        let font = rusttype::Font::try_from_bytes(&self.font_data).unwrap();
+        let scale = Scale::uniform(self.scale);
+        let v_metrics = font.v_metrics(scale);
+        let line_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
+
+        let mut indices = vec![];
+        let mut positions = vec![];
+        let mut colors = vec![];
+        let mut texcoords = vec![];
+        let texture_size = vec2(self.actual_size.x as f32, self.actual_size.y as f32);
+
+        let mut base_line = v_metrics.ascent;
+        let mut prev_line_width = 0.0f32;
+        let mut width = 0.0f32;
+
+        for glyph in font.layout(characters, scale, point(0.0f32, 0.0f32)) {
+            // new line
+            let h_metrics = glyph.unpositioned().h_metrics();
+            if glyph.id() == '\n'.into_glyph_id(&font) {
+                width += h_metrics.advance_width;
+                size.y += line_height;
+                base_line += line_height;
+                prev_line_width = width;
+                size.x = size.x.max(width);
+                continue;
+            }
+            let bounds = match glyph.pixel_bounding_box() {
+                Some(bounding_box) => bounding_box,
+                None => {
+                    width += h_metrics.advance_width;
+                    continue;
+                }
+            };
+
+            let texture_rect = &self.dictionary[&glyph.id()];
+            let uv_rect = rect2(
+                texture_rect.origin.x / texture_size.x,
+                texture_rect.origin.y / texture_size.y,
+                texture_rect.size.x / texture_size.x,
+                texture_rect.size.y / texture_size.y,
+            );
+            let rect = rect2(
+                bounds.min.x as f32 - prev_line_width,
+                base_line + bounds.min.y as f32,
+                (bounds.max.x - bounds.min.x) as f32,
+                (bounds.max.y - bounds.min.y) as f32,
+            );
+            indices.append(&mut create_square_indices_with_offset(
+                positions.len() as IndexType
+            ));
+            positions.append(&mut create_square_positions(&rect));
+            colors.append(&mut create_square_colors(vec4_white()));
+            texcoords.append(&mut create_square_texcoords_inv(&uv_rect));
+            width = rect.origin.x + rect.size.x;
+        }
+        size.y += line_height;
+        size.x = size.x.max(width);
+
         Ok((
             MeshBuilder::new()
                 .indices(indices)
