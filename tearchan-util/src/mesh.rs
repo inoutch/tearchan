@@ -37,18 +37,34 @@ impl Mesh {
         colors: Vec<Vec4>,
         texcoords: Vec<Vec2>,
         normals: Vec<Vec3>,
-    ) -> Result<Mesh, &'static str> {
-        Ok(Mesh {
+    ) -> Mesh {
+        Mesh {
             indices,
             positions,
             colors,
             texcoords,
             normals,
-        })
+        }
     }
 
     pub fn size(&self) -> usize {
         self.positions.len()
+    }
+
+    pub fn inverse(self, primitive: usize) -> Mesh {
+        let mut indices = Vec::with_capacity(self.indices.len());
+        for i in 0..(self.indices.len() / primitive) {
+            for j in 0..primitive {
+                indices.push(self.indices[i * primitive + primitive - j - 1]);
+            }
+        }
+        Mesh::new(
+            indices,
+            self.positions,
+            self.colors,
+            self.texcoords,
+            self.normals,
+        )
     }
 
     pub fn decompose(
@@ -597,6 +613,15 @@ pub mod square {
             vec2(rect.origin.x + rect.size.x, rect.origin.y + rect.size.y),
             vec2(rect.origin.x, rect.origin.y),
             vec2(rect.origin.x + rect.size.x, rect.origin.y),
+        ];
+    }
+
+    pub fn create_square_texcoords_inv(rect: &Rect2<f32>) -> Vec<Vec2> {
+        return vec![
+            vec2(rect.origin.x, rect.origin.y),
+            vec2(rect.origin.x + rect.size.x, rect.origin.y),
+            vec2(rect.origin.x, rect.origin.y + rect.size.y),
+            vec2(rect.origin.x + rect.size.x, rect.origin.y + rect.size.y),
         ];
     }
 
