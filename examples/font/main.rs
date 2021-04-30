@@ -4,7 +4,7 @@ use tearchan::engine_config::EngineStartupConfigBuilder;
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
-use tearchan_gfx::batch::batch2d::{Batch2D, Batch2DProvider};
+use tearchan_gfx::batch::batch2d::Batch2D;
 use tearchan_gfx::batch::types::BatchTypeArray;
 use tearchan_gfx::camera::Camera2D;
 use tearchan_gfx::font_texture::FontTexture;
@@ -54,7 +54,7 @@ impl FontScene {
             )
             .unwrap();
 
-            let mut batch = Batch2DProvider::new(device, queue);
+            let mut batch = Batch2D::new(device, queue);
             let mut batch_command_buffer = batch.create_command_buffer();
 
             let square_idx = create_square_indices();
