@@ -25,7 +25,7 @@ impl Texture {
         let size = wgpu::Extent3d {
             width,
             height,
-            depth: 1,
+            depth_or_array_layers: 1,
         };
         let texture_desc = wgpu::TextureDescriptor {
             label: Some(label),
