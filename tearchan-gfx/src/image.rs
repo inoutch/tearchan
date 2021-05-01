@@ -27,7 +27,10 @@ impl Image {
     }
 
     pub fn new(raw: Vec<u8>, size: TVec2<u32>) -> Image {
-        let stride = 4usize;
+        Self::new_with_stride(raw, size, 4usize)
+    }
+
+    pub fn new_with_stride(raw: Vec<u8>, size: TVec2<u32>, stride: usize) -> Image {
         debug_assert!(
             raw.len() == (size.x * size.y) as usize * stride,
             "invalid image size"
@@ -46,6 +49,11 @@ impl Image {
     pub fn new_empty_with_size(size: TVec2<u32>) -> Self {
         let pixels = vec![0; (size.x * size.y) as usize * 4usize];
         Image::new(pixels, size)
+    }
+
+    pub fn new_empty_with_size_with_stride(size: TVec2<u32>, stride: usize) -> Self {
+        let pixels = vec![0; (size.x * size.y) as usize * stride];
+        Image::new_with_stride(pixels, size, stride)
     }
 
     pub fn size(&self) -> &TVec2<u32> {
