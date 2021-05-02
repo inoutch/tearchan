@@ -17,7 +17,7 @@ tearchan-util = { path = "../tearchan-util" }
 
 # frameworks
 winit = { version = "0.24.0", features = ["web-sys"] }
-wgpu = { path = "../../wgpu-rs", features = ["cross"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "ef2fa77536855e0b7ebdfb0df0eb879d9b7d3a1b", features = ["cross"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { version = "0.2.68", features = ["serde-serialize"] }

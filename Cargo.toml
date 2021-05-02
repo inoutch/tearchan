@@ -7,7 +7,7 @@ edition = "2018"
 # utils
 instant = "0.1.9"
 log = "0.4.11"
-wgpu = { path = "../wgpu-rs", features = ["cross"] }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "ef2fa77536855e0b7ebdfb0df0eb879d9b7d3a1b", features = ["cross"] }
 futures = "0.3.12"
 async-executor = "1.4.0"
 async-std = "1.9.0"

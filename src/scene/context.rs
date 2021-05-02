@@ -8,14 +8,21 @@ pub struct SceneContext<'a, 'b, 'c, 'd> {
     gfx: GfxContext<'a>,
     spawner: &'b Spawner<'c>,
     custom: &'d mut OptAnyBox,
+    scale_factor: f64,
 }
 
 impl<'a, 'b, 'c, 'd> SceneContext<'a, 'b, 'c, 'd> {
-    pub fn new(gfx: GfxContext<'a>, spawner: &'b Spawner<'c>, custom: &'d mut OptAnyBox) -> Self {
+    pub fn new(
+        gfx: GfxContext<'a>,
+        spawner: &'b Spawner<'c>,
+        custom: &'d mut OptAnyBox,
+        scale_factor: f64,
+    ) -> Self {
         SceneContext {
             gfx,
             spawner,
             custom,
+            scale_factor,
         }
     }
 
@@ -34,6 +41,11 @@ impl<'a, 'b, 'c, 'd> SceneContext<'a, 'b, 'c, 'd> {
     pub fn custom_mut<T: Any>(&mut self) -> &mut T {
         self.custom.get_mut().unwrap()
     }
+
+    #[inline]
+    pub fn scale_factor(&self) -> f64 {
+        self.scale_factor
+    }
 }
 
 pub struct SceneRenderContext<'a, 'b, 'c, 'd> {
@@ -47,10 +59,11 @@ impl<'a, 'b, 'c, 'd> SceneRenderContext<'a, 'b, 'c, 'd> {
         gfx: (GfxContext<'a>, GfxRenderContext),
         spawner: &'b Spawner<'c>,
         custom: &'d mut OptAnyBox,
+        scale_factor: f64,
         delta: f32,
     ) -> SceneRenderContext<'a, 'b, 'c, 'd> {
         SceneRenderContext {
-            scene_context: SceneContext::new(gfx.0, spawner, custom),
+            scene_context: SceneContext::new(gfx.0, spawner, custom, scale_factor),
             rendering_context: gfx.1,
             delta,
         }
