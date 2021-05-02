@@ -30,6 +30,7 @@ impl Engine {
 
         let event_loop = EventLoop::new();
         let window = startup_config.window_builder.build(&event_loop).unwrap();
+        let scale_factor = window.scale_factor();
 
         let mut setup = RendererLazySetup::new(window);
         if !cfg!(target_os = "android") {
@@ -77,8 +78,12 @@ impl Engine {
                     _ => {}
                 }
                 if let Some(renderer) = setup.renderer_mut() {
-                    let context =
-                        SceneContext::new(renderer.create_context(), &spawner, &mut custom);
+                    let context = SceneContext::new(
+                        renderer.create_context(),
+                        &spawner,
+                        &mut custom,
+                        scale_factor,
+                    );
                     if let Some(overwrite) = scene_manager.update(event, context) {
                         *control_flow = overwrite;
                     };
@@ -115,6 +120,7 @@ impl Engine {
                         (context, render_context),
                         &spawner,
                         &mut custom,
+                        scale_factor,
                         elapsed_time as f32 / 1000000.0f32,
                     );
                     if let Some(overwrite) = scene_manager.render(context) {

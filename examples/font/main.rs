@@ -163,40 +163,36 @@ impl FontScene {
                 label: None,
             });
 
-            let index_format = wgpu::IndexFormat::Uint32;
             // Create the render pipeline
-            let vertex_state = wgpu::VertexStateDescriptor {
-                index_format: Some(index_format),
-                vertex_buffers: &[
-                    wgpu::VertexBufferDescriptor {
-                        stride: 3 * std::mem::size_of::<f32>() as u64, // positions
-                        step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &[wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float3,
-                            offset: 0,
-                            shader_location: 0,
-                        }],
-                    },
-                    wgpu::VertexBufferDescriptor {
-                        stride: 2 * std::mem::size_of::<f32>() as u64, // texcoords
-                        step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &[wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float2,
-                            offset: 0,
-                            shader_location: 1,
-                        }],
-                    },
-                    wgpu::VertexBufferDescriptor {
-                        stride: 4 * std::mem::size_of::<f32>() as u64,
-                        step_mode: wgpu::InputStepMode::Vertex,
-                        attributes: &[wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float4,
-                            offset: 0,
-                            shader_location: 2,
-                        }],
-                    },
-                ],
-            };
+            let vertex_buffers = [
+                wgpu::VertexBufferLayout {
+                    array_stride: 3 * std::mem::size_of::<f32>() as u64, // positions
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x3,
+                        offset: 0,
+                        shader_location: 0,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: 2 * std::mem::size_of::<f32>() as u64, // texcoords
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x2,
+                        offset: 0,
+                        shader_location: 1,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: 4 * std::mem::size_of::<f32>() as u64, // colors
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 2,
+                    }],
+                },
+            ];
 
             let vs_module = device.create_shader_module(&wgpu::include_spirv!(
                 "../../target/shaders/standard_2d.vert.spv"
@@ -208,39 +204,37 @@ impl FontScene {
             let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: None,
                 layout: Some(&pipeline_layout),
-                vertex_stage: wgpu::ProgrammableStageDescriptor {
+                vertex: wgpu::VertexState {
                     module: &vs_module,
                     entry_point: "main",
+                    buffers: &vertex_buffers,
                 },
-                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                fragment: Some(wgpu::FragmentState {
                     module: &fs_module,
                     entry_point: "main",
+                    targets: &[wgpu::ColorTargetState {
+                        format: context.gfx().swapchain_desc.format,
+                        blend: Some(wgpu::BlendState {
+                            color: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::SrcAlpha,
+                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                operation: wgpu::BlendOperation::Add,
+                            },
+                            alpha: wgpu::BlendComponent {
+                                src_factor: wgpu::BlendFactor::One,
+                                dst_factor: wgpu::BlendFactor::One,
+                                operation: wgpu::BlendOperation::Max,
+                            },
+                        }),
+                        write_mask: wgpu::ColorWrite::ALL,
+                    }],
                 }),
-                rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: wgpu::CullMode::Back,
+                primitive: wgpu::PrimitiveState {
+                    cull_mode: Some(wgpu::Face::Back),
                     ..Default::default()
-                }),
-                primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-                color_states: &[wgpu::ColorStateDescriptor {
-                    format: context.gfx().swapchain_desc.format,
-                    color_blend: wgpu::BlendDescriptor {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    alpha_blend: wgpu::BlendDescriptor {
-                        src_factor: wgpu::BlendFactor::One,
-                        dst_factor: wgpu::BlendFactor::One,
-                        operation: wgpu::BlendOperation::Max,
-                    },
-                    write_mask: wgpu::ColorWrite::ALL,
-                }],
-                depth_stencil_state: None,
-                vertex_state: vertex_state.clone(),
-                sample_count: 1,
-                sample_mask: !0,
-                alpha_to_coverage_enabled: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
             });
 
             Box::new(FontScene {
@@ -274,8 +268,8 @@ impl Scene for FontScene {
 
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {

@@ -13,7 +13,7 @@ use tearchan_util::mesh::square::{
     create_square_texcoords, create_square_texcoords_inv,
 };
 use tearchan_util::mesh::{IndexType, Mesh, MeshBuilder};
-use wgpu::{Extent3d, TextureDataLayout};
+use wgpu::{Extent3d, ImageDataLayout};
 
 const DEFAULT_TEXTURE_SIZE_WIDTH: u32 = 512;
 const DEFAULT_TEXTURE_SIZE_HEIGHT: u32 = 512;
@@ -162,7 +162,7 @@ impl FontTexture {
                 });
 
                 queue.write_texture(
-                    wgpu::TextureCopyView {
+                    wgpu::ImageCopyTexture {
                         texture: self.texture.texture(),
                         mip_level: 0,
                         origin: wgpu::Origin3d {
@@ -172,15 +172,17 @@ impl FontTexture {
                         },
                     },
                     character_image.bytes(),
-                    TextureDataLayout {
+                    ImageDataLayout {
                         offset: 0,
-                        bytes_per_row: character_image.size().x * 4,
-                        rows_per_image: 0,
+                        bytes_per_row: Some(
+                            std::num::NonZeroU32::new(character_image.size().x * 4).unwrap(),
+                        ),
+                        rows_per_image: None,
                     },
                     Extent3d {
                         width: character_size.x,
                         height: character_size.y,
-                        depth: 1,
+                        depth_or_array_layers: 1,
                     },
                 );
             }
@@ -374,7 +376,7 @@ fn create_texture_bundle(
         size: Extent3d {
             width,
             height,
-            depth: 1,
+            depth_or_array_layers: 1,
         },
         mip_level_count: 1,
         sample_count: 1,
