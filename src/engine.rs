@@ -30,7 +30,7 @@ impl Engine {
 
         let event_loop = EventLoop::new();
         let window = startup_config.window_builder.build(&event_loop).unwrap();
-        let scale_factor = window.scale_factor();
+        let mut scale_factor = window.scale_factor();
 
         let mut setup = RendererLazySetup::new(window);
         if !cfg!(target_os = "android") {
@@ -74,6 +74,9 @@ impl Engine {
                         if window_id == setup.window().id() {
                             *control_flow = ControlFlow::Exit;
                         }
+                    }
+                    WindowEvent::ScaleFactorChanged { scale_factor: new_scale_factor, .. } => {
+                        scale_factor = *new_scale_factor;
                     }
                     _ => {}
                 }
