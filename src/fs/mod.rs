@@ -1,6 +1,8 @@
 use futures::AsyncReadExt;
 use once_cell::sync::Lazy;
 use std::error::Error;
+use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use std::sync::{RwLock, RwLockReadGuard};
 use tearchan_core::io::file::FileUtil;
@@ -48,6 +50,13 @@ pub async fn read_bytes_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, Bo
 pub enum FileReadError {
     #[error("the file is not exits")]
     FileNotExists,
+}
+
+pub fn write_bytes_to_file<P: AsRef<Path>>(path: P, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+    let mut file = File::create(path)?;
+    file.write_all(bytes)?;
+    file.flush()?;
+    Ok(())
 }
 
 #[cfg(test)]

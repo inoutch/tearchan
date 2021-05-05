@@ -52,6 +52,14 @@ impl Future for FileReadFuture {
     }
 }
 
+pub fn create_writable_path() -> String {
+    ndk_glue::native_activity()
+        .internal_data_path()
+        .to_str()
+        .unwrap()
+        .to_string()
+}
+
 fn read_bytes_from_file(filename: &CStr) -> Result<Vec<u8>, AndroidFileError> {
     let asset_manager = ndk_glue::native_activity().asset_manager();
     let mut asset = asset_manager
