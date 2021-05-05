@@ -101,6 +101,10 @@ where
         }
     }
 
+    pub fn action_manager(&self) -> &ActionManager<T> {
+        &self.action_manager
+    }
+
     fn process_commands(&mut self, provider: &mut T, receiver: Option<&Receiver<Command>>) {
         while let Ok(command) = receiver.unwrap_or(&self.receiver).try_recv() {
             match command {
