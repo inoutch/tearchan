@@ -8,6 +8,7 @@ pub type EntityId = u32;
 
 #[derive(Serialize, Deserialize)]
 pub struct Component<T> {
+    #[serde(rename = "entityId")]
     entity_id: EntityId,
     inner: T,
 }

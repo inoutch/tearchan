@@ -9,8 +9,11 @@ pub mod result;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Action<T> {
+    #[serde(rename = "entityId")]
     entity_id: EntityId,
+    #[serde(rename = "startTime")]
     start_time: TimeMilliseconds,
+    #[serde(rename = "endTime")]
     end_time: TimeMilliseconds,
     inner: Rc<T>,
 }

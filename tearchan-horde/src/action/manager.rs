@@ -274,6 +274,8 @@ where
 #[derive(Serialize, Deserialize)]
 pub struct ActionManagerData<T> {
     pub actions: Vec<Rc<Action<T>>>,
+    #[serde(rename = "entityIds")]
     pub entity_ids: HashSet<EntityId>,
+    #[serde(rename = "currentTime")]
     pub current_time: TimeMilliseconds,
 }
