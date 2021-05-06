@@ -1,6 +1,6 @@
 use crate::action::manager::TimeMilliseconds;
 use serde::{Deserialize, Serialize};
-use std::rc::Rc;
+use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
 pub mod context;
@@ -15,7 +15,7 @@ pub struct Action<T> {
     start_time: TimeMilliseconds,
     #[serde(rename = "endTime")]
     end_time: TimeMilliseconds,
-    inner: Rc<T>,
+    inner: Arc<T>,
 }
 
 impl<T> Action<T> {
@@ -29,7 +29,7 @@ impl<T> Action<T> {
             entity_id,
             start_time: start,
             end_time: end,
-            inner: Rc::new(inner),
+            inner: Arc::new(inner),
         }
     }
 }
@@ -47,7 +47,7 @@ impl<T> Action<T> {
         self.end_time
     }
 
-    pub fn inner(&self) -> &Rc<T> {
+    pub fn inner(&self) -> &Arc<T> {
         &self.inner
     }
 }

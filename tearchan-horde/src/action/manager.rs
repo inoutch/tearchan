@@ -4,7 +4,7 @@ use crate::action::Action;
 use crate::HordeInterface;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 use tearchan_util::btree::DuplicatableBTreeMap;
 
@@ -15,8 +15,8 @@ where
     T: HordeInterface,
 {
     // Do serialize
-    pending_actions: DuplicatableBTreeMap<TimeMilliseconds, Rc<Action<T::ActionState>>>,
-    running_actions: DuplicatableBTreeMap<TimeMilliseconds, Rc<Action<T::ActionState>>>,
+    pending_actions: DuplicatableBTreeMap<TimeMilliseconds, Arc<Action<T::ActionState>>>,
+    running_actions: DuplicatableBTreeMap<TimeMilliseconds, Arc<Action<T::ActionState>>>,
     current_time: TimeMilliseconds,
     // Cache and using for server only
     contexts: HashMap<EntityId, ActionContext>,
@@ -113,7 +113,7 @@ where
             let end_time = last_time + duration;
             self.pending_actions.push_back(
                 last_time,
-                Rc::new(Action::new(entity_id, last_time, end_time, state)),
+                Arc::new(Action::new(entity_id, last_time, end_time, state)),
             );
             self.get_context_mut(entity_id).last_time = end_time;
         }
@@ -132,7 +132,7 @@ where
             let end_time = action.end_time();
             if action.end_time() > self.current_time {
                 self.running_actions
-                    .push_front(end_time, Rc::clone(&action));
+                    .push_front(end_time, Arc::clone(&action));
                 results.push_back(start_time, ActionResult::Start { action });
 
                 let context = self.get_context_mut(entity_id);
@@ -141,7 +141,7 @@ where
                 results.push_back(
                     start_time,
                     ActionResult::Start {
-                        action: Rc::clone(&action),
+                        action: Arc::clone(&action),
                     },
                 );
                 results.push_back(end_time, ActionResult::End { action });
@@ -174,7 +174,7 @@ where
                 results.push_back(
                     self.current_time,
                     ActionResult::Update {
-                        action: Rc::clone(action),
+                        action: Arc::clone(action),
                         current_time: self.current_time,
                     },
                 )
@@ -231,12 +231,12 @@ where
         let mut actions = vec![];
         for (_, pending_actions) in self.pending_actions.iter() {
             for pending_action in pending_actions {
-                actions.push(Rc::clone(&pending_action));
+                actions.push(Arc::clone(&pending_action));
             }
         }
         for (_, running_actions) in self.running_actions.iter() {
             for running_action in running_actions {
-                actions.push(Rc::clone(&running_action));
+                actions.push(Arc::clone(&running_action));
             }
         }
 
@@ -273,9 +273,19 @@ where
 
 #[derive(Serialize, Deserialize)]
 pub struct ActionManagerData<T> {
-    pub actions: Vec<Rc<Action<T>>>,
+    pub actions: Vec<Arc<Action<T>>>,
     #[serde(rename = "entityIds")]
     pub entity_ids: HashSet<EntityId>,
     #[serde(rename = "currentTime")]
     pub current_time: TimeMilliseconds,
+}
+
+impl<T> Default for ActionManagerData<T> {
+    fn default() -> Self {
+        ActionManagerData {
+            actions: Vec::new(),
+            entity_ids: HashSet::new(),
+            current_time: 0,
+        }
+    }
 }
