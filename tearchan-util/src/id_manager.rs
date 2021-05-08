@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub struct IdManager<T> {
     current: Arc<Mutex<T>>,
@@ -23,6 +23,10 @@ impl<T> IdManager<T> {
 
     pub fn reset(&mut self, first: T) {
         self.current = Arc::new(Mutex::new(first));
+    }
+
+    pub fn current(&self) -> MutexGuard<T> {
+        self.current.lock().unwrap()
     }
 
     pub fn create_generator(&self) -> IdGenerator<T> {
