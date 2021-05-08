@@ -1,7 +1,6 @@
 use crate::action::context::ActionContext;
 use crate::action::result::ActionResult;
 use crate::action::Action;
-use crate::HordeInterface;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -10,23 +9,17 @@ use tearchan_util::btree::DuplicatableBTreeMap;
 
 pub type TimeMilliseconds = u64;
 
-pub struct ActionManager<T>
-where
-    T: HordeInterface,
-{
+pub struct ActionManager<T> {
     // Do serialize
-    pending_actions: DuplicatableBTreeMap<TimeMilliseconds, Arc<Action<T::ActionState>>>,
-    running_actions: DuplicatableBTreeMap<TimeMilliseconds, Arc<Action<T::ActionState>>>,
+    pending_actions: DuplicatableBTreeMap<TimeMilliseconds, Arc<Action<T>>>,
+    running_actions: DuplicatableBTreeMap<TimeMilliseconds, Arc<Action<T>>>,
     current_time: TimeMilliseconds,
     // Cache and using for server only
     contexts: HashMap<EntityId, ActionContext>,
     pending_cache: HashSet<EntityId>,
 }
 
-impl<T> Default for ActionManager<T>
-where
-    T: HordeInterface,
-{
+impl<T> Default for ActionManager<T> {
     fn default() -> Self {
         ActionManager {
             pending_actions: DuplicatableBTreeMap::default(),
@@ -38,11 +31,8 @@ where
     }
 }
 
-impl<T> ActionManager<T>
-where
-    T: HordeInterface,
-{
-    pub fn new(data: ActionManagerData<T::ActionState>) -> ActionManager<T> {
+impl<T> ActionManager<T> {
+    pub fn new(data: ActionManagerData<T>) -> ActionManager<T> {
         let mut pending_actions = DuplicatableBTreeMap::default();
         let mut running_actions = DuplicatableBTreeMap::default();
         let mut contexts = HashMap::new();
@@ -103,11 +93,7 @@ where
         }
     }
 
-    pub fn push_states(
-        &mut self,
-        entity_id: EntityId,
-        states: Vec<(T::ActionState, TimeMilliseconds)>,
-    ) {
+    pub fn push_states(&mut self, entity_id: EntityId, states: Vec<(T, TimeMilliseconds)>) {
         for (state, duration) in states {
             let last_time = self.get_context_mut(entity_id).last_time;
             let end_time = last_time + duration;
@@ -227,7 +213,13 @@ where
         }
     }
 
-    pub fn create_data(&self) -> ActionManagerData<T::ActionState> {
+    pub fn controller(&mut self) -> ActionController<T> {
+        ActionController {
+            action_manager: self,
+        }
+    }
+
+    pub fn create_data(&self) -> ActionManagerData<T> {
         let mut actions = vec![];
         for (_, pending_actions) in self.pending_actions.iter() {
             for pending_action in pending_actions {
@@ -268,6 +260,24 @@ where
         };
         self.contexts.insert(entity_id, context);
         self.contexts.get_mut(&entity_id).unwrap()
+    }
+}
+
+pub struct ActionController<'a, T> {
+    action_manager: &'a mut ActionManager<T>,
+}
+
+impl<'a, T> ActionController<'a, T> {
+    pub fn attach(&mut self, entity_id: EntityId) {
+        self.action_manager.attach(entity_id);
+    }
+
+    pub fn detach(&mut self, entity_id: EntityId) {
+        self.action_manager.detach(entity_id);
+    }
+
+    pub fn cancel(&mut self, entity_id: EntityId) {
+        self.action_manager.cancel(entity_id);
     }
 }
 

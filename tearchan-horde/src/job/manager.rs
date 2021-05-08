@@ -1,19 +1,15 @@
-use crate::action::manager::{ActionManager, TimeMilliseconds};
+use crate::action::manager::{ActionController, ActionManager, TimeMilliseconds};
 use crate::action::result::ActionResult;
 use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
 use std::option::Option::Some;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use tearchan_ecs::component::EntityId;
 
 pub struct JobManager<T>
 where
     T: HordeInterface,
 {
-    action_manager: ActionManager<T>,
-    sender: Sender<Command>,
-    receiver: Receiver<Command>,
+    action_manager: ActionManager<T::ActionState>,
 }
 
 impl<T> Default for JobManager<T>
@@ -21,11 +17,8 @@ where
     T: HordeInterface,
 {
     fn default() -> Self {
-        let (sender, receiver) = channel();
         JobManager {
             action_manager: ActionManager::default(),
-            sender,
-            receiver,
         }
     }
 }
@@ -35,8 +28,6 @@ where
     T: HordeInterface,
 {
     pub fn run(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
-        self.process_commands(provider, None);
-
         self.action_manager.update(elapsed_time);
 
         loop {
@@ -71,13 +62,12 @@ where
 
     pub fn update_action(&mut self, provider: &mut T) {
         let mut results = self.action_manager.pull();
-        let (sender, receiver) = channel();
-        let mut buffer = CommandBuffer { sender };
+        let mut controller = self.action_manager.controller();
 
         while let Some(result) = results.pop_first_back() {
             match result {
                 ActionResult::Start { action } => {
-                    provider.on_start(action.deref(), &mut buffer);
+                    provider.on_start(action.deref(), &mut controller);
                 }
                 ActionResult::Update {
                     action,
@@ -85,74 +75,35 @@ where
                 } => {
                     let duration = action.end_time() - action.start_time();
                     let ratio = (current_time - action.start_time()) as f32 / duration as f32;
-                    provider.on_update(action.deref(), ratio, &mut buffer);
+                    provider.on_update(action.deref(), ratio, &mut controller);
                 }
                 ActionResult::End { action } => {
-                    provider.on_end(action.deref(), &mut buffer);
+                    provider.on_end(action.deref(), &mut controller);
                 }
             }
         }
-        self.process_commands(provider, Some(&receiver));
     }
 
-    pub fn create_command_buffer(&self) -> CommandBuffer {
-        CommandBuffer {
-            sender: Sender::clone(&self.sender),
-        }
+    pub fn action_controller(&mut self) -> ActionController<T::ActionState> {
+        self.action_manager.controller()
     }
 
-    pub fn action_manager(&self) -> &ActionManager<T> {
+    pub fn action_manager(&self) -> &ActionManager<T::ActionState> {
         &self.action_manager
     }
-
-    fn process_commands(&mut self, provider: &mut T, receiver: Option<&Receiver<Command>>) {
-        while let Ok(command) = receiver.unwrap_or(&self.receiver).try_recv() {
-            match command {
-                Command::AttachEntity { entity_id } => {
-                    self.attach(provider, entity_id);
-                }
-                Command::DetachEntity { entity_id } => {
-                    self.detach(provider, entity_id);
-                }
-                Command::CancelAction { entity_id } => {
-                    self.action_manager.cancel(entity_id);
-                }
-            }
-        }
-        provider.on_process_commands();
-    }
-
-    fn attach(&mut self, provider: &mut T, entity_id: EntityId) {
-        self.action_manager.attach(entity_id);
-        provider.on_attach_entity(entity_id);
-    }
-
-    fn detach(&mut self, provider: &mut T, entity_id: EntityId) {
-        self.action_manager.detach(entity_id);
-        provider.on_detach_entity(entity_id);
-    }
 }
 
-pub enum Command {
-    AttachEntity { entity_id: EntityId },
-    DetachEntity { entity_id: EntityId },
-    CancelAction { entity_id: EntityId }, // Only host command
-}
-
-pub struct CommandBuffer {
-    sender: Sender<Command>,
-}
-
-impl CommandBuffer {
-    pub fn push(&mut self, command: Command) {
-        self.sender.send(command).unwrap();
+impl<T: HordeInterface> From<ActionManager<T::ActionState>> for JobManager<T> {
+    fn from(action_manager: ActionManager<T::ActionState>) -> Self {
+        JobManager { action_manager }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::action::manager::ActionController;
     use crate::action::Action;
-    use crate::job::manager::{Command, CommandBuffer, JobManager};
+    use crate::job::manager::JobManager;
     use crate::job::result::JobResult;
     use crate::HordeInterface;
     use tearchan_ecs::component::group::ComponentGroup;
@@ -211,7 +162,11 @@ mod test {
         type ActionState = CustomActionState;
         type Job = CustomActionCreator;
 
-        fn on_start(&mut self, _action: &Action<Self::ActionState>, _buffer: &mut CommandBuffer) {
+        fn on_start(
+            &mut self,
+            _action: &Action<Self::ActionState>,
+            _controller: &mut ActionController<CustomActionState>,
+        ) {
             println!("start  : {:?}", _action);
         }
 
@@ -219,12 +174,16 @@ mod test {
             &mut self,
             _action: &Action<Self::ActionState>,
             _ratio: f32,
-            _buffer: &mut CommandBuffer,
+            _controller: &mut ActionController<CustomActionState>,
         ) {
             println!("update : {:?}", _action);
         }
 
-        fn on_end(&mut self, _action: &Action<Self::ActionState>, _buffer: &mut CommandBuffer) {
+        fn on_end(
+            &mut self,
+            _action: &Action<Self::ActionState>,
+            _controller: &mut ActionController<CustomActionState>,
+        ) {
             println!("end    : {:?}", _action);
         }
 
@@ -308,7 +267,7 @@ mod test {
         let name_components: ComponentGroup<String> = ComponentGroup::default();
         let position_components: ComponentGroup<Position> = ComponentGroup::default();
 
-        let mut action_creator_manager: JobManager<CustomGame> = JobManager::default();
+        let mut job_manager: JobManager<CustomGame> = JobManager::default();
         let mut custom_game = CustomGame {
             entity_id_manager,
             kind_components,
@@ -316,7 +275,6 @@ mod test {
             position_components,
         };
 
-        let mut command_buffer = action_creator_manager.create_command_buffer();
         // Create cat
         {
             let entity_id = custom_game.entity_id_manager.create_generator().gen();
@@ -327,7 +285,7 @@ mod test {
             custom_game
                 .position_components
                 .push(entity_id, Position((0, 0)));
-            command_buffer.push(Command::AttachEntity { entity_id });
+            job_manager.action_controller().attach(entity_id);
         }
         // Create dog
         {
@@ -339,7 +297,7 @@ mod test {
             custom_game
                 .position_components
                 .push(entity_id, Position((30, 10)));
-            command_buffer.push(Command::AttachEntity { entity_id });
+            job_manager.action_controller().attach(entity_id);
         }
         // Create human
         {
@@ -351,21 +309,10 @@ mod test {
             custom_game
                 .position_components
                 .push(entity_id, Position((4, 8)));
-            command_buffer.push(Command::AttachEntity { entity_id });
+            job_manager.action_controller().attach(entity_id);
         }
 
         // Process horde
-        action_creator_manager.run(&mut custom_game, 50000);
-    }
-}
-
-impl<T: HordeInterface> From<ActionManager<T>> for JobManager<T> {
-    fn from(action_manager: ActionManager<T>) -> Self {
-        let (sender, receiver) = channel();
-        JobManager {
-            sender,
-            receiver,
-            action_manager,
-        }
+        job_manager.run(&mut custom_game, 50000);
     }
 }
