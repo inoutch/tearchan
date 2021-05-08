@@ -53,6 +53,16 @@ impl<T> ComponentGroup<T> {
             .map(|component| component.inner_mut())
     }
 
+    pub fn entity(&self, entity_id: EntityId) -> &T {
+        self.get(entity_id)
+            .unwrap_or_else(|| panic!("The entity of {} id is not found", entity_id))
+    }
+
+    pub fn entity_mut(&mut self, entity_id: EntityId) -> &mut T {
+        self.get_mut(entity_id)
+            .unwrap_or_else(|| panic!("The entity of {} id is not found", entity_id))
+    }
+
     pub fn len(&self) -> usize {
         self.components.len()
     }
