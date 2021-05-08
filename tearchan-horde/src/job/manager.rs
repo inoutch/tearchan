@@ -358,3 +358,14 @@ mod test {
         action_creator_manager.run(&mut custom_game, 50000);
     }
 }
+
+impl<T: HordeInterface> From<ActionManager<T>> for JobManager<T> {
+    fn from(action_manager: ActionManager<T>) -> Self {
+        let (sender, receiver) = channel();
+        JobManager {
+            sender,
+            receiver,
+            action_manager,
+        }
+    }
+}
