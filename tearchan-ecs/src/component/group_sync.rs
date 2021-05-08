@@ -1,32 +1,31 @@
 use crate::component::group::ComponentGroup;
-use std::cell::UnsafeCell;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ComponentGroupSync<T>
 where
     T: Sync,
 {
-    inner: Arc<UnsafeCell<ComponentGroup<T>>>,
+    inner: Arc<RwLock<ComponentGroup<T>>>,
 }
 
 impl<T> Default for ComponentGroupSync<T>
 where
-    T: Sync,
+    T: Sync + Send,
 {
     fn default() -> ComponentGroupSync<T> {
         ComponentGroupSync {
-            inner: Arc::new(UnsafeCell::new(ComponentGroup::default())),
+            inner: Arc::new(RwLock::new(ComponentGroup::default())),
         }
     }
 }
 
 impl<T> ComponentGroupSync<T>
 where
-    T: Sync,
+    T: Sync + Send,
 {
     pub fn new(component_group: ComponentGroup<T>) -> ComponentGroupSync<T> {
         ComponentGroupSync {
-            inner: Arc::new(UnsafeCell::new(component_group)),
+            inner: Arc::new(RwLock::new(component_group)),
         }
     }
 
@@ -61,7 +60,7 @@ pub struct ComponentGroupSyncReader<T>
 where
     T: Sync,
 {
-    inner: Arc<UnsafeCell<ComponentGroup<T>>>,
+    inner: Arc<RwLock<ComponentGroup<T>>>,
 }
 
 impl<T> Clone for ComponentGroupSyncReader<T>
@@ -81,15 +80,15 @@ impl<T> ComponentGroupSyncReader<T>
 where
     T: Sync,
 {
-    pub fn get(&self) -> &ComponentGroup<T> {
-        unsafe { &*self.inner.get() }
+    pub fn get(&self) -> RwLockReadGuard<ComponentGroup<T>> {
+        self.inner.read().unwrap()
     }
 }
 pub struct ComponentGroupSyncWriter<T>
 where
     T: Sync,
 {
-    inner: Arc<UnsafeCell<ComponentGroup<T>>>,
+    inner: Arc<RwLock<ComponentGroup<T>>>,
 }
 unsafe impl<T> Send for ComponentGroupSyncWriter<T> where T: Sync {}
 
@@ -97,8 +96,8 @@ impl<T> ComponentGroupSyncWriter<T>
 where
     T: Sync,
 {
-    pub fn get_mut(&mut self) -> &mut ComponentGroup<T> {
-        unsafe { &mut *self.inner.get() }
+    pub fn get_mut(&mut self) -> RwLockWriteGuard<ComponentGroup<T>> {
+        self.inner.write().unwrap()
     }
 }
 
@@ -231,7 +230,7 @@ mod test {
                 read1
                     .get()
                     .iter()
-                    .zip_entities(&ZipEntity1::new(read2.get()))
+                    .zip_entities(&ZipEntity1::new(&read2.get()))
                     .for_each(|(_id, entity1, entity2)| {
                         assert_eq!(entity1 * 2, *entity2);
                     });
@@ -247,7 +246,7 @@ mod test {
                 write1
                     .get_mut()
                     .iter_mut()
-                    .zip_entities_mut(&ZipEntity1::new(read2.get()))
+                    .zip_entities_mut(&ZipEntity1::new(&read2.get()))
                     .for_each(|(_id, entity1, entity2)| {
                         *entity1 = entity2 * 2;
                     });
@@ -269,7 +268,9 @@ mod test {
         group.write().get_mut().push(1, 11);
         group.write().get_mut().push(2, 22);
 
-        let str = serde_json::to_string(group.read().get()).unwrap();
+        let read = group.read();
+        let value: &ComponentGroup<i32> = &read.get();
+        let str = serde_json::to_string(value).unwrap();
         let component_group: ComponentGroup<i32> = serde_json::from_str(&str).unwrap();
         let component_group_sync = ComponentGroupSync::new(component_group);
 

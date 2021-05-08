@@ -15,7 +15,7 @@ where
         read: ComponentGroupSyncReader<TR>,
     ) {
         thread_pool.execute(move || {
-            Self::run(&mut write.get_mut(), read.get());
+            Self::run(&mut write.get_mut(), &read.get());
         });
     }
 }
