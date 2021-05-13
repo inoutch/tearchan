@@ -75,7 +75,7 @@ impl FileUtil {
         {
             let assets_path = PathBuf::from(android::ASSETS_SCHEME);
             let writable_path = {
-                let mut writable_path = PathBuf::from(android::get_writable_path());
+                let mut writable_path = PathBuf::from(android::create_writable_path());
                 writable_path.push(WRITABLE_DIR);
                 writable_path
             };
