@@ -58,7 +58,7 @@ impl FileUtil {
             };
             #[cfg(target_os = "ios")]
             let writable_path = {
-                let mut writable_path = objc::create_writable_path();
+                let mut writable_path = PathBuf::from(objc::create_writable_path());
                 writable_path.push(WRITABLE_DIR);
                 writable_path
             };
