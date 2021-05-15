@@ -48,11 +48,13 @@ where
     }
 
     pub fn read(&self) -> ComponentGroupSyncReader<T> {
-        self.try_read().unwrap()
+        self.try_read()
+            .expect("It can only be read once. If you need more than one, please Clone")
     }
 
     pub fn write(&mut self) -> ComponentGroupSyncWriter<T> {
-        self.try_write().unwrap()
+        self.try_write()
+            .expect("It can only be write once. If you need more than one, please Clone")
     }
 }
 
