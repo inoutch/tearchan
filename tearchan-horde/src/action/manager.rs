@@ -123,6 +123,11 @@ impl<T> ActionManager<T> {
 
                 let context = self.get_context_mut(entity_id);
                 context.state_len += 1;
+
+                // When an action with zero start and end periods is executed on an entity that has no actions,
+                // the entity changes to pending state even though it has actions piled up.
+                // Therefore, if there is a subsequent action on the entity, the pending state will be released.
+                self.pending_cache.remove(&entity_id);
             } else {
                 results.push_back(
                     start_time,
