@@ -36,10 +36,4 @@ pub trait HordeInterface {
         entity_id: EntityId,
         job: Self::Job,
     ) -> JobResult<Self::Job, Self::ActionState>;
-
-    fn on_attach_entity(&mut self, _entity_id: EntityId) {}
-
-    fn on_detach_entity(&mut self, _entity_id: EntityId) {}
-
-    fn on_process_commands(&mut self) {}
 }
