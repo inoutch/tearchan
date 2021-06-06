@@ -101,7 +101,9 @@ impl<T> ActionManager<T> {
                 last_time,
                 Arc::new(Action::new(entity_id, last_time, end_time, state)),
             );
-            self.get_context_mut(entity_id).last_time = end_time;
+            let context = self.get_context_mut(entity_id);
+            context.last_time = end_time;
+            context.state_len += 1;
         }
     }
 
@@ -121,9 +123,6 @@ impl<T> ActionManager<T> {
                     .push_front(end_time, Arc::clone(&action));
                 results.push_back(start_time, ActionResult::Start { action });
 
-                let context = self.get_context_mut(entity_id);
-                context.state_len += 1;
-
                 // When an action with zero start and end periods is executed on an entity that has no actions,
                 // the entity changes to pending state even though it has actions piled up.
                 // Therefore, if there is a subsequent action on the entity, the pending state will be released.
@@ -138,6 +137,7 @@ impl<T> ActionManager<T> {
                 results.push_back(end_time, ActionResult::End { action });
 
                 let context = self.get_context_mut(entity_id);
+                context.state_len -= 1;
                 if context.state_len == 0 {
                     self.pending_cache.insert(entity_id);
                 }
@@ -302,5 +302,70 @@ impl<T> Default for ActionManagerData<T> {
             entity_ids: HashSet::new(),
             current_time: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::action::manager::ActionManager;
+
+    type TestActionState = &'static str;
+
+    #[test]
+    fn test() {
+        let mut action_manager: ActionManager<TestActionState> = ActionManager::default();
+        action_manager.attach(1);
+
+        action_manager.push_states(
+            1,
+            vec![
+                ("Wake", 1000),
+                ("Run", 2000),
+                ("Eat", 1000),
+                ("Sleep", 3000),
+            ],
+        );
+        assert_eq!(action_manager.contexts.get(&1).unwrap().state_len, 4);
+        assert_eq!(action_manager.contexts.get(&1).unwrap().last_time, 7000);
+
+        let mut actions = action_manager.pull();
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_start().unwrap().start_time, 0);
+        assert_eq!(action.get_start().unwrap().inner.as_ref(), &"Wake");
+
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_update().unwrap().0.start_time, 0);
+        assert_eq!(action.get_update().unwrap().0.inner.as_ref(), &"Wake");
+        assert!(actions.pop_first_back().is_none());
+
+        let mut actions = action_manager.pull();
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_update().unwrap().1, 0);
+        assert!(actions.pop_first_back().is_none());
+
+        action_manager.update(1500);
+
+        let mut actions = action_manager.pull();
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_end().unwrap().end_time, 1000);
+        assert_eq!(action.get_end().unwrap().inner.as_ref(), &"Wake");
+
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_start().unwrap().start_time, 1000);
+        assert_eq!(action.get_start().unwrap().inner.as_ref(), &"Run");
+
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_update().unwrap().1, 1500);
+        assert_eq!(action.get_update().unwrap().0.inner.as_ref(), &"Run");
+        assert!(actions.pop_first_back().is_none());
+
+        let ids = action_manager.clean_pending_entity_ids();
+        assert!(!ids.contains(&1));
+
+        action_manager.update(5500);
+        action_manager.pull();
+
+        let ids = action_manager.clean_pending_entity_ids();
+        assert!(ids.contains(&1));
     }
 }
