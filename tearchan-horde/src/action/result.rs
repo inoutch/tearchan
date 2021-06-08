@@ -1,6 +1,7 @@
 use crate::action::Action;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub enum ActionResult<T> {
     Start {
         action: Arc<Action<T>>,

@@ -201,20 +201,36 @@ impl<T> ActionManager<T> {
         self.pending_cache.remove(&entity_id);
     }
 
-    pub fn cancel(&mut self, entity_id: EntityId) {
+    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
         let context = self
             .contexts
             .get_mut(&entity_id)
             .expect("invalid entity_id");
-        context.last_time = self.current_time;
-        context.state_len = 0;
-        self.pending_cache.insert(entity_id);
+        if immediate {
+            context.last_time = self.current_time;
+            context.state_len = 0;
+
+            self.pending_cache.insert(entity_id);
+
+            for (_, running_actions) in self.running_actions.iter_mut() {
+                running_actions.retain(|action| action.entity_id != entity_id);
+            }
+        } else {
+            context.last_time = self
+                .running_actions
+                .iter()
+                .find_map(|(_, running_actions)| {
+                    running_actions
+                        .iter()
+                        .find(|action| action.entity_id == entity_id)
+                })
+                .map(|action| action.end_time)
+                .unwrap_or(self.current_time);
+            context.state_len = context.state_len.min(1);
+        }
 
         for (_, pending_actions) in self.pending_actions.iter_mut() {
             pending_actions.retain(|action| action.entity_id != entity_id);
-        }
-        for (_, running_actions) in self.running_actions.iter_mut() {
-            running_actions.retain(|action| action.entity_id != entity_id);
         }
     }
 
@@ -273,16 +289,19 @@ pub struct ActionController<'a, T> {
 }
 
 impl<'a, T> ActionController<'a, T> {
+    #[inline]
     pub fn attach(&mut self, entity_id: EntityId) {
         self.action_manager.attach(entity_id);
     }
 
+    #[inline]
     pub fn detach(&mut self, entity_id: EntityId) {
         self.action_manager.detach(entity_id);
     }
 
-    pub fn cancel(&mut self, entity_id: EntityId) {
-        self.action_manager.cancel(entity_id);
+    #[inline]
+    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
+        self.action_manager.cancel(entity_id, immediate);
     }
 }
 
@@ -367,5 +386,53 @@ mod test {
 
         let ids = action_manager.clean_pending_entity_ids();
         assert!(ids.contains(&1));
+    }
+
+    #[test]
+    fn test_cancel() {
+        let mut action_manager: ActionManager<TestActionState> = ActionManager::default();
+        action_manager.attach(1);
+
+        action_manager.push_states(
+            1,
+            vec![
+                ("Wake", 1000),
+                ("Run", 2000),
+                ("Eat", 1000),
+                ("Sleep", 3000),
+            ],
+        );
+        action_manager.update(1500);
+        action_manager.pull();
+        action_manager.cancel(1, true);
+
+        let mut actions = action_manager.pull();
+        assert!(actions.pop_first_back().is_none());
+
+        action_manager.push_states(
+            1,
+            vec![
+                ("Wake", 1000),
+                ("Run", 2000),
+                ("Eat", 1000),
+                ("Sleep", 3000),
+            ],
+        );
+        action_manager.update(1500);
+        action_manager.pull();
+        action_manager.cancel(1, false);
+
+        let mut actions = action_manager.pull();
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_update().unwrap().1, 3000);
+        assert_eq!(action.get_update().unwrap().0.end_time, 4500);
+        assert_eq!(action.get_update().unwrap().0.inner.as_ref(), &"Run");
+
+        action_manager.update(2000);
+        let mut actions = action_manager.pull();
+        let action = actions.pop_first_back().unwrap();
+        assert_eq!(action.get_end().unwrap().end_time, 4500);
+        assert_eq!(action.get_end().unwrap().inner.as_ref(), &"Run");
+        assert!(actions.pop_first_back().is_none());
     }
 }
