@@ -50,7 +50,9 @@ where
                     }
 
                     // Add actions
-                    self.action_manager.push_states(entity_id, result.states);
+                    for action in self.action_manager.push_states(entity_id, result.states) {
+                        provider.on_enqueue(action.as_ref());
+                    }
                 }
             }
 
@@ -185,6 +187,10 @@ mod test {
             _controller: &mut ActionController<CustomActionState>,
         ) {
             println!("end    : {:?}", _action);
+        }
+
+        fn on_enqueue(&mut self, action: &Action<Self::ActionState>) {
+            println!("queue  : {:?}", action);
         }
 
         fn on_first(&self, entity_id: u32) -> Self::Job {

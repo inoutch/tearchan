@@ -29,6 +29,8 @@ pub trait HordeInterface {
         controller: &mut ActionController<Self::ActionState>,
     );
 
+    fn on_enqueue(&mut self, action: &Action<Self::ActionState>);
+
     fn on_first(&self, entity_id: u32) -> Self::Job;
 
     fn on_next(
