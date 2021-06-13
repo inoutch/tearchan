@@ -41,6 +41,11 @@ where
 
                 while let Some(job) = job_queue.pop_front() {
                     let result = provider.on_next(entity_id, job);
+                    assert!(
+                        !result.states.is_empty() || !result.creators.is_empty(),
+                        "It need to enqueue at least one or more action states or creators"
+                    );
+
                     // Update actions
                     is_changed |= !result.states.is_empty();
 
