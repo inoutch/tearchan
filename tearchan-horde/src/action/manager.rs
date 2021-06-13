@@ -93,18 +93,25 @@ impl<T> ActionManager<T> {
         }
     }
 
-    pub fn push_states(&mut self, entity_id: EntityId, states: Vec<(T, TimeMilliseconds)>) {
+    pub fn push_states(
+        &mut self,
+        entity_id: EntityId,
+        states: Vec<(T, TimeMilliseconds)>,
+    ) -> Vec<Arc<Action<T>>> {
+        let mut actions = Vec::new();
         for (state, duration) in states {
             let last_time = self.get_context_mut(entity_id).last_time;
             let end_time = last_time + duration;
-            self.pending_actions.push_back(
-                last_time,
-                Arc::new(Action::new(entity_id, last_time, end_time, state)),
-            );
+            let action = Arc::new(Action::new(entity_id, last_time, end_time, state));
+            self.pending_actions
+                .push_back(last_time, Arc::clone(&action));
             let context = self.get_context_mut(entity_id);
             context.last_time = end_time;
             context.state_len += 1;
+
+            actions.push(action);
         }
+        actions
     }
 
     pub fn pull(&mut self) -> DuplicatableBTreeMap<u64, ActionResult<T>> {
@@ -178,7 +185,7 @@ impl<T> ActionManager<T> {
      * Get free entity ids after update_actions
      */
     pub fn clean_pending_entity_ids(&mut self) -> HashSet<EntityId> {
-        std::mem::replace(&mut self.pending_cache, HashSet::new())
+        std::mem::take(&mut self.pending_cache)
     }
 
     pub fn attach(&mut self, entity_id: EntityId) {
@@ -201,7 +208,8 @@ impl<T> ActionManager<T> {
         self.pending_cache.remove(&entity_id);
     }
 
-    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
+    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) -> Vec<Arc<Action<T>>> {
+        let mut canceled_actions = Vec::new();
         let context = self
             .contexts
             .get_mut(&entity_id)
@@ -213,9 +221,16 @@ impl<T> ActionManager<T> {
             self.pending_cache.insert(entity_id);
 
             for (_, running_actions) in self.running_actions.iter_mut() {
-                running_actions.retain(|action| action.entity_id != entity_id);
+                running_actions.retain(|action| {
+                    let is_target = action.entity_id == entity_id;
+                    if is_target {
+                        canceled_actions.push(Arc::clone(action));
+                    }
+                    !is_target
+                });
             }
         } else {
+            // Find a running action of entity_id
             context.last_time = self
                 .running_actions
                 .iter()
@@ -230,8 +245,15 @@ impl<T> ActionManager<T> {
         }
 
         for (_, pending_actions) in self.pending_actions.iter_mut() {
-            pending_actions.retain(|action| action.entity_id != entity_id);
+            pending_actions.retain(|action| {
+                let is_target = action.entity_id == entity_id;
+                if is_target {
+                    canceled_actions.push(Arc::clone(action));
+                }
+                !is_target
+            });
         }
+        canceled_actions
     }
 
     pub fn controller(&mut self) -> ActionController<T> {
@@ -300,8 +322,8 @@ impl<'a, T> ActionController<'a, T> {
     }
 
     #[inline]
-    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
-        self.action_manager.cancel(entity_id, immediate);
+    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) -> Vec<Arc<Action<T>>> {
+        self.action_manager.cancel(entity_id, immediate)
     }
 }
 
@@ -404,7 +426,11 @@ mod test {
         );
         action_manager.update(1500);
         action_manager.pull();
-        action_manager.cancel(1, true);
+        let canceled_actions = action_manager.cancel(1, true);
+        assert_eq!(canceled_actions.len(), 3);
+        assert_eq!(canceled_actions[0].inner.as_ref(), &"Run");
+        assert_eq!(canceled_actions[1].inner.as_ref(), &"Eat");
+        assert_eq!(canceled_actions[2].inner.as_ref(), &"Sleep");
 
         let mut actions = action_manager.pull();
         assert!(actions.pop_first_back().is_none());
@@ -420,7 +446,10 @@ mod test {
         );
         action_manager.update(1500);
         action_manager.pull();
-        action_manager.cancel(1, false);
+        let canceled_actions = action_manager.cancel(1, false);
+        assert_eq!(canceled_actions.len(), 2);
+        assert_eq!(canceled_actions[0].inner.as_ref(), &"Eat");
+        assert_eq!(canceled_actions[1].inner.as_ref(), &"Sleep");
 
         let mut actions = action_manager.pull();
         let action = actions.pop_first_back().unwrap();
