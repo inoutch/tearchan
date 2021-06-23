@@ -21,8 +21,8 @@ pub struct TextureFrame {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Size {
-    w: u32,
-    h: u32,
+    pub w: u32,
+    pub h: u32,
 }
 
 impl Size {
