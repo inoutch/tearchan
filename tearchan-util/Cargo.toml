@@ -6,7 +6,7 @@ edition = "2018"
 [dependencies]
 instant = "0.1.9"
 serde = { version = "1.0.118", features = ["derive"] }
-nalgebra-glm = { version = "0.12.0", features = ["serde-serialize"] }
+nalgebra-glm = { version = "0.13.0", features = ["serde-serialize"] }
 wavefront_obj = "9.0.0"
 texture_packer = "0.22.0"
 
