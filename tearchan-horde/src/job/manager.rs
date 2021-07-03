@@ -4,6 +4,7 @@ use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
 use std::option::Option::Some;
+use tearchan_ecs::component::EntityId;
 
 pub struct JobManager<T>
 where
@@ -36,15 +37,30 @@ where
             let mut is_changed = false;
             let entity_ids = self.action_manager.clean_pending_entity_ids();
             for entity_id in entity_ids {
+                let mut priority = 0;
                 let mut job_queue: VecDeque<T::Job> = VecDeque::new();
-                job_queue.push_front(provider.on_first(entity_id));
+                job_queue.push_front(get_until_some_priority_is_returned(
+                    |entity_id, priority| provider.on_first(entity_id, priority),
+                    entity_id,
+                    &mut priority,
+                ));
 
                 while let Some(job) = job_queue.pop_front() {
                     let result = provider.on_next(entity_id, job);
-                    assert!(
-                        !result.states.is_empty() || !result.creators.is_empty(),
-                        "It need to enqueue at least one or more action states or creators"
-                    );
+                    if job_queue.is_empty()
+                        && result.states.is_empty()
+                        && result.creators.is_empty()
+                    {
+                        // If the jobs and actions cannot be generated from the current job tree,
+                        // change the priority and recreate the first job
+                        priority += 1;
+                        job_queue.push_front(get_until_some_priority_is_returned(
+                            |entity_id, priority| provider.on_first(entity_id, priority),
+                            entity_id,
+                            &mut priority,
+                        ));
+                        continue;
+                    }
 
                     // Update actions
                     is_changed |= !result.states.is_empty();
@@ -103,6 +119,20 @@ where
 impl<T: HordeInterface> From<ActionManager<T::ActionState>> for JobManager<T> {
     fn from(action_manager: ActionManager<T::ActionState>) -> Self {
         JobManager { action_manager }
+    }
+}
+
+fn get_until_some_priority_is_returned<F, R>(mut f: F, entity_id: EntityId, priority: &mut u32) -> R
+where
+    F: FnMut(EntityId, u32) -> Option<R>,
+{
+    loop {
+        if let Some(v) = f(entity_id, *priority) {
+            return v;
+        }
+        *priority += 1;
+
+        debug_assert!(*priority < 1000, "Priority has been exceeded");
     }
 }
 
@@ -198,9 +228,9 @@ mod test {
             println!("queue  : {:?}", action);
         }
 
-        fn on_first(&self, entity_id: u32) -> Self::Job {
+        fn on_first(&self, entity_id: u32, _priority: u32) -> Option<Self::Job> {
             let kind = self.kind_components.get(entity_id).unwrap();
-            match kind {
+            Some(match kind {
                 Kind::Dog => CustomActionCreator::EatLunch {
                     position: Position((100, 200)),
                     food_name: "dog food",
@@ -210,7 +240,7 @@ mod test {
                     position: Position((100, 200)),
                     salary: 200, // $200
                 },
-            }
+            })
         }
 
         fn on_next(
