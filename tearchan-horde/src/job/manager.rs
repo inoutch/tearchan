@@ -4,6 +4,7 @@ use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
 use std::option::Option::Some;
+use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
 pub struct JobManager<T>
@@ -90,6 +91,7 @@ where
         while let Some(result) = results.pop_first_back() {
             match result {
                 ActionResult::Start { action } => {
+                    provider.on_send(Arc::clone(&action));
                     provider.on_start(action.deref(), &mut controller);
                 }
                 ActionResult::Update {

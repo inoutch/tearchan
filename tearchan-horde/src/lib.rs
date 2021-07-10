@@ -1,6 +1,7 @@
 use crate::action::manager::ActionController;
 use crate::action::Action;
 use crate::job::result::JobResult;
+use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
 pub mod action;
@@ -38,4 +39,6 @@ pub trait HordeInterface {
         entity_id: EntityId,
         job: Self::Job,
     ) -> JobResult<Self::Job, Self::ActionState>;
+
+    fn on_send(&self, _action: Arc<Action<Self::ActionState>>) {}
 }
