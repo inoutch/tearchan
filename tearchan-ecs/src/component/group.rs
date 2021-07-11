@@ -4,7 +4,8 @@ use serde::de::{MapAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
-use std::fmt::Formatter;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
 pub type ComponentIndex = usize;
@@ -63,6 +64,16 @@ impl<T> ComponentGroup<T> {
         self.components
             .get_mut(*index)
             .map(|component| component.inner_mut())
+    }
+
+    pub fn get_with_err(&self, entity_id: EntityId) -> Result<&T, ComponentGroupError> {
+        self.get(entity_id)
+            .ok_or_else(|| ComponentGroupError::NotFoundEntity { id: entity_id })
+    }
+
+    pub fn get_mut_with_err(&mut self, entity_id: EntityId) -> Result<&mut T, ComponentGroupError> {
+        self.get_mut(entity_id)
+            .ok_or_else(|| ComponentGroupError::NotFoundEntity { id: entity_id })
     }
 
     pub fn entity(&self, entity_id: EntityId) -> &T {
@@ -205,6 +216,23 @@ impl<'a, T> IterMut<'a, T> {
         U: ZipEntityBase,
     {
         ZipEntityIterMut::new(self, other)
+    }
+}
+
+#[derive(Debug)]
+pub enum ComponentGroupError {
+    NotFoundEntity { id: EntityId },
+}
+
+impl Error for ComponentGroupError {}
+
+impl Display for ComponentGroupError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ComponentGroupError::NotFoundEntity { id } => {
+                write!(f, "The entity of {} id is not found", id)
+            }
+        }
     }
 }
 
