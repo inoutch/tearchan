@@ -262,6 +262,12 @@ impl<T> ActionManager<T> {
         }
     }
 
+    pub fn reader(&self) -> ActionReader<T> {
+        ActionReader {
+            action_manager: self,
+        }
+    }
+
     pub fn create_data(&self) -> ActionManagerData<T> {
         let mut actions = vec![];
         for (_, pending_actions) in self.pending_actions.iter() {
@@ -324,6 +330,28 @@ impl<'a, T> ActionController<'a, T> {
     #[inline]
     pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) -> Vec<Arc<Action<T>>> {
         self.action_manager.cancel(entity_id, immediate)
+    }
+}
+
+pub struct ActionReader<'a, T> {
+    action_manager: &'a ActionManager<T>,
+}
+
+impl<'a, T> ActionReader<'a, T> {
+    /// The time for the next action to be processed
+    #[inline]
+    pub fn current_time(&self) -> TimeMilliseconds {
+        self.action_manager.current_time
+    }
+
+    /// The time of the entity's last action
+    /// When generating a job, it means the start time of the next action
+    #[inline]
+    pub fn last_time(&self, entity_id: EntityId) -> Option<TimeMilliseconds> {
+        self.action_manager
+            .contexts
+            .get(&entity_id)
+            .map(|context| context.last_time)
     }
 }
 

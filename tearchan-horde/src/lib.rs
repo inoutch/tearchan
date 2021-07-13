@@ -1,4 +1,4 @@
-use crate::action::manager::ActionController;
+use crate::action::manager::{ActionController, ActionReader};
 use crate::action::Action;
 use crate::job::result::JobResult;
 use std::sync::Arc;
@@ -30,14 +30,24 @@ pub trait HordeInterface {
         controller: &mut ActionController<Self::ActionState>,
     );
 
-    fn on_enqueue(&mut self, action: &Action<Self::ActionState>);
+    fn on_enqueue(
+        &mut self,
+        action: &Action<Self::ActionState>,
+        controller: &mut ActionController<Self::ActionState>,
+    );
 
-    fn on_first(&self, entity_id: u32, priority: u32) -> Option<Self::Job>;
+    fn on_first(
+        &self,
+        entity_id: u32,
+        priority: u32,
+        reader: &ActionReader<Self::ActionState>,
+    ) -> Option<Self::Job>;
 
     fn on_next(
         &self,
         entity_id: EntityId,
         job: Self::Job,
+        reader: &ActionReader<Self::ActionState>,
     ) -> JobResult<Self::Job, Self::ActionState>;
 
     fn on_send(&self, _action: Arc<Action<Self::ActionState>>) {}

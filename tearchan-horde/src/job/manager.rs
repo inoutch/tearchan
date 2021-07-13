@@ -41,13 +41,15 @@ where
                 let mut priority = 0;
                 let mut job_queue: VecDeque<T::Job> = VecDeque::new();
                 job_queue.push_front(get_until_some_priority_is_returned(
-                    |entity_id, priority| provider.on_first(entity_id, priority),
+                    |entity_id, priority| {
+                        provider.on_first(entity_id, priority, &self.action_manager.reader())
+                    },
                     entity_id,
                     &mut priority,
                 ));
 
                 while let Some(job) = job_queue.pop_front() {
-                    let result = provider.on_next(entity_id, job);
+                    let result = provider.on_next(entity_id, job, &self.action_manager.reader());
                     if job_queue.is_empty()
                         && result.states.is_empty()
                         && result.creators.is_empty()
@@ -56,7 +58,13 @@ where
                         // change the priority and recreate the first job
                         priority += 1;
                         job_queue.push_front(get_until_some_priority_is_returned(
-                            |entity_id, priority| provider.on_first(entity_id, priority),
+                            |entity_id, priority| {
+                                provider.on_first(
+                                    entity_id,
+                                    priority,
+                                    &self.action_manager.reader(),
+                                )
+                            },
                             entity_id,
                             &mut priority,
                         ));
@@ -73,7 +81,7 @@ where
 
                     // Add actions
                     for action in self.action_manager.push_states(entity_id, result.states) {
-                        provider.on_enqueue(action.as_ref());
+                        provider.on_enqueue(action.as_ref(), &mut self.action_manager.controller());
                     }
                 }
             }
@@ -140,7 +148,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::action::manager::ActionController;
+    use crate::action::manager::{ActionController, ActionReader};
     use crate::action::Action;
     use crate::job::manager::JobManager;
     use crate::job::result::JobResult;
@@ -226,11 +234,20 @@ mod test {
             println!("end    : {:?}", _action);
         }
 
-        fn on_enqueue(&mut self, action: &Action<Self::ActionState>) {
+        fn on_enqueue(
+            &mut self,
+            action: &Action<Self::ActionState>,
+            _controller: &mut ActionController<CustomActionState>,
+        ) {
             println!("queue  : {:?}", action);
         }
 
-        fn on_first(&self, entity_id: u32, _priority: u32) -> Option<Self::Job> {
+        fn on_first(
+            &self,
+            entity_id: u32,
+            _priority: u32,
+            _reader: &ActionReader<Self::ActionState>,
+        ) -> Option<Self::Job> {
             let kind = self.kind_components.get(entity_id).unwrap();
             Some(match kind {
                 Kind::Dog => CustomActionCreator::EatLunch {
@@ -249,6 +266,7 @@ mod test {
             &self,
             _entity_id: u32,
             job: Self::Job,
+            _reader: &ActionReader<Self::ActionState>,
         ) -> JobResult<Self::Job, Self::ActionState> {
             let mut result = JobResult::default();
             match job {
