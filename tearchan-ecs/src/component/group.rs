@@ -52,6 +52,12 @@ impl<T> ComponentGroup<T> {
             .map(|component| component.inner())
     }
 
+    pub fn remove_all(&mut self) {
+        self.indices.clear();
+        self.pending_indices.clear();
+        self.components.clear();
+    }
+
     pub fn get(&self, entity_id: EntityId) -> Option<&T> {
         let index = self.indices.get(&entity_id)?;
         self.components
