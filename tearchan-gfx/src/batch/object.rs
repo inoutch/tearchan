@@ -230,6 +230,9 @@ impl BatchObject {
                 return data;
             }
         }
+        if let BatchTypeArray::V1F32 { data } = &self.data[attribute as usize] {
+            return data;
+        }
         panic!("Invalid type as v1f32");
     }
 
