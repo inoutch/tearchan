@@ -61,7 +61,7 @@ impl<T> ActionManager<T> {
             }
 
             if data.current_time >= action.start_time {
-                running_actions.push_back(action.start_time, action);
+                running_actions.push_back(action.end_time, action);
             } else {
                 pending_actions.push_back(action.start_time, action);
             }
