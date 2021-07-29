@@ -3,6 +3,7 @@ use crate::batch::{Batch, BatchObjectManager, BatchProvider, BatchProviderComman
 use crate::buffer::{Buffer, BufferInterface};
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 use tearchan_util::bytes::flatten;
 
 pub const BATCH3D_ATTRIBUTE_INDEX: usize = 0;
@@ -11,7 +12,30 @@ pub const BATCH3D_ATTRIBUTE_TEXCOORD: usize = 2;
 pub const BATCH3D_ATTRIBUTE_COLOR: usize = 3;
 pub const BATCH3D_ATTRIBUTE_NORMAL: usize = 4;
 
-pub type Batch3D = Batch<Batch3DProvider>;
+pub struct Batch3D {
+    batch: Batch<Batch3DProvider>,
+}
+
+impl Batch3D {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+        let batch = Batch::new(Batch3DProvider::new(device, queue));
+        Batch3D { batch }
+    }
+}
+
+impl Deref for Batch3D {
+    type Target = Batch<Batch3DProvider>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.batch
+    }
+}
+
+impl DerefMut for Batch3D {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.batch
+    }
+}
 
 pub struct Batch3DProvider {
     index_buffer: BatchBuffer<Buffer<u32>>,
@@ -22,7 +46,7 @@ pub struct Batch3DProvider {
 }
 
 impl Batch3DProvider {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Batch3D {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
         let index_buffer: BatchBuffer<Buffer<u32>> = BatchBuffer::new(
             device,
             queue,
@@ -142,13 +166,13 @@ impl Batch3DProvider {
             },
         );
 
-        Batch::new(Batch3DProvider {
+        Batch3DProvider {
             index_buffer,
             position_buffer,
             texcoord_buffer,
             color_buffer,
             normal_buffer,
-        })
+        }
     }
 
     pub fn index_count(&self) -> usize {
