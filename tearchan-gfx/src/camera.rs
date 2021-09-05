@@ -2,7 +2,7 @@ use nalgebra_glm::{vec3, Mat4, Vec2, Vec3};
 use std::f32::consts::PI;
 use tearchan_util::math::mat::create_orthographic;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Camera {
     pub projection_matrix: Mat4,
     pub view_matrix: Mat4,
@@ -31,7 +31,7 @@ impl Camera {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Camera2D {
     base: Camera,
     pub position: Vec3,
@@ -63,7 +63,7 @@ impl Camera2D {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Camera3D {
     base: Camera,
     pub position: Vec3,
