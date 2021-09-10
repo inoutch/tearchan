@@ -1,6 +1,7 @@
 use crate::scene::context::{SceneContext, SceneRenderContext};
 use crate::scene::factory::{SceneFactory, SceneOption};
 use crate::scene::{Scene, SceneControlFlow};
+use wgpu::Maintain;
 use winit::event::WindowEvent;
 use winit::event_loop::ControlFlow;
 
@@ -20,17 +21,15 @@ impl Default for SceneManager {
 
 impl SceneManager {
     pub fn update(&mut self, event: WindowEvent, mut context: SceneContext) -> Option<ControlFlow> {
-        self.recreate_scene(&mut context);
-
         let control_flow = self.current_scene.update(&mut context, event);
-        self.process(control_flow)
+        self.process(control_flow, &context)
     }
 
     pub fn render(&mut self, mut context: SceneRenderContext) -> Option<ControlFlow> {
         self.recreate_scene(&mut context);
 
         let control_flow = self.current_scene.render(&mut context);
-        self.process(control_flow)
+        self.process(control_flow, &context)
     }
 
     pub fn set_current_scene(&mut self, scene: SceneFactory, option: Option<Box<dyn SceneOption>>) {
@@ -45,11 +44,16 @@ impl SceneManager {
         }
     }
 
-    fn process(&mut self, control_flow: SceneControlFlow) -> Option<ControlFlow> {
+    fn process(
+        &mut self,
+        control_flow: SceneControlFlow,
+        context: &SceneContext,
+    ) -> Option<ControlFlow> {
         match control_flow {
             SceneControlFlow::None => {}
             SceneControlFlow::Winit { control_flow } => return Some(control_flow),
             SceneControlFlow::TransitScene { factory, option } => {
+                context.gfx().device.poll(Maintain::Wait);
                 self.current_scene_factory = Some((factory, option));
             }
         }
