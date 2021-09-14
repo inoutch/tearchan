@@ -124,6 +124,10 @@ where
     pub fn action_manager(&self) -> &ActionManager<T::ActionState> {
         &self.action_manager
     }
+
+    pub fn action_manager_mut(&mut self) -> &mut ActionManager<T::ActionState> {
+        &mut self.action_manager
+    }
 }
 
 impl<T: HordeInterface> From<ActionManager<T::ActionState>> for JobManager<T> {
