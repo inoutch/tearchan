@@ -13,6 +13,9 @@ pub enum ActionResult<T> {
     End {
         action: Arc<Action<T>>,
     },
+    Cancel {
+        action: Arc<Action<T>>,
+    },
 }
 
 impl<T> ActionResult<T> {
@@ -21,6 +24,7 @@ impl<T> ActionResult<T> {
             ActionResult::Start { action } => Some(action),
             ActionResult::Update { .. } => None,
             ActionResult::End { .. } => None,
+            ActionResult::Cancel { .. } => None,
         }
     }
 
@@ -32,6 +36,7 @@ impl<T> ActionResult<T> {
                 current_time,
             } => Some((action, *current_time)),
             ActionResult::End { .. } => None,
+            ActionResult::Cancel { .. } => None,
         }
     }
 
@@ -40,6 +45,16 @@ impl<T> ActionResult<T> {
             ActionResult::Start { .. } => None,
             ActionResult::Update { .. } => None,
             ActionResult::End { action } => Some(action),
+            ActionResult::Cancel { .. } => None,
+        }
+    }
+
+    pub fn cancel(&self) -> Option<&Arc<Action<T>>> {
+        match self {
+            ActionResult::Start { .. } => None,
+            ActionResult::Update { .. } => None,
+            ActionResult::End { .. } => None,
+            ActionResult::Cancel { action } => Some(action),
         }
     }
 }

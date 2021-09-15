@@ -113,6 +113,7 @@ where
                 ActionResult::End { action } => {
                     provider.on_end(action.deref(), &mut controller);
                 }
+                ActionResult::Cancel { action } => provider.on_cancel(&action, &mut controller),
             }
         }
     }
@@ -322,6 +323,14 @@ mod test {
                 states: vec![(CustomActionState::Sleep, 1000)],
                 creators: vec![],
             }
+        }
+
+        fn on_cancel(
+            &mut self,
+            action: &Action<Self::ActionState>,
+            _controller: &mut ActionController<Self::ActionState>,
+        ) {
+            println!("cancel : {}", action.entity_id());
         }
     }
 

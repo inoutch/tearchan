@@ -51,4 +51,10 @@ pub trait HordeInterface {
     ) -> JobResult<Self::Job, Self::ActionState>;
 
     fn on_send(&self, _action: Arc<Action<Self::ActionState>>) {}
+
+    fn on_cancel(
+        &mut self,
+        action: &Action<Self::ActionState>,
+        controller: &mut ActionController<Self::ActionState>,
+    );
 }

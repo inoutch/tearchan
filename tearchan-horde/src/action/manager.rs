@@ -37,40 +37,51 @@ impl<T> ActionManager<T> {
         let mut running_actions = DuplicatableBTreeMap::default();
         let mut contexts = HashMap::new();
         let mut pending_cache = HashSet::new();
+        let mut first_actions: HashMap<EntityId, Arc<Action<T>>> = HashMap::new();
+        let current_time = data.current_time;
 
         for entity_id in data.entity_ids {
             contexts.insert(
                 entity_id,
                 ActionContext {
-                    last_time: data.current_time,
+                    last_time: current_time,
+                    running_end_time: data.current_time,
                     state_len: 0,
                 },
             );
         }
 
         for action in data.actions {
-            let context = contexts
-                .entry(action.entity_id)
-                .or_insert_with(|| ActionContext {
-                    last_time: action.end_time,
-                    state_len: 0,
-                });
+            let entity_id = action.entity_id;
+            let context = contexts.entry(entity_id).or_insert_with(|| ActionContext {
+                last_time: action.end_time,
+                running_end_time: current_time,
+                state_len: 0,
+            });
             context.state_len += 1;
             if context.last_time < action.end_time {
                 context.last_time = action.end_time;
             }
 
-            if data.current_time >= action.start_time {
-                running_actions.push_back(action.end_time, action);
+            if current_time >= action.start_time {
+                running_actions.push_back(action.end_time, Arc::clone(&action));
+                if first_actions
+                    .get(&entity_id)
+                    .map(|x| x.start_time < action.start_time)
+                    .unwrap_or(true)
+                {
+                    first_actions.insert(entity_id, action);
+                }
             } else {
                 pending_actions.push_back(action.start_time, action);
             }
         }
 
-        for (entity_id, context) in &contexts {
+        for (entity_id, context) in &mut contexts {
             if context.state_len == 0 {
                 pending_cache.insert(*entity_id);
             }
+            context.running_end_time = first_actions.get(&entity_id).unwrap().end_time;
         }
 
         ActionManager {
@@ -114,8 +125,32 @@ impl<T> ActionManager<T> {
         actions
     }
 
-    pub fn pull(&mut self) -> DuplicatableBTreeMap<u64, ActionResult<T>> {
+    pub fn push_actions(&mut self, entity_id: EntityId, mut actions: Vec<Arc<Action<T>>>) {
+        actions.sort_by(|a, b| a.start_time.cmp(&b.start_time));
+        self.get_context_mut(entity_id).last_time = actions.last().unwrap().end_time;
+
+        for action in actions {
+            if action.start_time <= self.current_time {
+                if action.start_time == self.current_time
+                    && self.get_context_mut(entity_id).state_len == 0
+                {
+                    self.pending_actions.push_back(action.end_time, action);
+                } else {
+                    self.running_actions.push_back(action.end_time, action);
+                }
+            } else {
+                self.pending_actions.push_back(action.end_time, action);
+            }
+            let context = self.get_context_mut(entity_id);
+            context.state_len += 1;
+        }
+    }
+
+    pub fn pull(&mut self) -> DuplicatableBTreeMap<TimeMilliseconds, ActionResult<T>> {
         let mut results = DuplicatableBTreeMap::default();
+        let mut results_of_end: HashMap<EntityId, (TimeMilliseconds, ActionResult<T>)> =
+            HashMap::new();
+
         while let Some(action) = self.pending_actions.pop_first_back() {
             if action.start_time() > self.current_time {
                 self.pending_actions.push_front(action.start_time(), action);
@@ -125,15 +160,37 @@ impl<T> ActionManager<T> {
             let entity_id = action.entity_id();
             let start_time = action.start_time();
             let end_time = action.end_time();
+            let context = self.get_context_mut(entity_id);
+
+            // If there is an action that is earlier than the end time of the action being executed,
+            // it will be an interrupt and the end action will be removed.
+            let interrupt = start_time < context.running_end_time;
+            if interrupt {
+                // Add the end because it does not affect the interrupt
+                if let Some((end_time, result)) = results_of_end.remove(&entity_id) {
+                    if end_time <= start_time {
+                        results.push_front(end_time, result);
+                    }
+                }
+            }
+
             if action.end_time() > self.current_time {
                 self.running_actions
                     .push_front(end_time, Arc::clone(&action));
-                results.push_back(start_time, ActionResult::Start { action });
+                results.push_back(
+                    start_time,
+                    ActionResult::Start {
+                        action: Arc::clone(&action),
+                    },
+                );
 
                 // When an action with zero start and end periods is executed on an entity that has no actions,
                 // the entity changes to pending state even though it has actions piled up.
                 // Therefore, if there is a subsequent action on the entity, the pending state will be released.
                 self.pending_cache.remove(&entity_id);
+
+                let context = self.get_context_mut(entity_id);
+                context.running_end_time = end_time;
             } else {
                 results.push_back(
                     start_time,
@@ -141,13 +198,32 @@ impl<T> ActionManager<T> {
                         action: Arc::clone(&action),
                     },
                 );
-                results.push_back(end_time, ActionResult::End { action });
+
+                results_of_end.insert(
+                    entity_id,
+                    (
+                        end_time,
+                        ActionResult::End {
+                            action: Arc::clone(&action),
+                        },
+                    ),
+                );
 
                 let context = self.get_context_mut(entity_id);
+                context.running_end_time = end_time;
                 context.state_len -= 1;
                 if context.state_len == 0 {
                     self.pending_cache.insert(entity_id);
                 }
+            }
+
+            if interrupt {
+                results.push_back(
+                    start_time,
+                    ActionResult::Cancel {
+                        action: Arc::clone(&action),
+                    },
+                );
             }
         }
 
@@ -167,17 +243,32 @@ impl<T> ActionManager<T> {
             }
         }
 
+        for (_, (end_time, result)) in results_of_end {
+            results.push_front(end_time, result);
+        }
+
+        let mut visit_map: HashMap<EntityId, (TimeMilliseconds, Arc<Action<T>>)> = HashMap::new();
         for (_, started_stores) in self.running_actions.iter() {
             for action in started_stores.iter() {
-                results.push_back(
-                    self.current_time,
-                    ActionResult::Update {
-                        action: Arc::clone(action),
-                        current_time: self.current_time,
-                    },
-                )
+                if visit_map
+                    .get(&action.entity_id())
+                    .map(|(start_time, _)| start_time < &action.start_time)
+                    .unwrap_or(true)
+                {
+                    visit_map.insert(action.entity_id(), (action.start_time, Arc::clone(action)));
+                }
             }
         }
+        for (_, (_, action)) in visit_map {
+            results.push_back(
+                self.current_time,
+                ActionResult::Update {
+                    action,
+                    current_time: self.current_time,
+                },
+            )
+        }
+
         results
     }
 
@@ -197,6 +288,7 @@ impl<T> ActionManager<T> {
 
         let context = ActionContext {
             last_time: self.current_time,
+            running_end_time: self.current_time,
             state_len: 0,
         };
         self.contexts.insert(entity_id, context);
@@ -305,6 +397,7 @@ impl<T> ActionManager<T> {
 
         let context = ActionContext {
             last_time: self.current_time,
+            running_end_time: self.current_time,
             state_len: 0,
         };
         self.contexts.insert(entity_id, context);
@@ -376,9 +469,29 @@ impl<T> Default for ActionManagerData<T> {
 
 #[cfg(test)]
 mod test {
-    use crate::action::manager::ActionManager;
+    use crate::action::manager::{ActionManager, ActionManagerData};
+    use crate::action::result::ActionResult;
+    use crate::action::Action;
+    use crate::action::TimeMilliseconds;
+    use std::sync::Arc;
+    use tearchan_ecs::component::EntityId;
+    use tearchan_util::btree::DuplicatableBTreeMap;
 
     type TestActionState = &'static str;
+
+    fn flatten<T, F>(
+        actions: &DuplicatableBTreeMap<TimeMilliseconds, ActionResult<T>>,
+        f: F,
+    ) -> Vec<Arc<Action<T>>>
+    where
+        F: FnMut(&ActionResult<T>) -> Option<Arc<Action<T>>> + Copy,
+    {
+        actions
+            .iter()
+            .map(|(_, results)| results.iter().filter_map(f).collect::<Vec<_>>())
+            .flatten()
+            .collect::<Vec<_>>()
+    }
 
     #[test]
     fn test() {
@@ -491,5 +604,164 @@ mod test {
         assert_eq!(action.get_end().unwrap().end_time, 4500);
         assert_eq!(action.get_end().unwrap().inner.as_ref(), &"Run");
         assert!(actions.pop_first_back().is_none());
+    }
+
+    #[test]
+    fn test_serialization() {
+        let mut data: ActionManagerData<TestActionState> = ActionManagerData::default();
+        data.current_time = 700;
+
+        data.entity_ids.insert(1);
+        data.actions.push(Arc::new(Action::new(1, 0, 500, "Jump")));
+        data.actions.push(Arc::new(Action::new(1, 250, 600, "Run")));
+        data.actions
+            .push(Arc::new(Action::new(1, 600, 800, "Walk")));
+        data.actions
+            .push(Arc::new(Action::new(1, 800, 1200, "Sleep")));
+
+        let manager = ActionManager::new(data);
+        assert_eq!(manager.running_actions.len(), 3);
+        assert_eq!(manager.pending_actions.len(), 1);
+        assert_eq!(manager.contexts.get(&1).unwrap().last_time, 1200);
+        assert_eq!(manager.contexts.get(&1).unwrap().running_end_time, 800);
+        assert_eq!(manager.contexts.get(&1).unwrap().state_len, 4);
+    }
+
+    #[test]
+    fn test_push_actions() {
+        let mut action_manager_1: ActionManager<TestActionState> = ActionManager::default();
+        let entity_id: EntityId = 1;
+        action_manager_1.attach(entity_id);
+        action_manager_1.push_states(
+            entity_id,
+            vec![
+                ("Wake", 1000),
+                ("Run", 2000),
+                ("Eat", 1000),
+                ("Sleep", 3000),
+            ],
+        );
+        action_manager_1.update(1500);
+
+        let actions_1 = action_manager_1.pull();
+        let actions = flatten(&actions_1, |action| match action {
+            ActionResult::Start { action } => Some(Arc::clone(action)),
+            ActionResult::Update { .. } => None,
+            ActionResult::End { .. } => None,
+            ActionResult::Cancel { .. } => None,
+        });
+
+        let mut action_manager_2: ActionManager<TestActionState> = ActionManager::default();
+        action_manager_2.attach(entity_id);
+        action_manager_2.push_actions(entity_id, actions);
+        action_manager_2.update(1500);
+
+        let actions_2 = action_manager_2.pull();
+
+        let mut action_1 = actions_1.iter();
+        let mut action_2 = actions_2.iter();
+        {
+            let action_1 = action_1.next().unwrap();
+            let action_2 = action_2.next().unwrap();
+            assert_eq!(action_1.0, action_2.0);
+            assert_eq!(
+                action_1.1[0].get_start().unwrap().inner,
+                action_2.1[0].get_start().unwrap().inner
+            );
+        }
+        {
+            let action_1 = action_1.next().unwrap();
+            let action_2 = action_2.next().unwrap();
+            assert_eq!(action_1.0, action_2.0);
+            assert_eq!(
+                action_1.1[0].get_end().unwrap().inner,
+                action_2.1[0].get_end().unwrap().inner
+            );
+            assert_eq!(action_1.0, action_2.0);
+            assert_eq!(
+                action_1.1[1].get_start().unwrap().inner,
+                action_2.1[1].get_start().unwrap().inner
+            );
+        }
+        {
+            let action_1 = action_1.next().unwrap();
+            let action_2 = action_2.next().unwrap();
+            assert_eq!(action_1.0, action_2.0);
+            assert_eq!(
+                action_1.1[0].get_update().unwrap().0.inner,
+                action_2.1[0].get_update().unwrap().0.inner
+            );
+        }
+    }
+
+    #[test]
+    fn test_push_actions_with_cancels() {
+        let mut action_manager_1: ActionManager<TestActionState> = ActionManager::default();
+        let entity_id: EntityId = 1;
+        action_manager_1.attach(entity_id);
+        action_manager_1.push_states(
+            entity_id,
+            vec![
+                ("Wake", 1000),
+                ("Run", 2000),
+                ("Eat", 1000),
+                ("Sleep", 3000),
+            ],
+        );
+        action_manager_1.update(1500);
+        let actions_1 = action_manager_1.pull();
+        let mut actions = flatten(&actions_1, |action| match action {
+            ActionResult::Start { action } => Some(Arc::clone(action)),
+            ActionResult::Update { .. } => None,
+            ActionResult::End { .. } => None,
+            ActionResult::Cancel { .. } => None,
+        });
+
+        println!("1 - {:?}", actions_1);
+
+        action_manager_1.cancel(entity_id, true);
+        action_manager_1.push_states(
+            entity_id,
+            vec![("Drink", 1200), ("Eat", 1000), ("Sleep", 3000)],
+        );
+        action_manager_1.update(0);
+        let actions_1 = action_manager_1.pull();
+        actions.append(&mut flatten(&actions_1, |action| match action {
+            ActionResult::Start { action } => Some(Arc::clone(action)),
+            ActionResult::Update { .. } => None,
+            ActionResult::End { .. } => None,
+            ActionResult::Cancel { .. } => None,
+        }));
+        println!("1 - {:?}", actions_1);
+        println!("s - {:?}", actions);
+
+        let mut action_manager_2: ActionManager<TestActionState> = ActionManager::default();
+        action_manager_2.attach(entity_id);
+        action_manager_2.push_actions(entity_id, actions);
+        action_manager_2.update(1500);
+
+        let actions_2 = action_manager_2.pull();
+
+        println!("2 - {:?}", actions_2);
+    }
+
+    #[test]
+    fn test_push_actions_with_cancels2() {
+        let entity_id = 1;
+        let mut action_manager_2: ActionManager<TestActionState> = ActionManager::default();
+        action_manager_2.attach(entity_id);
+        action_manager_2.push_actions(
+            entity_id,
+            vec![
+                Arc::new(Action::new(entity_id, 0, 1000, "Wake")),
+                Arc::new(Action::new(entity_id, 1000, 3000, "Run")),
+                Arc::new(Action::new(entity_id, 1500, 2700, "Drink")),
+            ],
+        );
+        action_manager_2.update(1500);
+
+        let actions_2 = action_manager_2.pull();
+
+        println!("2 - {:?}", actions_2);
     }
 }
