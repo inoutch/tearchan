@@ -360,6 +360,10 @@ impl<T> ActionManager<T> {
         }
     }
 
+    pub fn current_time(&self) -> TimeMilliseconds {
+        self.current_time
+    }
+
     pub fn create_data(&self) -> ActionManagerData<T> {
         let mut actions = vec![];
         for (_, pending_actions) in self.pending_actions.iter() {
