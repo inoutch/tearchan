@@ -92,6 +92,11 @@ where
         }
     }
 
+    pub fn run_without_job_processing(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
+        self.action_manager.update(elapsed_time);
+        self.update_action(provider);
+    }
+
     pub fn update_action(&mut self, provider: &mut T) {
         let mut results = self.action_manager.pull();
         let mut controller = self.action_manager.controller();
