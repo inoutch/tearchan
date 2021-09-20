@@ -199,15 +199,30 @@ impl<T> ActionManager<T> {
                     },
                 );
 
-                results_of_end.insert(
-                    entity_id,
-                    (
+                if start_time != end_time {
+                    if let Some((end_time, result)) = results_of_end.remove(&entity_id) {
+                        if end_time <= start_time {
+                            results.push_front(end_time, result);
+                        }
+                    }
+
+                    results_of_end.insert(
+                        entity_id,
+                        (
+                            end_time,
+                            ActionResult::End {
+                                action: Arc::clone(&action),
+                            },
+                        ),
+                    );
+                } else {
+                    results.push_back(
                         end_time,
                         ActionResult::End {
                             action: Arc::clone(&action),
                         },
-                    ),
-                );
+                    );
+                }
 
                 let context = self.get_context_mut(entity_id);
                 context.running_end_time = end_time;
@@ -767,5 +782,104 @@ mod test {
         let actions_2 = action_manager_2.pull();
 
         println!("2 - {:?}", actions_2);
+    }
+
+    #[test]
+    fn test_push_actions_and_actions() {
+        let mut action_manager: ActionManager<TestActionState> = ActionManager::default();
+        let entity = 2;
+
+        action_manager.attach(entity);
+
+        action_manager.push_actions(entity, vec![Arc::new(Action::new(entity, 0, 500, "Wake"))]);
+        action_manager.push_actions(
+            entity,
+            vec![Arc::new(Action::new(entity, 500, 1500, "Run"))],
+        );
+        action_manager.push_actions(
+            entity,
+            vec![Arc::new(Action::new(entity, 1500, 4500, "Drink"))],
+        );
+        action_manager.update(1500);
+        let actions = action_manager.pull();
+        let actions = actions.iter().collect::<Vec<_>>();
+        assert_eq!(actions[0].0, &0);
+        assert_eq!(actions[0].1[0].get_start().unwrap().inner.as_ref(), &"Wake");
+
+        assert_eq!(actions[1].0, &500);
+        assert_eq!(actions[1].1[0].get_end().unwrap().inner.as_ref(), &"Wake");
+        assert_eq!(actions[1].1[1].get_start().unwrap().inner.as_ref(), &"Run");
+
+        assert_eq!(actions[2].0, &1500);
+        assert_eq!(actions[2].1[0].get_end().unwrap().inner.as_ref(), &"Run");
+        assert_eq!(
+            actions[2].1[1].get_start().unwrap().inner.as_ref(),
+            &"Drink"
+        );
+        assert_eq!(
+            actions[2].1[2].get_update().unwrap().0.inner.as_ref(),
+            &"Drink"
+        );
+    }
+
+    #[test]
+    fn test_push_actions_for_entities() {
+        let mut action_manager: ActionManager<TestActionState> = ActionManager::default();
+        let entity1 = 1;
+        let entity2 = 2;
+
+        action_manager.attach(entity1);
+        action_manager.attach(entity2);
+
+        action_manager.push_actions(
+            entity1,
+            vec![Arc::new(Action::new(entity1, 0, 1000, "Wake1"))],
+        );
+        action_manager.push_actions(
+            entity2,
+            vec![Arc::new(Action::new(entity2, 0, 500, "Wake2"))],
+        );
+        action_manager.push_actions(
+            entity2,
+            vec![Arc::new(Action::new(entity2, 500, 1500, "Run2"))],
+        );
+        action_manager.push_actions(
+            entity1,
+            vec![Arc::new(Action::new(entity1, 1000, 3000, "Run1"))],
+        );
+        action_manager.push_actions(
+            entity2,
+            vec![Arc::new(Action::new(entity2, 1500, 4500, "Drink2"))],
+        );
+        action_manager.push_actions(
+            entity1,
+            vec![Arc::new(Action::new(entity1, 3000, 4500, "Drink1"))],
+        );
+        action_manager.update(1500);
+        let actions = action_manager.pull();
+        for x in actions.iter().collect::<Vec<_>>() {
+            println!("- {}: {:?}", x.0, x.1);
+        }
+    }
+
+    #[test]
+    fn test_push_actions_for_orders() {
+        let mut action_manager: ActionManager<TestActionState> = ActionManager::default();
+        let entity = 2;
+
+        action_manager.attach(entity);
+
+        action_manager.push_actions(entity, vec![Arc::new(Action::new(entity, 0, 500, "Wake"))]);
+        action_manager.push_actions(entity, vec![Arc::new(Action::new(entity, 500, 500, "Run"))]);
+        action_manager.push_actions(
+            entity,
+            vec![Arc::new(Action::new(entity, 500, 4500, "Drink"))],
+        );
+        action_manager.update(1500);
+        let actions = action_manager.pull();
+        let actions = actions.iter().collect::<Vec<_>>();
+        for x in actions.iter().collect::<Vec<_>>() {
+            println!("- {}: {:?}", x.0, x.1);
+        }
     }
 }
