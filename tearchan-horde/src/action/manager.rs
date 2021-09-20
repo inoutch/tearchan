@@ -134,12 +134,12 @@ impl<T> ActionManager<T> {
                 if action.start_time == self.current_time
                     && self.get_context_mut(entity_id).state_len == 0
                 {
-                    self.pending_actions.push_back(action.end_time, action);
+                    self.pending_actions.push_back(action.start_time, action);
                 } else {
                     self.running_actions.push_back(action.end_time, action);
                 }
             } else {
-                self.pending_actions.push_back(action.end_time, action);
+                self.pending_actions.push_back(action.start_time, action);
             }
             let context = self.get_context_mut(entity_id);
             context.state_len += 1;
