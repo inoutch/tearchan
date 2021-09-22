@@ -7,11 +7,10 @@ use winit::window::Window;
 pub struct Renderer {
     instance: wgpu::Instance,
     surface: wgpu::Surface,
+    surface_config: wgpu::SurfaceConfiguration,
     adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
-    swapchain: wgpu::SwapChain,
-    swapchain_desc: wgpu::SwapChainDescriptor,
 }
 
 impl Renderer {
@@ -31,44 +30,19 @@ impl Renderer {
                 .expect("couldn't append canvas to document body");
         }
 
-        let backend = if let Ok(backend) = std::env::var("WGPU_BACKEND") {
-            match backend.to_lowercase().as_str() {
-                "vulkan" => wgpu::BackendBit::VULKAN,
-                "metal" => wgpu::BackendBit::METAL,
-                "dx12" => wgpu::BackendBit::DX12,
-                "dx11" => wgpu::BackendBit::DX11,
-                "gl" => wgpu::BackendBit::GL,
-                "webgpu" => wgpu::BackendBit::BROWSER_WEBGPU,
-                other => panic!("Unknown backend: {}", other),
-            }
-        } else if cfg!(target_arch = "wasm32") {
-            wgpu::BackendBit::GL
-        } else {
-            wgpu::BackendBit::PRIMARY
-        };
+        let backend = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::PRIMARY);
         log::info!("backend: {:?}", backend);
-        let power_preference = if let Ok(power_preference) = std::env::var("WGPU_POWER_PREF") {
-            match power_preference.to_lowercase().as_str() {
-                "low" => wgpu::PowerPreference::LowPower,
-                "high" => wgpu::PowerPreference::HighPerformance,
-                other => panic!("Unknown power preference: {}", other),
-            }
-        } else {
-            wgpu::PowerPreference::default()
-        };
+
         let instance = wgpu::Instance::new(backend);
         let (size, surface) = unsafe {
             let size = window.inner_size();
             let surface = instance.create_surface(window);
             (size, surface)
         };
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference,
-                compatible_surface: Some(&surface),
-            })
+        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, backend)
             .await
             .expect("No suitable GPU adapters found on the system!");
+
         let adapter_features = adapter.features();
         let trace_dir = std::env::var("WGPU_TRACE");
         let (device, queue) = adapter
@@ -83,23 +57,22 @@ impl Renderer {
             .await
             .expect("Unable to find a suitable GPU adapter!");
 
-        let swapchain_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
-            format: adapter.get_swap_chain_preferred_format(&surface).unwrap(),
+        let surface_config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface.get_preferred_format(&adapter).unwrap(),
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Mailbox,
         };
-        let swapchain = device.create_swap_chain(&surface, &swapchain_desc);
+        surface.configure(&device, &surface_config);
 
         Renderer {
             instance,
             surface,
+            surface_config,
             adapter,
             device,
             queue,
-            swapchain,
-            swapchain_desc,
         }
     }
 
@@ -107,31 +80,33 @@ impl Renderer {
         GfxContext {
             device: &self.device,
             queue: &self.queue,
-            swapchain_desc: &self.swapchain_desc,
+            surface_config: &self.surface_config,
         }
     }
 
-    pub fn create_render_context(&mut self) -> (GfxContext, GfxRenderContext) {
-        let frame = match self.swapchain.get_current_frame() {
+    pub fn create_frame(&self) -> wgpu::SurfaceFrame {
+        match self.surface.get_current_frame() {
             Ok(frame) => frame,
             Err(_) => {
-                self.swapchain = self
-                    .device
-                    .create_swap_chain(&self.surface, &self.swapchain_desc);
-                self.swapchain
+                self.surface.configure(&self.device, &self.surface_config);
+                self.surface
                     .get_current_frame()
-                    .expect("Failed to acquire next swap chain texture!")
+                    .expect("Failed to acquire next surface texture!")
             }
-        };
+        }
+    }
+
+    pub fn create_render_context(
+        &self,
+        frame: &wgpu::SurfaceFrame,
+    ) -> (GfxContext, GfxRenderContext) {
         (self.create_context(), GfxRenderContext::new(frame))
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.swapchain_desc.width = if size.width == 0 { 1 } else { size.width };
-        self.swapchain_desc.height = if size.height == 0 { 1 } else { size.height };
-        self.swapchain = self
-            .device
-            .create_swap_chain(&self.surface, &self.swapchain_desc);
+        self.surface_config.width = size.width.max(1);
+        self.surface_config.height = size.height.max(1);
+        self.surface.configure(&self.device, &self.surface_config);
     }
 }
 

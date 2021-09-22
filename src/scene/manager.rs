@@ -1,7 +1,7 @@
 use crate::scene::context::{SceneContext, SceneRenderContext};
 use crate::scene::factory::{SceneFactory, SceneOption};
 use crate::scene::{Scene, SceneControlFlow};
-use wgpu::Maintain;
+use tearchan_gfx::wgpu::Maintain;
 use winit::event::WindowEvent;
 use winit::event_loop::ControlFlow;
 
@@ -25,10 +25,10 @@ impl SceneManager {
         self.process(control_flow, &context)
     }
 
-    pub fn render(&mut self, mut context: SceneRenderContext) -> Option<ControlFlow> {
-        self.recreate_scene(&mut context);
+    pub fn render(&mut self, context: &mut SceneRenderContext) -> Option<ControlFlow> {
+        self.recreate_scene(context);
 
-        let control_flow = self.current_scene.render(&mut context);
+        let control_flow = self.current_scene.render(context);
         self.process(control_flow, &context)
     }
 

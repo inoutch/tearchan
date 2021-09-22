@@ -2,19 +2,19 @@
 name = "tearchan"
 version = "0.0.1"
 edition = "2018"
+resolver = "2"
 
 [dependencies]
 # utils
 instant = "0.1.9"
 log = "0.4.11"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "ef2fa77536855e0b7ebdfb0df0eb879d9b7d3a1b", features = ["cross"] }
 futures = "0.3.12"
 async-executor = "1.4.0"
 async-std = "1.9.0"
 once_cell = "1.5.2"
 thiserror = "1.0.23"
 # framework
-winit = { version = "0.24.0", features = ["web-sys"] }
+winit = { version = "0.25", features = ["web-sys"] }
 tearchan-core = { path = "tearchan-core" }
 tearchan-gfx = { path = "tearchan-gfx" }
 tearchan-util = { path = "tearchan-util" }

@@ -51,9 +51,9 @@ impl Batch2DProvider {
             &mut None,
             |device, _queue, encoder, prev, len| {
                 let label = "IndexBuffer";
-                let usage = wgpu::BufferUsage::INDEX
-                    | wgpu::BufferUsage::COPY_DST
-                    | wgpu::BufferUsage::COPY_SRC;
+                let usage = wgpu::BufferUsages::INDEX
+                    | wgpu::BufferUsages::COPY_DST
+                    | wgpu::BufferUsages::COPY_SRC;
                 match prev {
                     None => {}
                     Some(prev) => {
@@ -77,9 +77,9 @@ impl Batch2DProvider {
             &mut None,
             |device, _queue, encoder, prev, len| {
                 let label = "PositionBuffer";
-                let usage = wgpu::BufferUsage::VERTEX
-                    | wgpu::BufferUsage::COPY_DST
-                    | wgpu::BufferUsage::COPY_SRC;
+                let usage = wgpu::BufferUsages::VERTEX
+                    | wgpu::BufferUsages::COPY_DST
+                    | wgpu::BufferUsages::COPY_SRC;
                 match prev {
                     None => Buffer::new(device, len, label, usage),
                     Some(prev) => Buffer::new_with_buffer(
@@ -100,9 +100,9 @@ impl Batch2DProvider {
             &mut None,
             |device, _queue, encoder, prev, len| {
                 let label = "ColorBuffer";
-                let usage = wgpu::BufferUsage::VERTEX
-                    | wgpu::BufferUsage::COPY_DST
-                    | wgpu::BufferUsage::COPY_SRC;
+                let usage = wgpu::BufferUsages::VERTEX
+                    | wgpu::BufferUsages::COPY_DST
+                    | wgpu::BufferUsages::COPY_SRC;
                 match prev {
                     None => Buffer::new(device, len, label, usage),
                     Some(prev) => Buffer::new_with_buffer(
@@ -123,9 +123,9 @@ impl Batch2DProvider {
             &mut None,
             |device, _queue, encoder, prev, len| {
                 let label = "TexcoordBuffer";
-                let usage = wgpu::BufferUsage::VERTEX
-                    | wgpu::BufferUsage::COPY_DST
-                    | wgpu::BufferUsage::COPY_SRC;
+                let usage = wgpu::BufferUsages::VERTEX
+                    | wgpu::BufferUsages::COPY_DST
+                    | wgpu::BufferUsages::COPY_SRC;
                 match prev {
                     None => Buffer::new(device, len, label, usage),
                     Some(prev) => Buffer::new_with_buffer(

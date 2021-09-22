@@ -1,8 +1,8 @@
-use tearchan_core::io::file::FileUtil;
+use tearchan::core::io::file::FileUtil;
 
 pub fn main() {
-    let path_util = FileUtil::new().expect("Failed to create path util");
-    let assets_path = path_util
+    let file_util = FileUtil::new().expect("Failed to create path util");
+    let assets_path = file_util
         .assets_path()
         .to_str()
         .expect("Failed to get assets path");

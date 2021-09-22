@@ -36,9 +36,9 @@ impl Engine {
         if !cfg!(target_os = "android") {
             setup
                 .setup(
-                    wgpu::Features::empty(),
-                    wgpu::Features::empty(),
-                    wgpu::Limits::default(),
+                    tearchan_gfx::wgpu::Features::empty(),
+                    tearchan_gfx::wgpu::Features::empty(),
+                    tearchan_gfx::wgpu::Limits::default(),
                 )
                 .await;
         }
@@ -75,7 +75,10 @@ impl Engine {
                             *control_flow = ControlFlow::Exit;
                         }
                     }
-                    WindowEvent::ScaleFactorChanged { scale_factor: new_scale_factor, .. } => {
+                    WindowEvent::ScaleFactorChanged {
+                        scale_factor: new_scale_factor,
+                        ..
+                    } => {
                         scale_factor = *new_scale_factor;
                     }
                     _ => {}
@@ -117,18 +120,19 @@ impl Engine {
                 }
 
                 // Rendering
-                if let Some(x) = setup.renderer_mut() {
-                    let (context, render_context) = x.create_render_context();
-                    let context = SceneRenderContext::new(
+                if let Some(renderer) = setup.renderer_mut() {
+                    let frame = renderer.create_frame();
+                    let (context, render_context) = renderer.create_render_context(&frame);
+                    let mut context = SceneRenderContext::new(
                         (context, render_context),
                         &spawner,
                         &mut custom,
                         scale_factor,
                         elapsed_time as f32 / 1000000.0f32,
                     );
-                    if let Some(overwrite) = scene_manager.render(context) {
+                    if let Some(overwrite) = scene_manager.render(&mut context) {
                         *control_flow = overwrite;
-                    };
+                    }
                 }
                 duration_watcher.reset();
                 spawner.run_until_stalled();

@@ -1,48 +1,49 @@
 use nalgebra_glm::{vec2, vec4};
 use tearchan::engine::Engine;
 use tearchan::engine_config::EngineStartupConfigBuilder;
+use tearchan::gfx::batch::batch2d::Batch2D;
+use tearchan::gfx::batch::types::BatchTypeArray;
+use tearchan::gfx::camera::Camera2D;
+use tearchan::gfx::font_texture::FontTexture;
+use tearchan::gfx::shader::get_standard_2d_shader_source;
+use tearchan::gfx::wgpu::util::DeviceExt;
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
-use tearchan_gfx::batch::batch2d::Batch2D;
-use tearchan_gfx::batch::types::BatchTypeArray;
-use tearchan_gfx::camera::Camera2D;
-use tearchan_gfx::font_texture::FontTexture;
-use tearchan_util::math::rect::rect2;
-use tearchan_util::mesh::square::{
+use tearchan::util::math::rect::rect2;
+use tearchan::util::mesh::square::{
     create_square_colors, create_square_indices, create_square_positions, create_square_texcoords,
 };
-use wgpu::util::DeviceExt;
-use winit::event::WindowEvent;
-use winit::window::WindowBuilder;
+use tearchan::winit::event::WindowEvent;
+use tearchan::winit::window::WindowBuilder;
 
 #[allow(dead_code)]
 struct FontScene {
     font_texture: FontTexture,
     batch: Batch2D,
-    bind_group: wgpu::BindGroup,
-    bind_group_layout: wgpu::BindGroupLayout,
-    uniform_buffer: wgpu::Buffer,
-    pipeline: wgpu::RenderPipeline,
+    bind_group: tearchan::gfx::wgpu::BindGroup,
+    bind_group_layout: tearchan::gfx::wgpu::BindGroupLayout,
+    uniform_buffer: tearchan::gfx::wgpu::Buffer,
+    pipeline: tearchan::gfx::wgpu::RenderPipeline,
     camera: Camera2D,
 }
 
 impl FontScene {
     pub fn factory() -> SceneFactory {
         |context, _| {
-            let width = context.gfx().swapchain_desc.width as f32;
-            let height = context.gfx().swapchain_desc.height as f32;
+            let width = context.gfx().surface_config.width as f32;
+            let height = context.gfx().surface_config.height as f32;
             let device = context.gfx().device;
             let queue = context.gfx().queue;
 
             // create font texture
-            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                mag_filter: wgpu::FilterMode::Linear,
-                min_filter: wgpu::FilterMode::Linear,
-                mipmap_filter: wgpu::FilterMode::Nearest,
+            let sampler = device.create_sampler(&tearchan::gfx::wgpu::SamplerDescriptor {
+                address_mode_u: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
+                address_mode_v: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
+                address_mode_w: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
+                mag_filter: tearchan::gfx::wgpu::FilterMode::Linear,
+                min_filter: tearchan::gfx::wgpu::FilterMode::Linear,
+                mipmap_filter: tearchan::gfx::wgpu::FilterMode::Nearest,
                 ..Default::default()
             });
             let mut font_texture = FontTexture::new(
@@ -95,33 +96,35 @@ impl FontScene {
             );
 
             let bind_group_layout =
-                device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                device.create_bind_group_layout(&tearchan::gfx::wgpu::BindGroupLayoutDescriptor {
                     label: None,
                     entries: &[
-                        wgpu::BindGroupLayoutEntry {
+                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
                             binding: 0,
-                            visibility: wgpu::ShaderStage::VERTEX,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
+                            visibility: tearchan::gfx::wgpu::ShaderStages::VERTEX,
+                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
+                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
                                 has_dynamic_offset: false,
-                                min_binding_size: wgpu::BufferSize::new(64),
+                                min_binding_size: tearchan::gfx::wgpu::BufferSize::new(64),
                             },
                             count: None,
                         },
-                        wgpu::BindGroupLayoutEntry {
+                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
                             binding: 1,
-                            visibility: wgpu::ShaderStage::FRAGMENT,
-                            ty: wgpu::BindingType::Texture {
+                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
+                            ty: tearchan::gfx::wgpu::BindingType::Texture {
                                 multisampled: false,
-                                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                view_dimension: wgpu::TextureViewDimension::D2,
+                                sample_type: tearchan::gfx::wgpu::TextureSampleType::Float {
+                                    filterable: true,
+                                },
+                                view_dimension: tearchan::gfx::wgpu::TextureViewDimension::D2,
                             },
                             count: None,
                         },
-                        wgpu::BindGroupLayoutEntry {
+                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
                             binding: 2,
-                            visibility: wgpu::ShaderStage::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler {
+                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
+                            ty: tearchan::gfx::wgpu::BindingType::Sampler {
                                 comparison: false,
                                 filtering: true,
                             },
@@ -129,35 +132,42 @@ impl FontScene {
                         },
                     ],
                 });
-            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
-            });
+            let pipeline_layout =
+                device.create_pipeline_layout(&tearchan::gfx::wgpu::PipelineLayoutDescriptor {
+                    label: None,
+                    bind_group_layouts: &[&bind_group_layout],
+                    push_constant_ranges: &[],
+                });
             let mut camera = Camera2D::new(&vec2(width, height));
             camera.update();
 
-            let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Uniform Buffer"),
-                contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            });
+            let uniform_buffer =
+                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
+                    label: Some("Uniform Buffer"),
+                    contents: bytemuck::cast_slice(camera.combine().as_slice()),
+                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
+                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
+                });
 
             // Create bind group
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            let bind_group = device.create_bind_group(&tearchan::gfx::wgpu::BindGroupDescriptor {
                 layout: &bind_group_layout,
                 entries: &[
-                    wgpu::BindGroupEntry {
+                    tearchan::gfx::wgpu::BindGroupEntry {
                         binding: 0,
                         resource: uniform_buffer.as_entire_binding(),
                     },
-                    wgpu::BindGroupEntry {
+                    tearchan::gfx::wgpu::BindGroupEntry {
                         binding: 1,
-                        resource: wgpu::BindingResource::TextureView(font_texture.view()),
+                        resource: tearchan::gfx::wgpu::BindingResource::TextureView(
+                            font_texture.view(),
+                        ),
                     },
-                    wgpu::BindGroupEntry {
+                    tearchan::gfx::wgpu::BindGroupEntry {
                         binding: 2,
-                        resource: wgpu::BindingResource::Sampler(font_texture.sampler()),
+                        resource: tearchan::gfx::wgpu::BindingResource::Sampler(
+                            font_texture.sampler(),
+                        ),
                     },
                 ],
                 label: None,
@@ -165,77 +175,77 @@ impl FontScene {
 
             // Create the render pipeline
             let vertex_buffers = [
-                wgpu::VertexBufferLayout {
+                tearchan::gfx::wgpu::VertexBufferLayout {
                     array_stride: 3 * std::mem::size_of::<f32>() as u64, // positions
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x3,
+                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
+                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
+                        format: tearchan::gfx::wgpu::VertexFormat::Float32x3,
                         offset: 0,
                         shader_location: 0,
                     }],
                 },
-                wgpu::VertexBufferLayout {
+                tearchan::gfx::wgpu::VertexBufferLayout {
                     array_stride: 2 * std::mem::size_of::<f32>() as u64, // texcoords
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x2,
+                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
+                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
+                        format: tearchan::gfx::wgpu::VertexFormat::Float32x2,
                         offset: 0,
                         shader_location: 1,
                     }],
                 },
-                wgpu::VertexBufferLayout {
+                tearchan::gfx::wgpu::VertexBufferLayout {
                     array_stride: 4 * std::mem::size_of::<f32>() as u64, // colors
-                    step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x4,
+                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
+                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
+                        format: tearchan::gfx::wgpu::VertexFormat::Float32x4,
                         offset: 0,
                         shader_location: 2,
                     }],
                 },
             ];
 
-            let vs_module = device.create_shader_module(&wgpu::include_spirv!(
-                "../../target/shaders/standard_2d.vert.spv"
-            ));
-            let fs_module = device.create_shader_module(&wgpu::include_spirv!(
-                "../../target/shaders/standard_2d.frag.spv"
-            ));
+            let shader =
+                device.create_shader_module(&tearchan::gfx::wgpu::ShaderModuleDescriptor {
+                    label: None,
+                    source: get_standard_2d_shader_source(),
+                });
 
-            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: None,
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &vs_module,
-                    entry_point: "main",
-                    buffers: &vertex_buffers,
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &fs_module,
-                    entry_point: "main",
-                    targets: &[wgpu::ColorTargetState {
-                        format: context.gfx().swapchain_desc.format,
-                        blend: Some(wgpu::BlendState {
-                            color: wgpu::BlendComponent {
-                                src_factor: wgpu::BlendFactor::SrcAlpha,
-                                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                                operation: wgpu::BlendOperation::Add,
-                            },
-                            alpha: wgpu::BlendComponent {
-                                src_factor: wgpu::BlendFactor::One,
-                                dst_factor: wgpu::BlendFactor::One,
-                                operation: wgpu::BlendOperation::Max,
-                            },
-                        }),
-                        write_mask: wgpu::ColorWrite::ALL,
-                    }],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    cull_mode: Some(wgpu::Face::Back),
-                    ..Default::default()
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-            });
+            let pipeline =
+                device.create_render_pipeline(&tearchan::gfx::wgpu::RenderPipelineDescriptor {
+                    label: None,
+                    layout: Some(&pipeline_layout),
+                    vertex: tearchan::gfx::wgpu::VertexState {
+                        module: &shader,
+                        entry_point: "vs_main",
+                        buffers: &vertex_buffers,
+                    },
+                    fragment: Some(tearchan::gfx::wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: "fs_main",
+                        targets: &[tearchan::gfx::wgpu::ColorTargetState {
+                            format: context.gfx().surface_config.format,
+                            blend: Some(tearchan::gfx::wgpu::BlendState {
+                                color: tearchan::gfx::wgpu::BlendComponent {
+                                    src_factor: tearchan::gfx::wgpu::BlendFactor::SrcAlpha,
+                                    dst_factor: tearchan::gfx::wgpu::BlendFactor::OneMinusSrcAlpha,
+                                    operation: tearchan::gfx::wgpu::BlendOperation::Add,
+                                },
+                                alpha: tearchan::gfx::wgpu::BlendComponent {
+                                    src_factor: tearchan::gfx::wgpu::BlendFactor::One,
+                                    dst_factor: tearchan::gfx::wgpu::BlendFactor::One,
+                                    operation: tearchan::gfx::wgpu::BlendOperation::Max,
+                                },
+                            }),
+                            write_mask: tearchan::gfx::wgpu::ColorWrites::ALL,
+                        }],
+                    }),
+                    primitive: tearchan::gfx::wgpu::PrimitiveState {
+                        cull_mode: Some(tearchan::gfx::wgpu::Face::Back),
+                        ..Default::default()
+                    },
+                    depth_stencil: None,
+                    multisample: tearchan::gfx::wgpu::MultisampleState::default(),
+                });
 
             Box::new(FontScene {
                 font_texture,
@@ -256,23 +266,22 @@ impl Scene for FontScene {
     }
 
     fn render(&mut self, context: &mut SceneRenderContext) -> SceneControlFlow {
-        let frame = context.gfx_rendering().frame();
         let queue = context.gfx().queue;
         let device = context.gfx().device;
 
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder = device
+            .create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
         {
             self.batch.flush(device, queue, &mut Some(&mut encoder));
             let provider = self.batch.provider();
 
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut rpass = encoder.begin_render_pass(&tearchan::gfx::wgpu::RenderPassDescriptor {
                 label: None,
-                color_attachments: &[wgpu::RenderPassColorAttachment {
-                    view: &frame.view,
+                color_attachments: &[tearchan::gfx::wgpu::RenderPassColorAttachment {
+                    view: &context.gfx_rendering().view,
                     resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                    ops: tearchan::gfx::wgpu::Operations {
+                        load: tearchan::gfx::wgpu::LoadOp::Clear(tearchan::gfx::wgpu::Color {
                             r: 0.1,
                             g: 0.2,
                             b: 0.3,
@@ -286,7 +295,10 @@ impl Scene for FontScene {
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.bind_group, &[]);
-            rpass.set_index_buffer(provider.index_buffer().slice(..), wgpu::IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                provider.index_buffer().slice(..),
+                tearchan::gfx::wgpu::IndexFormat::Uint32,
+            );
             rpass.set_vertex_buffer(0, provider.position_buffer().slice(..));
             rpass.set_vertex_buffer(1, provider.texcoord_buffer().slice(..));
             rpass.set_vertex_buffer(2, provider.color_buffer().slice(..));
@@ -301,6 +313,8 @@ impl Scene for FontScene {
 }
 
 pub fn main() {
+    env_logger::init();
+
     let window_builder = WindowBuilder::new().with_title("font");
     let startup_config = EngineStartupConfigBuilder::new()
         .window_builder(window_builder)
