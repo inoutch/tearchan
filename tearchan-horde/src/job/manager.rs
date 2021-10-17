@@ -92,6 +92,11 @@ where
         }
     }
 
+    pub fn run_without_job_processing(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
+        self.action_manager.update(elapsed_time);
+        self.update_action(provider);
+    }
+
     pub fn update_action(&mut self, provider: &mut T) {
         let mut results = self.action_manager.pull();
         let mut controller = self.action_manager.controller();
@@ -113,6 +118,7 @@ where
                 ActionResult::End { action } => {
                     provider.on_end(action.deref(), &mut controller);
                 }
+                ActionResult::Cancel { action } => provider.on_cancel(&action, &mut controller),
             }
         }
     }
@@ -322,6 +328,14 @@ mod test {
                 states: vec![(CustomActionState::Sleep, 1000)],
                 creators: vec![],
             }
+        }
+
+        fn on_cancel(
+            &mut self,
+            action: &Action<Self::ActionState>,
+            _controller: &mut ActionController<Self::ActionState>,
+        ) {
+            println!("cancel : {}", action.entity_id());
         }
     }
 
