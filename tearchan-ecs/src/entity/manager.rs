@@ -129,6 +129,13 @@ impl<'de> Deserialize<'de> for IdManager {
 pub struct EntityManager(#[serde(with = "arc_rwlock_serde")] Arc<RwLock<IdManager>>);
 
 impl EntityManager {
+    pub fn new(first_id: EntityId) -> Self {
+        EntityManager(Arc::new(RwLock::new(IdManager {
+            next_entity_id: first_id,
+            ..IdManager::default()
+        })))
+    }
+
     pub fn gen(&self) -> EntityId {
         self.0.write().unwrap().gen()
     }
