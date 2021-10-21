@@ -6,6 +6,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::iter::Enumerate;
 use std::marker::PhantomData;
 
 pub type ComponentIndex = usize;
@@ -102,13 +103,15 @@ impl<T> ComponentGroup<T> {
 
     pub fn iter(&self) -> Iter<T> {
         Iter {
-            iter: self.components.iter(),
+            iter: self.components.iter().enumerate(),
+            indices: &self.indices,
         }
     }
 
     pub fn iter_mut(&mut self) -> IterMut<T> {
         IterMut {
-            iter: self.components.iter_mut(),
+            iter_mut: self.components.iter_mut().enumerate(),
+            indices: &self.indices,
         }
     }
 }
@@ -182,15 +185,25 @@ where
 }
 
 pub struct Iter<'a, T> {
-    iter: std::slice::Iter<'a, Component<T>>,
+    iter: Enumerate<std::slice::Iter<'a, Component<T>>>,
+    indices: &'a HashMap<EntityId, ComponentIndex>,
 }
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = (EntityId, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.iter.next()?;
-        Some((next.entity_id(), next.inner()))
+        loop {
+            let (index, next) = self.iter.next()?;
+            if self
+                .indices
+                .get(&next.entity_id)
+                .map(|exist_index| exist_index == &index)
+                .unwrap_or(false)
+            {
+                return Some((next.entity_id(), next.inner()));
+            }
+        }
     }
 }
 
@@ -204,15 +217,25 @@ impl<'a, T> Iter<'a, T> {
 }
 
 pub struct IterMut<'a, T> {
-    iter: std::slice::IterMut<'a, Component<T>>,
+    iter_mut: Enumerate<std::slice::IterMut<'a, Component<T>>>,
+    indices: &'a HashMap<EntityId, ComponentIndex>,
 }
 
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = (EntityId, &'a mut T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next = self.iter.next()?;
-        Some((next.entity_id(), next.inner_mut()))
+        loop {
+            let (index, next) = self.iter_mut.next()?;
+            if self
+                .indices
+                .get(&next.entity_id)
+                .map(|exist_index| exist_index == &index)
+                .unwrap_or(false)
+            {
+                return Some((next.entity_id(), next.inner_mut()));
+            }
+        }
     }
 }
 
@@ -359,5 +382,27 @@ mod test {
         assert_eq!(group.get(1).as_ref().unwrap().0, "entity 1");
         assert_eq!(group.get(2).as_ref().unwrap().0, "entity 2");
         assert!(group.get(3).is_none());
+    }
+
+    #[test]
+    fn test_iter_with_removing() {
+        let mut group = ComponentGroup::default();
+        group.push(0, 10);
+        group.push(1, 11);
+        group.push(2, 12);
+        group.push(3, 13);
+        group.remove(3);
+
+        let mut iter = group.iter();
+        assert_eq!(iter.next(), Some((0, &10)));
+        assert_eq!(iter.next(), Some((1, &11)));
+        assert_eq!(iter.next(), Some((2, &12)));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = group.iter_mut();
+        assert_eq!(iter.next(), Some((0, &mut 10)));
+        assert_eq!(iter.next(), Some((1, &mut 11)));
+        assert_eq!(iter.next(), Some((2, &mut 12)));
+        assert_eq!(iter.next(), None);
     }
 }
