@@ -16,45 +16,47 @@ pub enum ActionResult<T> {
     Cancel {
         action: Arc<Action<T>>,
     },
+    Enqueue {
+        action: Arc<Action<T>>,
+    },
 }
 
 impl<T> ActionResult<T> {
     pub fn get_start(&self) -> Option<&Arc<Action<T>>> {
         match self {
             ActionResult::Start { action } => Some(action),
-            ActionResult::Update { .. } => None,
-            ActionResult::End { .. } => None,
-            ActionResult::Cancel { .. } => None,
+            _ => None,
         }
     }
 
     pub fn get_update(&self) -> Option<(&Arc<Action<T>>, u64)> {
         match self {
-            ActionResult::Start { .. } => None,
             ActionResult::Update {
                 action,
                 current_time,
             } => Some((action, *current_time)),
-            ActionResult::End { .. } => None,
-            ActionResult::Cancel { .. } => None,
+            _ => None,
         }
     }
 
     pub fn get_end(&self) -> Option<&Arc<Action<T>>> {
         match self {
-            ActionResult::Start { .. } => None,
-            ActionResult::Update { .. } => None,
             ActionResult::End { action } => Some(action),
-            ActionResult::Cancel { .. } => None,
+            _ => None,
         }
     }
 
-    pub fn cancel(&self) -> Option<&Arc<Action<T>>> {
+    pub fn get_cancel(&self) -> Option<&Arc<Action<T>>> {
         match self {
-            ActionResult::Start { .. } => None,
-            ActionResult::Update { .. } => None,
-            ActionResult::End { .. } => None,
             ActionResult::Cancel { action } => Some(action),
+            _ => None,
+        }
+    }
+
+    pub fn get_enqueue(&self) -> Option<&Arc<Action<T>>> {
+        match self {
+            ActionResult::Enqueue { action } => Some(action),
+            _ => None,
         }
     }
 }
