@@ -300,7 +300,11 @@ impl<T> ActionServerManager<T> {
     pub fn detach(&mut self, entity_id: EntityId) {
         self.contexts.remove(&entity_id);
         self.pending_cache.remove(&entity_id);
-        self.actions.remove(&entity_id);
+        if let Some(mut states) = self.actions.remove(&entity_id) {
+            while let Some(state) = states.pop_first_back() {
+                state.inactive();
+            }
+        }
     }
 
     pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
@@ -418,10 +422,10 @@ impl<T> ActionManagerTrait<T> for ActionServerManager<T> {
                         && self.next_time < state.action.end_time
                     {
                         self.commands.push_back(
-                            self.current_time,
+                            self.next_time,
                             Command::Update {
                                 state: Arc::new(CommandState::new(Arc::clone(&state.action))),
-                                time: self.current_time,
+                                time: self.next_time,
                             },
                         );
                     }
@@ -469,6 +473,7 @@ impl<T> ActionManagerTrait<T> for ActionServerManager<T> {
 pub struct ActionClientManager<T> {
     // Do serialize
     commands: DuplicatableBTreeMap<TimeMilliseconds, Command<T>>,
+    last_actions: HashMap<EntityId, Arc<CommandState<T>>>,
     running_actions: BTreeMap<EntityId, Arc<Action<T>>>,
     current_time: TimeMilliseconds,
     next_time: TimeMilliseconds,
@@ -477,6 +482,7 @@ pub struct ActionClientManager<T> {
 impl<T> ActionClientManager<T> {
     pub fn new(data: ActionManagerData<T>) -> Self {
         let mut commands = DuplicatableBTreeMap::default();
+        let mut last_actions = HashMap::new();
         let mut running_actions = BTreeMap::new();
 
         for action in data.actions {
@@ -500,10 +506,18 @@ impl<T> ActionClientManager<T> {
                     time: action.end_time,
                 },
             );
+
+            let last_action = last_actions
+                .entry(action.entity_id)
+                .or_insert_with(|| Arc::clone(&command_state));
+            if last_action.action.start_time < action.start_time {
+                *last_action = command_state;
+            }
         }
 
         ActionClientManager {
             commands,
+            last_actions,
             running_actions,
             current_time: data.current_time,
             next_time: data.current_time,
@@ -521,20 +535,43 @@ impl<T> ActionClientManager<T> {
 
     pub fn push_actions(&mut self, actions: Vec<Arc<Action<T>>>) {
         for action in actions {
+            let command_state = Arc::new(CommandState::new(Arc::clone(&action)));
+
+            if let Some(last_command_state) = self.last_actions.get(&action.entity_id) {
+                let last_time = last_command_state.action.end_time;
+                if action.start_time < last_time {
+                    self.commands.push_back(
+                        action.start_time,
+                        Command::Cancel {
+                            state: Arc::clone(&last_command_state),
+                            time: action.start_time,
+                        },
+                    );
+                }
+            }
+
             self.commands.push_back(
                 action.start_time,
                 Command::Start {
-                    state: Arc::new(CommandState::new(Arc::clone(&action))),
+                    state: Arc::clone(&command_state),
                     time: action.start_time,
                 },
             );
             self.commands.push_back(
                 action.end_time,
                 Command::End {
-                    state: Arc::new(CommandState::new(Arc::clone(&action))),
+                    state: Arc::clone(&command_state),
                     time: action.end_time,
                 },
             );
+
+            let last_command_state = self
+                .last_actions
+                .entry(action.entity_id)
+                .or_insert_with(|| Arc::clone(&command_state));
+            if last_command_state.action.start_time < action.start_time {
+                *last_command_state = command_state;
+            }
         }
     }
 }
@@ -542,6 +579,10 @@ impl<T> ActionClientManager<T> {
 impl<T> ActionManagerTrait<T> for ActionClientManager<T> {
     fn pull(&mut self) -> Option<ActionResult<T>> {
         while let Some(command) = self.commands.pop_first_back() {
+            if !command.state().is_active() {
+                continue;
+            }
+
             if self.next_time < command.time() {
                 self.current_time = self.next_time;
                 self.commands.push_front(command.time(), command);
@@ -558,10 +599,10 @@ impl<T> ActionManagerTrait<T> for ActionClientManager<T> {
                         && self.next_time < state.action.end_time
                     {
                         self.commands.push_back(
-                            self.current_time,
+                            self.next_time,
                             Command::Update {
                                 state: Arc::new(CommandState::new(Arc::clone(&state.action))),
-                                time: self.current_time,
+                                time: self.next_time,
                             },
                         );
                     }
@@ -575,15 +616,25 @@ impl<T> ActionManagerTrait<T> for ActionClientManager<T> {
                     current_time: time,
                 }),
                 Command::End { state, .. } => {
-                    self.running_actions.remove(&state.action.entity_id);
+                    let entity_id = state.action.entity_id;
+                    if let Some(command_state) = self.last_actions.get(&entity_id) {
+                        if command_state.action.start_time == state.action.start_time {
+                            self.last_actions.remove(&entity_id);
+                        }
+                    }
+
+                    self.running_actions.remove(&entity_id);
 
                     Some(ActionResult::End {
                         action: Arc::clone(&state.action),
                     })
                 }
-                Command::Cancel { state, .. } => Some(ActionResult::Cancel {
-                    action: Arc::clone(&state.action),
-                }),
+                Command::Cancel { state, .. } => {
+                    state.inactive();
+                    Some(ActionResult::Cancel {
+                        action: Arc::clone(&state.action),
+                    })
+                }
                 Command::Enqueue { .. } => continue,
             };
         }
@@ -813,7 +864,21 @@ mod test {
                     .unwrap_or_else(|| panic!("{:?} is not start", actual));
                 asset_action(actual, &action);
             }
-            ActionResult::Update { action, .. } => {
+            ActionResult::Update {
+                action,
+                current_time,
+            } => {
+                match &actual {
+                    ActionResult::Update {
+                        current_time: actual_current_time,
+                        ..
+                    } => assert_eq!(
+                        *actual_current_time, current_time,
+                        "current_time is not correct\n   actual: {:?}\n   expect: {:?}",
+                        *actual_current_time, current_time
+                    ),
+                    _ => {}
+                }
                 let (actual, _) = actual
                     .get_update()
                     .unwrap_or_else(|| panic!("{:?} is not update", actual));
@@ -969,7 +1034,7 @@ mod test {
             action_manager.pull(),
             Some(ActionResult::Update {
                 action: Arc::new(Action::new(2, 0, 3000, "Sleep")),
-                current_time: 1000,
+                current_time: 2000,
             }),
         );
         asset_action_result(
@@ -1251,5 +1316,114 @@ mod test {
             asset_action_result(Some(command), action_manager2.pull());
         }
         asset_action_result(action_manager2.pull(), None);
+    }
+
+    #[test]
+    fn test_client_lazy_attach_and_detach() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionClientManager<TestActionState> =
+            ActionClientManager::new(data);
+
+        action_manager.push_actions(vec![
+            Arc::new(Action::new(1, 0, 1000, "Sleep")),
+            Arc::new(Action::new(1, 1000, 1000, "Spawn")),
+            Arc::new(Action::new(1, 1000, 2000, "Eat")),
+            Arc::new(Action::new(2, 1000, 2000, "Sleep")),
+        ]);
+
+        action_manager.update(500);
+        while let Some(_) = action_manager.pull() {}
+
+        action_manager.update(1000);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 0, 1000, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 1000, 1000, "Spawn")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 1000, 1000, "Spawn")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 1000, 2000, "Eat")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(2, 1000, 2000, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Update {
+                action: Arc::new(Action::new(1, 1000, 2000, "Eat")),
+                current_time: 1500,
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Update {
+                action: Arc::new(Action::new(2, 1000, 2000, "Sleep")),
+                current_time: 1500,
+            }),
+        );
+        asset_action_result(action_manager.pull(), None);
+    }
+
+    #[test]
+    fn test_client_cancel_immediate() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionClientManager<TestActionState> =
+            ActionClientManager::new(data);
+
+        action_manager.push_actions(vec![
+            Arc::new(Action::new(1, 0, 1000, "Sleep")),
+            Arc::new(Action::new(1, 500, 2000, "Spawn")),
+        ]);
+
+        while let Some(_) = action_manager.pull() {}
+
+        action_manager.update(1000);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Cancel {
+                action: Arc::new(Action::new(1, 0, 1000, "Sleep")),
+            }),
+        );
+        assert_eq!(action_manager.current_time, 500);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 500, 2000, "Spawn")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Update {
+                action: Arc::new(Action::new(1, 500, 2000, "Spawn")),
+                current_time: 1000,
+            }),
+        );
+        asset_action_result(action_manager.pull(), None);
+
+        action_manager.update(1000);
+        while let Some(_) = action_manager.pull() {}
+
+        assert_eq!(action_manager.last_actions.len(), 0);
     }
 }
