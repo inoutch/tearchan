@@ -1,4 +1,6 @@
-use crate::action::manager::{ActionController, ActionManager, TimeMilliseconds};
+use crate::action::manager::{
+    ActionController, ActionManager, ActionManagerTrait, TimeMilliseconds,
+};
 use crate::action::result::ActionResult;
 use crate::HordeInterface;
 use std::collections::VecDeque;
@@ -30,95 +32,69 @@ where
     T: HordeInterface,
 {
     pub fn run(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
-        self.action_manager.update(elapsed_time);
+        match &mut self.action_manager {
+            ActionManager::Server(action_manager) => {
+                action_manager.update(elapsed_time);
 
-        loop {
-            self.update_action(provider);
+                loop {
+                    update_action(provider, action_manager);
 
-            let mut is_changed = false;
-            let entity_ids = self.action_manager.clean_pending_entity_ids();
-            for entity_id in entity_ids {
-                let mut priority = 0;
-                let mut job_queue: VecDeque<T::Job> = VecDeque::new();
-                job_queue.push_front(get_until_some_priority_is_returned(
-                    |entity_id, priority| {
-                        provider.on_first(entity_id, priority, &self.action_manager.reader())
-                    },
-                    entity_id,
-                    &mut priority,
-                ));
-
-                while let Some(job) = job_queue.pop_front() {
-                    let result = provider.on_next(entity_id, job, &self.action_manager.reader());
-                    if job_queue.is_empty()
-                        && result.states.is_empty()
-                        && result.creators.is_empty()
-                    {
-                        // If the jobs and actions cannot be generated from the current job tree,
-                        // change the priority and recreate the first job
-                        priority += 1;
+                    let mut is_changed = false;
+                    let entity_ids = action_manager.clean_pending_entity_ids();
+                    for entity_id in entity_ids {
+                        let mut priority = 0;
+                        let mut job_queue: VecDeque<T::Job> = VecDeque::new();
                         job_queue.push_front(get_until_some_priority_is_returned(
                             |entity_id, priority| {
-                                provider.on_first(
-                                    entity_id,
-                                    priority,
-                                    &self.action_manager.reader(),
-                                )
+                                provider.on_first(entity_id, priority, &action_manager.reader())
                             },
                             entity_id,
                             &mut priority,
                         ));
-                        continue;
+
+                        while let Some(job) = job_queue.pop_front() {
+                            let result = provider.on_next(entity_id, job, &action_manager.reader());
+                            if job_queue.is_empty()
+                                && result.states.is_empty()
+                                && result.creators.is_empty()
+                            {
+                                // If the jobs and actions cannot be generated from the current job tree,
+                                // change the priority and recreate the first job
+                                priority += 1;
+                                job_queue.push_front(get_until_some_priority_is_returned(
+                                    |entity_id, priority| {
+                                        provider.on_first(
+                                            entity_id,
+                                            priority,
+                                            &action_manager.reader(),
+                                        )
+                                    },
+                                    entity_id,
+                                    &mut priority,
+                                ));
+                                continue;
+                            }
+
+                            // Update actions
+                            is_changed |= !result.states.is_empty();
+
+                            // Add action creators
+                            for creator in result.creators.into_iter().rev() {
+                                job_queue.push_front(creator);
+                            }
+                            // Add actions
+                            action_manager.push_states(entity_id, result.states);
+                        }
                     }
 
-                    // Update actions
-                    is_changed |= !result.states.is_empty();
-
-                    // Add action creators
-                    for creator in result.creators.into_iter().rev() {
-                        job_queue.push_front(creator);
-                    }
-
-                    // Add actions
-                    for action in self.action_manager.push_states(entity_id, result.states) {
-                        provider.on_enqueue(action.as_ref(), &mut self.action_manager.controller());
+                    if !is_changed {
+                        break;
                     }
                 }
             }
-
-            if !is_changed {
-                break;
-            }
-        }
-    }
-
-    pub fn run_without_job_processing(&mut self, provider: &mut T, elapsed_time: TimeMilliseconds) {
-        self.action_manager.update(elapsed_time);
-        self.update_action(provider);
-    }
-
-    pub fn update_action(&mut self, provider: &mut T) {
-        let mut results = self.action_manager.pull();
-        let mut controller = self.action_manager.controller();
-
-        while let Some(result) = results.pop_first_back() {
-            match result {
-                ActionResult::Start { action } => {
-                    provider.on_send(Arc::clone(&action));
-                    provider.on_start(action.deref(), &mut controller);
-                }
-                ActionResult::Update {
-                    action,
-                    current_time,
-                } => {
-                    let duration = action.end_time() - action.start_time();
-                    let ratio = (current_time - action.start_time()) as f32 / duration as f32;
-                    provider.on_update(action.deref(), ratio, &mut controller);
-                }
-                ActionResult::End { action } => {
-                    provider.on_end(action.deref(), &mut controller);
-                }
-                ActionResult::Cancel { action } => provider.on_cancel(&action, &mut controller),
+            ActionManager::Client(action_manager) => {
+                action_manager.update(elapsed_time);
+                update_action(provider, action_manager);
             }
         }
     }
@@ -142,6 +118,35 @@ impl<T: HordeInterface> From<ActionManager<T::ActionState>> for JobManager<T> {
     }
 }
 
+fn update_action<T, U>(provider: &mut T, action_manager: &mut U)
+where
+    T: HordeInterface,
+    U: ActionManagerTrait<T::ActionState>,
+{
+    while let Some(result) = action_manager.pull() {
+        let mut controller = action_manager.controller();
+        match result {
+            ActionResult::Start { action } => {
+                provider.on_send(Arc::clone(&action));
+                provider.on_start(action.deref(), &mut controller);
+            }
+            ActionResult::Update {
+                action,
+                current_time,
+            } => {
+                let duration = action.end_time() - action.start_time();
+                let ratio = (current_time - action.start_time()) as f32 / duration as f32;
+                provider.on_update(action.deref(), ratio, &mut controller);
+            }
+            ActionResult::End { action } => {
+                provider.on_end(action.deref(), &mut controller);
+            }
+            ActionResult::Cancel { action } => provider.on_cancel(&action, &mut controller),
+            ActionResult::Enqueue { .. } => {}
+        }
+    }
+}
+
 fn get_until_some_priority_is_returned<F, R>(mut f: F, entity_id: EntityId, priority: &mut u32) -> R
 where
     F: FnMut(EntityId, u32) -> Option<R>,
@@ -158,7 +163,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::action::manager::{ActionController, ActionReader};
+    use crate::action::manager::{ActionController, ActionServerReader};
     use crate::action::Action;
     use crate::job::manager::JobManager;
     use crate::job::result::JobResult;
@@ -256,7 +261,7 @@ mod test {
             &self,
             entity_id: u32,
             _priority: u32,
-            _reader: &ActionReader<Self::ActionState>,
+            _reader: &ActionServerReader<Self::ActionState>,
         ) -> Option<Self::Job> {
             let kind = self.kind_components.get(entity_id).unwrap();
             Some(match kind {
@@ -276,7 +281,7 @@ mod test {
             &self,
             _entity_id: u32,
             job: Self::Job,
-            _reader: &ActionReader<Self::ActionState>,
+            _reader: &ActionServerReader<Self::ActionState>,
         ) -> JobResult<Self::Job, Self::ActionState> {
             let mut result = JobResult::default();
             match job {

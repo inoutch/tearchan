@@ -1,4 +1,4 @@
-use crate::action::manager::{ActionController, ActionReader};
+use crate::action::manager::{ActionController, ActionServerReader};
 use crate::action::Action;
 use crate::job::result::JobResult;
 use std::sync::Arc;
@@ -40,14 +40,14 @@ pub trait HordeInterface {
         &self,
         entity_id: u32,
         priority: u32,
-        reader: &ActionReader<Self::ActionState>,
+        reader: &ActionServerReader<Self::ActionState>,
     ) -> Option<Self::Job>;
 
     fn on_next(
         &self,
         entity_id: EntityId,
         job: Self::Job,
-        reader: &ActionReader<Self::ActionState>,
+        reader: &ActionServerReader<Self::ActionState>,
     ) -> JobResult<Self::Job, Self::ActionState>;
 
     fn on_send(&self, _action: Arc<Action<Self::ActionState>>) {}
