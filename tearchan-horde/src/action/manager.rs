@@ -125,6 +125,8 @@ pub trait ActionManagerTrait<T> {
     fn pull(&mut self) -> Option<ActionResult<T>>;
 
     fn controller(&mut self) -> ActionController<T>;
+
+    fn get_running_action(&self, entity_id: EntityId) -> Option<&Arc<Action<T>>>;
 }
 
 pub struct ActionServerManager<T> {
@@ -468,6 +470,10 @@ impl<T> ActionManagerTrait<T> for ActionServerManager<T> {
             action_manager: ActionManagerRef::Server(self),
         }
     }
+
+    fn get_running_action(&self, entity_id: EntityId) -> Option<&Arc<Action<T>>> {
+        self.running_actions.get(&entity_id)
+    }
 }
 
 pub struct ActionClientManager<T> {
@@ -645,6 +651,10 @@ impl<T> ActionManagerTrait<T> for ActionClientManager<T> {
         ActionController {
             action_manager: ActionManagerRef::Client(self),
         }
+    }
+
+    fn get_running_action(&self, entity_id: EntityId) -> Option<&Arc<Action<T>>> {
+        self.running_actions.get(&entity_id)
     }
 }
 
