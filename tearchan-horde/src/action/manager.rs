@@ -319,36 +319,64 @@ impl<T> ActionServerManager<T> {
             context.state_len = 0;
 
             self.pending_cache.insert(entity_id);
+            self.running_actions.remove(&entity_id);
             let actions = self.actions.get_mut(&entity_id).unwrap();
-            while let Some(action) = actions.pop_first_back() {
-                action.inactive();
-                commands.push(Command::Cancel {
-                    state: Arc::new(CommandState::new(Arc::clone(&action.action))),
-                    time: current_time,
-                });
-            }
-        } else {
-            // Find a running action of entity_id
-            let actions = self.actions.get_mut(&entity_id).unwrap();
-            context.last_time = actions
-                .iter()
-                .find_map(|(_, states)| {
-                    states
-                        .iter()
-                        .filter(|state| state.is_active())
-                        .map(|state| state.action.end_time)
-                        .next()
-                })
-                .unwrap_or(current_time);
-            context.state_len = context.state_len.min(1);
             while let Some(command_state) = actions.pop_first_back() {
-                if current_time <= command_state.action.start_time {
+                if command_state.action.start_time != current_time
+                    && command_state.action.start_time != command_state.action.end_time
+                {
                     command_state.inactive();
                     commands.push(Command::Cancel {
                         state: Arc::new(CommandState::new(Arc::clone(&command_state.action))),
                         time: current_time,
                     });
+                } else {
+                    // If there is an event with the same start and end time, do not cancel it
+                    context.state_len += 1;
                 }
+            }
+        } else {
+            // Find a running action of entity_id
+            let actions = self.actions.get_mut(&entity_id).unwrap();
+            context.last_time = self
+                .running_actions
+                .get(&entity_id)
+                .map(|action| action.end_time)
+                .unwrap_or(self.current_time);
+            context.state_len = context.state_len.min(1);
+
+            let mut running_actions = Vec::new();
+            while let Some(command_state) = actions.pop_first_back() {
+                if current_time < command_state.action.start_time {
+                    command_state.inactive();
+                    commands.push(Command::Cancel {
+                        state: Arc::new(CommandState::new(Arc::clone(&command_state.action))),
+                        time: current_time,
+                    });
+                } else if current_time == command_state.action.start_time
+                    && current_time != command_state.action.end_time
+                {
+                    // If the timing of the cancellation is the same as the action to be executed,
+                    // only the actions that cannot be executed immediately will be inactive.
+                    command_state.inactive();
+
+                    let command_state =
+                        Arc::new(CommandState::new(Arc::clone(&command_state.action)));
+                    commands.push(Command::Start {
+                        state: Arc::clone(&command_state),
+                        time: current_time,
+                    });
+                    commands.push(Command::Cancel {
+                        state: command_state,
+                        time: current_time,
+                    });
+                } else {
+                    running_actions.push(command_state);
+                }
+            }
+
+            for running_action in running_actions {
+                actions.push_back(running_action.action.start_time, running_action);
             }
         }
 
@@ -1435,5 +1463,162 @@ mod test {
         while let Some(_) = action_manager.pull() {}
 
         assert_eq!(action_manager.last_actions.len(), 0);
+    }
+
+    #[test]
+    fn test_server_cancel_zero_time() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionServerManager<TestActionState> =
+            ActionServerManager::new(data);
+
+        action_manager.attach(1);
+        action_manager.push_states(1, vec![("Sleep", 0), ("Walk", 3000)]);
+
+        action_manager.cancel(1, false);
+        action_manager.push_states(1, vec![("Interrupt", 0)]);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Cancel {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 0, "Interrupt")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 0, "Interrupt")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 0, 0, "Interrupt")),
+            }),
+        );
+        asset_action_result(action_manager.pull(), None);
+    }
+
+    #[test]
+    fn test_server_cancel_immediate_false_true() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionServerManager<TestActionState> =
+            ActionServerManager::new(data);
+
+        action_manager.attach(1);
+        action_manager.push_states(1, vec![("Sleep", 0), ("Walk", 3000)]);
+
+        action_manager.cancel(1, false);
+        action_manager.cancel(1, true);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+    }
+
+    #[test]
+    fn test_server_cancel_immediate_true_false() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionServerManager<TestActionState> =
+            ActionServerManager::new(data);
+
+        action_manager.attach(1);
+        action_manager.push_states(1, vec![("Sleep", 0), ("Walk", 3000)]);
+
+        action_manager.cancel(1, true);
+        action_manager.cancel(1, false);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Enqueue {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
     }
 }
