@@ -1626,7 +1626,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_cancel_imediate_multiple() {
+    fn test_server_cancel_immediate_multiple() {
         let data = ActionManagerData::default();
         let mut action_manager: ActionServerManager<TestActionState> =
             ActionServerManager::new(data);
