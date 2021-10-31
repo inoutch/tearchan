@@ -165,7 +165,6 @@ impl<T> ActionServerManager<T> {
         for action in data.actions {
             let mut context =
                 get_or_create_context_mut(action.entity_id, data.current_time, &mut contexts);
-            context.state_len += 1;
 
             let command_state = Arc::new(CommandState::new(Arc::clone(&action)));
             if data.current_time <= action.start_time {
@@ -216,8 +215,8 @@ impl<T> ActionServerManager<T> {
     }
 
     pub fn is_running(&self, entity_id: EntityId) -> bool {
-        match self.contexts.get(&entity_id) {
-            Some(context) => context.state_len != 0,
+        match self.actions.get(&entity_id) {
+            Some(actions) => !actions.is_empty(),
             None => false,
         }
     }
@@ -270,7 +269,6 @@ impl<T> ActionServerManager<T> {
 
             let context = get_context_mut(entity_id, self.current_time, &mut self.contexts);
             context.last_time = end_time;
-            context.state_len += 1;
         }
     }
 
@@ -291,7 +289,6 @@ impl<T> ActionServerManager<T> {
         let context = ActionContext {
             last_time: self.current_time,
             running_end_time: self.current_time,
-            state_len: 0,
         };
         self.contexts.insert(entity_id, context);
         self.pending_cache.insert(entity_id);
@@ -316,23 +313,34 @@ impl<T> ActionServerManager<T> {
 
         if immediate {
             context.last_time = current_time;
-            context.state_len = 0;
 
             self.pending_cache.insert(entity_id);
             self.running_actions.remove(&entity_id);
             let actions = self.actions.get_mut(&entity_id).unwrap();
             while let Some(command_state) = actions.pop_first_back() {
-                if command_state.action.start_time != current_time
-                    && command_state.action.start_time != command_state.action.end_time
-                {
+                if current_time < command_state.action.end_time {
                     command_state.inactive();
                     commands.push(Command::Cancel {
                         state: Arc::new(CommandState::new(Arc::clone(&command_state.action))),
                         time: current_time,
                     });
-                } else {
-                    // If there is an event with the same start and end time, do not cancel it
-                    context.state_len += 1;
+                } else if current_time == command_state.action.end_time
+                    && current_time == command_state.action.start_time
+                {
+                    // If the timing of the cancellation is the same as the action to be executed,
+                    // only the actions that cannot be executed immediately will be inactive.
+                    command_state.inactive();
+
+                    let command_state =
+                        Arc::new(CommandState::new(Arc::clone(&command_state.action)));
+                    commands.push(Command::Start {
+                        state: Arc::clone(&command_state),
+                        time: current_time,
+                    });
+                    commands.push(Command::Cancel {
+                        state: command_state,
+                        time: current_time,
+                    });
                 }
             }
         } else {
@@ -343,7 +351,6 @@ impl<T> ActionServerManager<T> {
                 .get(&entity_id)
                 .map(|action| action.end_time)
                 .unwrap_or(self.current_time);
-            context.state_len = context.state_len.min(1);
 
             let mut running_actions = Vec::new();
             while let Some(command_state) = actions.pop_first_back() {
@@ -470,13 +477,10 @@ impl<T> ActionManagerTrait<T> for ActionServerManager<T> {
                 }),
                 Command::End { state, .. } => {
                     let entity_id = state.action.entity_id;
-                    let context = get_context_mut(entity_id, self.current_time, &mut self.contexts);
-                    context.state_len -= 1;
-                    if context.state_len == 0 {
+                    pop_until_active_action(&mut self.actions, entity_id);
+                    if self.actions.get(&entity_id).unwrap().is_empty() {
                         self.pending_cache.insert(entity_id);
                     }
-
-                    pop_until_active_action(&mut self.actions, entity_id);
 
                     Some(ActionResult::End {
                         action: Arc::clone(&state.action),
@@ -736,7 +740,6 @@ fn get_or_create_context_mut(
     let context = ActionContext {
         last_time: current_time,
         running_end_time: current_time,
-        state_len: 0,
     };
     contexts.insert(entity_id, context);
     contexts.get_mut(&entity_id).unwrap()
@@ -1618,6 +1621,45 @@ mod test {
             action_manager.pull(),
             Some(ActionResult::Start {
                 action: Arc::new(Action::new(1, 0, 3000, "Walk")),
+            }),
+        );
+    }
+
+    #[test]
+    fn test_server_cancel_imediate_multiple() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionServerManager<TestActionState> =
+            ActionServerManager::new(data);
+
+        action_manager.attach(1040);
+        action_manager.attach(1039);
+        action_manager.push_states(
+            1040,
+            vec![("WalkTo1", 500), ("WalkTo2", 500), ("WalkTo3", 500)],
+        );
+        action_manager.push_states(1039, vec![("WalkTo1", 500), ("Wait", 3000)]);
+
+        while let Some(_) = action_manager.pull() {}
+        action_manager.update(1000);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1040, 0, 500, "WalkTo1")),
+            }),
+        );
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Start {
+                action: Arc::new(Action::new(1040, 500, 1000, "WalkTo2")),
+            }),
+        );
+        action_manager.cancel(1039, true);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1039, 0, 500, "WalkTo1")),
             }),
         );
     }

@@ -141,8 +141,12 @@ where
             ActionResult::End { action } => {
                 provider.on_end(action.deref(), &mut controller);
             }
-            ActionResult::Cancel { action } => provider.on_cancel(&action, &mut controller),
-            ActionResult::Enqueue { .. } => {}
+            ActionResult::Cancel { action } => {
+                provider.on_cancel(&action, &mut controller);
+            }
+            ActionResult::Enqueue { action } => {
+                provider.on_enqueue(&action, &mut controller);
+            }
         }
     }
 }
