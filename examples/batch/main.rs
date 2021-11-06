@@ -5,21 +5,21 @@ use std::collections::VecDeque;
 use std::f32::consts::PI;
 use tearchan::engine::Engine;
 use tearchan::engine_config::EngineStartupConfigBuilder;
-use tearchan::scene::context::{SceneContext, SceneRenderContext};
-use tearchan::scene::factory::SceneFactory;
-use tearchan::scene::{Scene, SceneControlFlow};
 use tearchan::gfx::batch::batch2d::Batch2D;
 use tearchan::gfx::batch::types::{BatchTypeArray, BatchTypeTransform};
 use tearchan::gfx::batch::{BatchCommandBuffer, BatchObjectId};
 use tearchan::gfx::camera::Camera3D;
+use tearchan::gfx::wgpu::util::DeviceExt;
+use tearchan::gfx::wgpu::TextureAspect;
+use tearchan::scene::context::{SceneContext, SceneRenderContext};
+use tearchan::scene::factory::SceneFactory;
+use tearchan::scene::{Scene, SceneControlFlow};
 use tearchan::util::math::rect::rect2;
 use tearchan::util::mesh::square::{
     create_square_colors, create_square_indices, create_square_positions, create_square_texcoords,
 };
-use tearchan::gfx::wgpu::util::DeviceExt;
 use winit::event::{ElementState, TouchPhase, VirtualKeyCode, WindowEvent};
 use winit::window::WindowBuilder;
-use tearchan::gfx::wgpu::TextureAspect;
 
 #[allow(dead_code)]
 pub struct BatchScene {
@@ -66,7 +66,9 @@ impl BatchScene {
                             visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
                             ty: tearchan::gfx::wgpu::BindingType::Texture {
                                 multisampled: false,
-                                sample_type: tearchan::gfx::wgpu::TextureSampleType::Float { filterable: true },
+                                sample_type: tearchan::gfx::wgpu::TextureSampleType::Float {
+                                    filterable: true,
+                                },
                                 view_dimension: tearchan::gfx::wgpu::TextureViewDimension::D2,
                             },
                             count: None,
@@ -82,11 +84,12 @@ impl BatchScene {
                         },
                     ],
                 });
-            let pipeline_layout = device.create_pipeline_layout(&tearchan::gfx::wgpu::PipelineLayoutDescriptor {
-                label: None,
-                bind_group_layouts: &[&bind_group_layout],
-                push_constant_ranges: &[],
-            });
+            let pipeline_layout =
+                device.create_pipeline_layout(&tearchan::gfx::wgpu::PipelineLayoutDescriptor {
+                    label: None,
+                    bind_group_layouts: &[&bind_group_layout],
+                    push_constant_ranges: &[],
+                });
             let size = 1u32;
             let texel = vec![255, 255, 255, 255];
             let texture_extent = tearchan::gfx::wgpu::Extent3d {
@@ -101,9 +104,12 @@ impl BatchScene {
                 sample_count: 1,
                 dimension: tearchan::gfx::wgpu::TextureDimension::D2,
                 format: tearchan::gfx::wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: tearchan::gfx::wgpu::TextureUsages::TEXTURE_BINDING | tearchan::gfx::wgpu::TextureUsages::RENDER_ATTACHMENT | tearchan::gfx::wgpu::TextureUsages::COPY_DST,
+                usage: tearchan::gfx::wgpu::TextureUsages::TEXTURE_BINDING
+                    | tearchan::gfx::wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | tearchan::gfx::wgpu::TextureUsages::COPY_DST,
             });
-            let texture_view = texture.create_view(&tearchan::gfx::wgpu::TextureViewDescriptor::default());
+            let texture_view =
+                texture.create_view(&tearchan::gfx::wgpu::TextureViewDescriptor::default());
             queue.write_texture(
                 tearchan::gfx::wgpu::ImageCopyTexture {
                     texture: &texture,
@@ -134,11 +140,13 @@ impl BatchScene {
             camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
             camera.update();
 
-            let uniform_buffer = device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                label: Some("Uniform Buffer"),
-                contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-            });
+            let uniform_buffer =
+                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
+                    label: Some("Uniform Buffer"),
+                    contents: bytemuck::cast_slice(camera.combine().as_slice()),
+                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
+                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
+                });
 
             // Create bind group
             let bind_group = device.create_bind_group(&tearchan::gfx::wgpu::BindGroupDescriptor {
@@ -191,28 +199,30 @@ impl BatchScene {
                 },
             ];
 
-            let shader = device.create_shader_module(&tearchan::gfx::wgpu::include_wgsl!("./batch.wgsl"));
+            let shader =
+                device.create_shader_module(&tearchan::gfx::wgpu::include_wgsl!("./batch.wgsl"));
 
-            let pipeline = device.create_render_pipeline(&tearchan::gfx::wgpu::RenderPipelineDescriptor {
-                label: None,
-                layout: Some(&pipeline_layout),
-                vertex: tearchan::gfx::wgpu::VertexState {
-                    module: &shader,
-                    entry_point: "vs_main",
-                    buffers: &vertex_state,
-                },
-                fragment: Some(tearchan::gfx::wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: "fs_main",
-                    targets: &[gfx.surface_config.format.into()],
-                }),
-                primitive: tearchan::gfx::wgpu::PrimitiveState {
-                    cull_mode: Some(tearchan::gfx::wgpu::Face::Back),
-                    ..Default::default()
-                },
-                depth_stencil: None,
-                multisample: tearchan::gfx::wgpu::MultisampleState::default(),
-            });
+            let pipeline =
+                device.create_render_pipeline(&tearchan::gfx::wgpu::RenderPipelineDescriptor {
+                    label: None,
+                    layout: Some(&pipeline_layout),
+                    vertex: tearchan::gfx::wgpu::VertexState {
+                        module: &shader,
+                        entry_point: "vs_main",
+                        buffers: &vertex_state,
+                    },
+                    fragment: Some(tearchan::gfx::wgpu::FragmentState {
+                        module: &shader,
+                        entry_point: "fs_main",
+                        targets: &[gfx.surface_config.format.into()],
+                    }),
+                    primitive: tearchan::gfx::wgpu::PrimitiveState {
+                        cull_mode: Some(tearchan::gfx::wgpu::Face::Back),
+                        ..Default::default()
+                    },
+                    depth_stencil: None,
+                    multisample: tearchan::gfx::wgpu::MultisampleState::default(),
+                });
 
             Box::new(BatchScene {
                 batch,
@@ -265,8 +275,8 @@ impl Scene for BatchScene {
         let queue = context.gfx().queue;
         let device = context.gfx().device;
 
-        let mut encoder =
-            device.create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder = device
+            .create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
         {
             self.batch.flush(device, queue, &mut Some(&mut encoder));
             let provider = self.batch.provider();
@@ -291,7 +301,10 @@ impl Scene for BatchScene {
             rpass.push_debug_group("Prepare data for draw.");
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.bind_group, &[]);
-            rpass.set_index_buffer(provider.index_buffer().slice(..), tearchan::gfx::wgpu::IndexFormat::Uint32);
+            rpass.set_index_buffer(
+                provider.index_buffer().slice(..),
+                tearchan::gfx::wgpu::IndexFormat::Uint32,
+            );
             rpass.set_vertex_buffer(0, provider.position_buffer().slice(..));
             rpass.set_vertex_buffer(1, provider.texcoord_buffer().slice(..));
             rpass.set_vertex_buffer(2, provider.color_buffer().slice(..));
