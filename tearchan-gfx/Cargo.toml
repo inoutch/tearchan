@@ -26,6 +26,3 @@ wasm-bindgen-futures = "0.4.19"
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 version = "0.3.45"
 features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
-
-[build-dependencies]
-shaderc = "0.6.2"
