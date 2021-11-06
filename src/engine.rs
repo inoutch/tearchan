@@ -6,7 +6,6 @@ use std::future::Future;
 use std::time::Duration;
 use tearchan_gfx::renderer::RendererLazySetup;
 use tearchan_util::any::OptAnyBox;
-use tearchan_util::time::DurationWatch;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -36,9 +35,9 @@ impl Engine {
         if !cfg!(target_os = "android") {
             setup
                 .setup(
-                    wgpu::Features::empty(),
-                    wgpu::Features::empty(),
-                    wgpu::Limits::default(),
+                    tearchan_gfx::wgpu::Features::empty(),
+                    tearchan_gfx::wgpu::Features::empty(),
+                    tearchan_gfx::wgpu::Limits::default(),
                 )
                 .await;
         }
@@ -46,9 +45,9 @@ impl Engine {
         let mut scene_manager = SceneManager::default();
         scene_manager.set_current_scene(startup_config.scene_factory, None);
 
-        let duration = Duration::from_millis(1000 / startup_config.fps).as_nanos() as u64;
-        let mut start_time = Instant::now();
-        let mut duration_watcher = DurationWatch::default();
+        let target_frametime = Duration::from_secs_f64(1.0 / startup_config.fps as f64);
+        let mut last_update_inst = Instant::now();
+        let mut last_frame_inst = Instant::now();
 
         event_loop.run(move |event, _, control_flow| match event {
             #[cfg(target_os = "android")]
@@ -75,7 +74,10 @@ impl Engine {
                             *control_flow = ControlFlow::Exit;
                         }
                     }
-                    WindowEvent::ScaleFactorChanged { scale_factor: new_scale_factor, .. } => {
+                    WindowEvent::ScaleFactorChanged {
+                        scale_factor: new_scale_factor,
+                        ..
+                    } => {
                         scale_factor = *new_scale_factor;
                     }
                     _ => {}
@@ -92,46 +94,39 @@ impl Engine {
                     };
                 }
             }
-            Event::MainEventsCleared => {
-                setup.window().request_redraw();
-
-                #[cfg(target_os = "android")]
-                request_redraw_for_android();
+            Event::RedrawEventsCleared => {
+                let time_since_last_frame = last_update_inst.elapsed();
+                if time_since_last_frame >= target_frametime {
+                    setup.window().request_redraw();
+                    last_update_inst = Instant::now();
+                } else {
+                    *control_flow = ControlFlow::WaitUntil(
+                        Instant::now() + target_frametime - time_since_last_frame,
+                    );
+                }
+                spawner.run_until_stalled();
             }
             Event::RedrawRequested(_) => {
-                let elapsed_time = Instant::now().duration_since(start_time).as_micros() as u64;
-                start_time = Instant::now();
-
-                let wait_micros = match duration >= elapsed_time {
-                    true => duration - elapsed_time,
-                    false => 0,
-                };
-                let new_inst = start_time + std::time::Duration::from_nanos(wait_micros);
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    *control_flow = ControlFlow::WaitUntil(new_inst);
-                }
-                #[cfg(target_arch = "wasm32")]
-                {
-                    *control_flow = ControlFlow::Poll;
-                }
+                let delta = last_frame_inst.elapsed().as_secs_f32();
+                last_frame_inst = Instant::now();
 
                 // Rendering
-                if let Some(x) = setup.renderer_mut() {
-                    let (context, render_context) = x.create_render_context();
-                    let context = SceneRenderContext::new(
+                if let Some(renderer) = setup.renderer_mut() {
+                    let frame = renderer.create_surface_texture();
+                    let (context, render_context) = renderer.create_render_context(&frame);
+                    let mut context = SceneRenderContext::new(
                         (context, render_context),
                         &spawner,
                         &mut custom,
                         scale_factor,
-                        elapsed_time as f32 / 1000000.0f32,
+                        delta,
                     );
-                    if let Some(overwrite) = scene_manager.render(context) {
+                    if let Some(overwrite) = scene_manager.render(&mut context) {
                         *control_flow = overwrite;
-                    };
+                    }
+
+                    frame.present();
                 }
-                duration_watcher.reset();
-                spawner.run_until_stalled();
             }
             _ => (),
         });

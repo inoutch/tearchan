@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::mem::size_of;
 use std::ops::RangeBounds;
 use wgpu::util::DeviceExt;
-use wgpu::{BufferAddress, BufferSlice, BufferUsage};
+use wgpu::{BufferAddress, BufferSlice, BufferUsages};
 
 pub trait BufferInterface {
     type DataType: Pod;
@@ -28,27 +28,23 @@ pub struct Buffer<T> {
 }
 
 impl<T> Buffer<T> {
-    pub fn new(device: &wgpu::Device, len: usize, label: &str, usage: BufferUsage) -> Buffer<T> {
+    pub fn new(device: &wgpu::Device, len: usize, label: &str, usage: BufferUsages) -> Buffer<T> {
         let u8_len = len * size_of::<T>();
-        let mut bytes: Vec<u8> = vec![];
-        for _ in 0..u8_len {
-            bytes.push(0u8);
-        }
-
+        let bytes: Vec<u8> = vec![0u8; u8_len];
         Buffer::new_with_bytes(device, label, usage, &bytes)
     }
 
     pub fn new_with_bytes(
         device: &wgpu::Device,
         label: &str,
-        usage: BufferUsage,
+        usage: BufferUsages,
         bytes: &[u8],
     ) -> Buffer<T> {
         assert_eq!(bytes.len() % size_of::<T>(), 0);
         let len = bytes.len() / size_of::<T>();
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),
-            contents: &bytes,
+            contents: bytes,
             usage,
         });
         Buffer {
@@ -63,7 +59,7 @@ impl<T> Buffer<T> {
         encoder: &mut wgpu::CommandEncoder,
         len: usize,
         label: &str,
-        usage: BufferUsage,
+        usage: BufferUsages,
         buffer: &Buffer<T>,
         buffer_len: usize,
     ) -> Buffer<T> {
@@ -104,11 +100,7 @@ where
         let u8_offset = offset * size_of::<T>() as usize;
         let u8_size = len * size_of::<T>() as usize;
 
-        let mut bytes: Vec<u8> = vec![];
-        for _ in 0..u8_size {
-            bytes.push(0u8);
-        }
-
+        let bytes: Vec<u8> = vec![0u8; u8_size];
         queue.write_buffer(&self.buffer, u8_offset as u64, &bytes);
     }
 }

@@ -13,7 +13,7 @@ use tearchan_util::mesh::square::{
     create_square_texcoords, create_square_texcoords_inv,
 };
 use tearchan_util::mesh::{IndexType, Mesh, MeshBuilder};
-use wgpu::{Extent3d, ImageDataLayout};
+use wgpu::{Extent3d, ImageDataLayout, TextureAspect};
 
 const DEFAULT_TEXTURE_SIZE_WIDTH: u32 = 512;
 const DEFAULT_TEXTURE_SIZE_HEIGHT: u32 = 512;
@@ -170,6 +170,7 @@ impl FontTexture {
                             y: character_offset.y,
                             z: 0,
                         },
+                        aspect: TextureAspect::All,
                     },
                     character_image.bytes(),
                     ImageDataLayout {
@@ -382,7 +383,7 @@ fn create_texture_bundle(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format,
-        usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
     };
     let texture = device.create_texture(&texture_desc);
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());

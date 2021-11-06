@@ -1,19 +1,19 @@
 pub struct GfxContext<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
-    pub swapchain_desc: &'a wgpu::SwapChainDescriptor,
+    pub surface_config: &'a wgpu::SurfaceConfiguration,
 }
 
 pub struct GfxRenderContext {
-    frame: wgpu::SwapChainFrame,
+    pub view: wgpu::TextureView,
 }
 
 impl GfxRenderContext {
-    pub fn new(frame: wgpu::SwapChainFrame) -> Self {
-        GfxRenderContext { frame }
-    }
-
-    pub fn frame(&self) -> &wgpu::SwapChainTexture {
-        &self.frame.output
+    pub fn new(surface_texture: &wgpu::SurfaceTexture) -> Self {
+        GfxRenderContext {
+            view: surface_texture
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+        }
     }
 }

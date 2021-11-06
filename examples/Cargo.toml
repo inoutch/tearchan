@@ -2,12 +2,11 @@
 name = "examples"
 version = "0.0.1"
 publish = false
-workspace = ".."
 edition = "2018"
 
 [[bin]]
-name = "quad"
-path = "quad/main.rs"
+name = "empty"
+path = "empty/main.rs"
 
 [[bin]]
 name = "batch"
@@ -22,17 +21,14 @@ name = "font"
 path = "font/main.rs"
 
 [dependencies]
-winit = { version = "0.24.0", features = ["web-sys"] }
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git", rev = "ef2fa77536855e0b7ebdfb0df0eb879d9b7d3a1b", features = ["cross"] }
+winit = { version = "0.25", features = ["web-sys"] }
 nalgebra-glm = { version = "0.13.0", features = ["serde-serialize"] }
 image = "0.23.4"
 bytemuck = "1.5.0"
 rand = "0.8.3"
 color-rs = "0.6.1"
+env_logger = "0.8.4"
 tearchan = { path = ".." }
-tearchan-core = { path = "../tearchan-core" }
-tearchan-gfx = { path = "../tearchan-gfx" }
-tearchan-util = { path = "../tearchan-util" }
 
 [build-dependencies]
 shaderc = "0.6.2"

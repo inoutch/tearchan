@@ -6,15 +6,15 @@ use tearchan::scene::{Scene, SceneControlFlow};
 use winit::event::WindowEvent;
 use winit::window::WindowBuilder;
 
-struct QuadScene {}
+struct EmptyScene {}
 
-impl QuadScene {
+impl EmptyScene {
     fn factory() -> SceneFactory {
-        |_context, _| Box::new(QuadScene {})
+        |_context, _| Box::new(EmptyScene {})
     }
 }
 
-impl Scene for QuadScene {
+impl Scene for EmptyScene {
     fn update(&mut self, _context: &mut SceneContext, _event: WindowEvent) -> SceneControlFlow {
         SceneControlFlow::None
     }
@@ -25,10 +25,10 @@ impl Scene for QuadScene {
 }
 
 pub fn main() {
-    let window_builder = WindowBuilder::new().with_title("quad");
+    let window_builder = WindowBuilder::new().with_title("empty");
     let startup_config = EngineStartupConfigBuilder::new()
         .window_builder(window_builder)
-        .scene_factory(QuadScene::factory())
+        .scene_factory(EmptyScene::factory())
         .build();
     let engine = Engine::new(startup_config);
     engine.run();
