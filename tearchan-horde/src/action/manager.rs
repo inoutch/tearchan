@@ -226,7 +226,7 @@ impl<T> ActionServerManager<T> {
         let mut last_time =
             get_context_mut(entity_id, self.current_time, &mut self.contexts).last_time;
         for (state, duration) in states {
-            let end_time = last_time + duration;
+            let end_time = last_time.saturating_add(duration);
             actions.push(Arc::new(Action::new(entity_id, last_time, end_time, state)));
             last_time = end_time;
         }
