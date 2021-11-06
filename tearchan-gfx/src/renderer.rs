@@ -30,7 +30,7 @@ impl Renderer {
                 .expect("couldn't append canvas to document body");
         }
 
-        let backend = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::PRIMARY);
+        let backend = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
         log::info!("backend: {:?}", backend);
 
         let instance = wgpu::Instance::new(backend);
@@ -39,9 +39,10 @@ impl Renderer {
             let surface = instance.create_surface(window);
             (size, surface)
         };
-        let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, backend)
-            .await
-            .expect("No suitable GPU adapters found on the system!");
+        let adapter =
+            wgpu::util::initialize_adapter_from_env_or_default(&instance, backend, Some(&surface))
+                .await
+                .expect("No suitable GPU adapters found on the system!");
 
         let adapter_features = adapter.features();
         let trace_dir = std::env::var("WGPU_TRACE");
@@ -84,13 +85,13 @@ impl Renderer {
         }
     }
 
-    pub fn create_frame(&self) -> wgpu::SurfaceFrame {
-        match self.surface.get_current_frame() {
+    pub fn create_surface_texture(&self) -> wgpu::SurfaceTexture {
+        match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(_) => {
                 self.surface.configure(&self.device, &self.surface_config);
                 self.surface
-                    .get_current_frame()
+                    .get_current_texture()
                     .expect("Failed to acquire next surface texture!")
             }
         }
@@ -98,9 +99,12 @@ impl Renderer {
 
     pub fn create_render_context(
         &self,
-        frame: &wgpu::SurfaceFrame,
+        surface_texture: &wgpu::SurfaceTexture,
     ) -> (GfxContext, GfxRenderContext) {
-        (self.create_context(), GfxRenderContext::new(frame))
+        (
+            self.create_context(),
+            GfxRenderContext::new(surface_texture),
+        )
     }
 
     pub fn resize(&mut self, size: PhysicalSize<u32>) {

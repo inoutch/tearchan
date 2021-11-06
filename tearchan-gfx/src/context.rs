@@ -9,10 +9,9 @@ pub struct GfxRenderContext {
 }
 
 impl GfxRenderContext {
-    pub fn new(frame: &wgpu::SurfaceFrame) -> Self {
+    pub fn new(surface_texture: &wgpu::SurfaceTexture) -> Self {
         GfxRenderContext {
-            view: frame
-                .output
+            view: surface_texture
                 .texture
                 .create_view(&wgpu::TextureViewDescriptor::default()),
         }
