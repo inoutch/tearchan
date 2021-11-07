@@ -119,6 +119,13 @@ impl<T> ActionManager<T> {
             ActionManager::Client(_) => panic!("Unsupported"),
         }
     }
+
+    pub fn get_running_action(&self, entity_id: EntityId) -> Option<&Arc<Action<T>>> {
+        match self {
+            ActionManager::Server(manager) => manager.get_running_action(entity_id),
+            ActionManager::Client(manager) => manager.get_running_action(entity_id),
+        }
+    }
 }
 
 pub trait ActionManagerTrait<T> {
