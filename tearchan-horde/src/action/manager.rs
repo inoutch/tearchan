@@ -306,6 +306,7 @@ impl<T> ActionServerManager<T> {
     pub fn detach(&mut self, entity_id: EntityId) {
         self.contexts.remove(&entity_id);
         self.pending_cache.remove(&entity_id);
+        self.running_actions.remove(&entity_id);
         if let Some(mut states) = self.actions.remove(&entity_id) {
             while let Some(state) = states.pop_first_back() {
                 state.inactive();
