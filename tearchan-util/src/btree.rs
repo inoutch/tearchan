@@ -12,7 +12,7 @@ macro_rules! get_or_put {
                 $btree.insert($key, $putter);
                 $btree.get_mut(&$key).unwrap()
             }
-        };
+        }
     };
 }
 

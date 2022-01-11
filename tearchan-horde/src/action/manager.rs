@@ -914,16 +914,16 @@ mod test {
                 action,
                 current_time,
             } => {
-                match &actual {
-                    ActionResult::Update {
-                        current_time: actual_current_time,
-                        ..
-                    } => assert_eq!(
+                if let ActionResult::Update {
+                    current_time: actual_current_time,
+                    ..
+                } = &actual
+                {
+                    assert_eq!(
                         *actual_current_time, current_time,
                         "current_time is not correct\n   actual: {:?}\n   expect: {:?}",
                         *actual_current_time, current_time
-                    ),
-                    _ => {}
+                    )
                 }
                 let (actual, _) = actual
                     .get_update()
@@ -1046,7 +1046,7 @@ mod test {
 
         action_manager.update(1000);
 
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         action_manager.cancel(1, false);
         assert_eq!(action_manager.contexts.get(&1).unwrap().last_time, 2000);
@@ -1139,7 +1139,7 @@ mod test {
 
         action_manager.update(2500);
 
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         action_manager.cancel(1, false);
         assert_eq!(action_manager.contexts.get(&1).unwrap().last_time, 5000);
@@ -1199,7 +1199,7 @@ mod test {
 
         action_manager.update(1000);
 
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         action_manager.cancel(1, true);
         assert_eq!(action_manager.contexts.get(&1).unwrap().last_time, 1000);
@@ -1263,13 +1263,13 @@ mod test {
         assert_eq!(ids.len(), 0);
 
         action_manager.update(2500);
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         let ids = action_manager.clean_pending_entity_ids();
         assert_eq!(ids.len(), 0);
 
         action_manager.update(2500);
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         let ids = action_manager.clean_pending_entity_ids();
         assert_eq!(ids.len(), 1);
@@ -1332,9 +1332,8 @@ mod test {
             ActionServerManager::new(data);
 
         while let Some(command) = action_manager1.pull() {
-            match command {
-                ActionResult::Enqueue { .. } => continue,
-                _ => {}
+            if let ActionResult::Enqueue { .. } = command {
+                continue;
             }
             asset_action_result(Some(command), action_manager2.pull());
         }
@@ -1355,9 +1354,8 @@ mod test {
             ActionClientManager::new(data);
 
         while let Some(command) = action_manager1.pull() {
-            match command {
-                ActionResult::Enqueue { .. } => continue,
-                _ => {}
+            if let ActionResult::Enqueue { .. } = command {
+                continue;
             }
             asset_action_result(Some(command), action_manager2.pull());
         }
@@ -1378,7 +1376,7 @@ mod test {
         ]);
 
         action_manager.update(500);
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         action_manager.update(1000);
 
@@ -1440,7 +1438,7 @@ mod test {
             Arc::new(Action::new(1, 500, 2000, "Spawn")),
         ]);
 
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         action_manager.update(1000);
 
@@ -1468,7 +1466,7 @@ mod test {
         asset_action_result(action_manager.pull(), None);
 
         action_manager.update(1000);
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
 
         assert_eq!(action_manager.last_actions.len(), 0);
     }
@@ -1644,7 +1642,7 @@ mod test {
         );
         action_manager.push_states(1039, vec![("WalkTo1", 500), ("Wait", 3000)]);
 
-        while let Some(_) = action_manager.pull() {}
+        while action_manager.pull().is_some() {}
         action_manager.update(1000);
 
         asset_action_result(

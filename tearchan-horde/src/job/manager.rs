@@ -277,6 +277,7 @@ mod test {
     }
 
     #[derive(Debug)]
+    #[allow(dead_code)]
     enum CustomActionState {
         Move { position: Position },
         Sleep,
