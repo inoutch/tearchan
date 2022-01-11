@@ -57,4 +57,9 @@ pub trait HordeInterface {
         action: &Action<Self::ActionState>,
         controller: &mut ActionController<Self::ActionState>,
     );
+
+    fn on_change_time(
+        &mut self,
+        reader: &ActionServerReader<Self::ActionState>,
+    ) -> Vec<(EntityId, Self::ActionState)>;
 }

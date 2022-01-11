@@ -1,7 +1,8 @@
 use crate::action::manager::{
-    ActionController, ActionManager, ActionManagerTrait, TimeMilliseconds,
+    ActionController, ActionManager, ActionManagerTrait, ActionServerManager, TimeMilliseconds,
 };
 use crate::action::result::ActionResult;
+use crate::action::Action;
 use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
@@ -94,7 +95,7 @@ where
             }
             ActionManager::Client(action_manager) => {
                 action_manager.update(elapsed_time);
-                update_action(provider, action_manager);
+                update_action_in_client(provider, action_manager);
             }
         }
     }
@@ -118,7 +119,99 @@ impl<T: HordeInterface> From<ActionManager<T::ActionState>> for JobManager<T> {
     }
 }
 
-fn update_action<T, U>(provider: &mut T, action_manager: &mut U)
+fn update_action<T>(provider: &mut T, action_manager: &mut ActionServerManager<T::ActionState>)
+where
+    T: HordeInterface,
+{
+    let mut time: Option<TimeMilliseconds> = None;
+    while let Some(result) = action_manager.pull() {
+        let current_time = match &result {
+            ActionResult::Start { action, .. } => Some(action.start_time()),
+            ActionResult::Update { current_time, .. } => Some(*current_time),
+            ActionResult::End { action, .. } => Some(action.end_time()),
+            _ => None,
+        };
+        if time != current_time {
+            if let Some(time) = time {
+                for result in provider
+                    .on_change_time(&action_manager.reader())
+                    .into_iter()
+                    .map(|(entity_id, action_state)| {
+                        let action = Arc::new(Action::new(entity_id, time, time, action_state));
+                        vec![
+                            ActionResult::Start {
+                                action: Arc::clone(&action),
+                            },
+                            ActionResult::End { action },
+                        ]
+                    })
+                    .flatten()
+                {
+                    let mut controller = action_manager.controller();
+                    update_event(provider, &mut controller, result);
+                }
+            }
+            time = current_time;
+        }
+
+        let mut controller = action_manager.controller();
+        update_event(provider, &mut controller, result);
+    }
+
+    if let Some(time) = time {
+        for result in provider
+            .on_change_time(&action_manager.reader())
+            .into_iter()
+            .map(|(entity_id, action_state)| {
+                let action = Arc::new(Action::new(entity_id, time, time, action_state));
+                vec![
+                    ActionResult::Start {
+                        action: Arc::clone(&action),
+                    },
+                    ActionResult::End { action },
+                ]
+            })
+            .flatten()
+        {
+            let mut controller = action_manager.controller();
+            update_event(provider, &mut controller, result);
+        }
+    }
+}
+
+fn update_event<T>(
+    provider: &mut T,
+    controller: &mut ActionController<T::ActionState>,
+    result: ActionResult<T::ActionState>,
+) where
+    T: HordeInterface,
+{
+    match result {
+        ActionResult::Start { action } => {
+            provider.on_send(Arc::clone(&action));
+            provider.on_start(action.deref(), controller);
+        }
+        ActionResult::Update {
+            action,
+            current_time,
+        } => {
+            let duration = action.end_time() - action.start_time();
+            let ratio = (current_time - action.start_time()) as f32 / duration as f32;
+            provider.on_update(action.deref(), ratio, controller);
+        }
+        ActionResult::End { action } => {
+            provider.on_end(action.deref(), controller);
+        }
+        ActionResult::Cancel { action } => {
+            provider.on_cancel(&action, controller);
+        }
+        ActionResult::Enqueue { action } => {
+            provider.on_enqueue(&action, controller);
+        }
+    }
+}
+
+fn update_action_in_client<T, U>(provider: &mut T, action_manager: &mut U)
 where
     T: HordeInterface,
     U: ActionManagerTrait<T::ActionState>,
@@ -345,6 +438,14 @@ mod test {
             _controller: &mut ActionController<Self::ActionState>,
         ) {
             println!("cancel : {}", action.entity_id());
+        }
+
+        fn on_change_time(
+            &mut self,
+            reader: &ActionServerReader<Self::ActionState>,
+        ) -> Vec<(EntityId, Self::ActionState)> {
+            println!("changed time : {}", reader.current_time());
+            Vec::with_capacity(0)
         }
     }
 

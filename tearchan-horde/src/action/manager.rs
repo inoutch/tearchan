@@ -197,7 +197,7 @@ impl<T> ActionServerManager<T> {
 
             actions
                 .entry(action.entity_id)
-                .or_insert_with(|| DuplicatableBTreeMap::default())
+                .or_insert_with(DuplicatableBTreeMap::default)
                 .push_back(action.start_time, command_state);
         }
 
@@ -414,13 +414,10 @@ impl<T> ActionServerManager<T> {
         let mut actions = Vec::new();
         for (_, commands) in self.commands.iter() {
             for command in commands {
-                match command {
-                    Command::End { state, .. } => {
-                        if state.is_active() {
-                            actions.push(Arc::clone(&state.action));
-                        }
+                if let Command::End { state, .. } = command {
+                    if state.is_active() {
+                        actions.push(Arc::clone(&state.action));
                     }
-                    _ => {}
                 }
             }
         }
@@ -589,7 +586,7 @@ impl<T> ActionClientManager<T> {
                     self.commands.push_back(
                         action.start_time,
                         Command::Cancel {
-                            state: Arc::clone(&last_command_state),
+                            state: Arc::clone(last_command_state),
                             time: action.start_time,
                         },
                     );
