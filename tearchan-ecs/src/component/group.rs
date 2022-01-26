@@ -5,7 +5,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::Enumerate;
 use std::marker::PhantomData;
 
@@ -113,6 +113,13 @@ impl<T> ComponentGroup<T> {
             iter_mut: self.components.iter_mut().enumerate(),
             indices: &self.indices,
         }
+    }
+
+    pub fn debug(&self) -> ComponentGroupDebug<T>
+    where
+        T: Debug,
+    {
+        ComponentGroupDebug(&self.components)
     }
 }
 
@@ -264,6 +271,9 @@ impl Display for ComponentGroupError {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct ComponentGroupDebug<'a, T: Debug>(&'a Vec<Component<T>>);
 
 #[cfg(test)]
 mod test {
