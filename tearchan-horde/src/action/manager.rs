@@ -326,29 +326,41 @@ impl<T> ActionServerManager<T> {
             self.running_actions.remove(&entity_id);
             let actions = self.actions.get_mut(&entity_id).unwrap();
             while let Some(command_state) = actions.pop_first_back() {
-                if current_time < command_state.action.end_time {
-                    command_state.inactive();
-                    commands.push(Command::Cancel {
-                        state: Arc::new(CommandState::new(Arc::clone(&command_state.action))),
-                        time: current_time,
-                    });
-                } else if current_time == command_state.action.end_time
-                    && current_time == command_state.action.start_time
-                {
-                    // If the timing of the cancellation is the same as the action to be executed,
-                    // only the actions that cannot be executed immediately will be inactive.
-                    command_state.inactive();
+                match current_time.cmp(&command_state.action.end_time) {
+                    std::cmp::Ordering::Less => {
+                        command_state.inactive();
+                        commands.push(Command::Cancel {
+                            state: Arc::new(CommandState::new(Arc::clone(&command_state.action))),
+                            time: current_time,
+                        });
+                    }
+                    std::cmp::Ordering::Equal => {
+                        if current_time == command_state.action.start_time {
+                            // If the timing of the cancellation is the same as the action to be executed,
+                            // only the actions that cannot be executed immediately will be inactive.
+                            command_state.inactive();
 
-                    let command_state =
-                        Arc::new(CommandState::new(Arc::clone(&command_state.action)));
-                    commands.push(Command::Start {
-                        state: Arc::clone(&command_state),
-                        time: current_time,
-                    });
-                    commands.push(Command::Cancel {
-                        state: command_state,
-                        time: current_time,
-                    });
+                            let command_state =
+                                Arc::new(CommandState::new(Arc::clone(&command_state.action)));
+                            commands.push(Command::Start {
+                                state: Arc::clone(&command_state),
+                                time: current_time,
+                            });
+                            commands.push(Command::Cancel {
+                                state: command_state,
+                                time: current_time,
+                            });
+                        } else {
+                            command_state.inactive();
+                            let command_state =
+                                Arc::new(CommandState::new(Arc::clone(&command_state.action)));
+                            commands.push(Command::Cancel {
+                                state: command_state,
+                                time: current_time,
+                            });
+                        }
+                    }
+                    std::cmp::Ordering::Greater => {}
                 }
             }
         } else {
@@ -1665,5 +1677,39 @@ mod test {
                 action: Arc::new(Action::new(1039, 0, 500, "WalkTo1")),
             }),
         );
+    }
+
+    #[test]
+    fn test_same_time_cancel() {
+        let data = ActionManagerData::default();
+        let mut action_manager: ActionServerManager<TestActionState> =
+            ActionServerManager::new(data);
+
+        action_manager.attach(1);
+        action_manager.attach(2);
+
+        action_manager.push_states(1, vec![("Sleep1", 1000)]);
+        action_manager.push_states(2, vec![("Sleep2", 1000)]);
+
+        action_manager.update(0);
+        while action_manager.pull().is_some() {}
+
+        action_manager.update(1000);
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::End {
+                action: Arc::new(Action::new(1, 0, 1000, "Sleep1")),
+            }),
+        );
+        action_manager.cancel(2, true);
+
+        asset_action_result(
+            action_manager.pull(),
+            Some(ActionResult::Cancel {
+                action: Arc::new(Action::new(2, 0, 1000, "Sleep2")),
+            }),
+        );
+
+        asset_action_result(action_manager.pull(), None);
     }
 }
