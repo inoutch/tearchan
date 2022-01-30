@@ -2,7 +2,7 @@ use crate::action::context::ActionContext;
 use crate::action::result::ActionResult;
 use crate::action::Action;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
@@ -145,7 +145,7 @@ pub struct ActionServerManager<T> {
     next_time: TimeMilliseconds,
     // Cache and using for server only
     contexts: HashMap<EntityId, ActionContext>,
-    pending_cache: HashSet<EntityId>,
+    pending_cache: BTreeSet<EntityId>,
 }
 
 impl<T> Default for ActionServerManager<T> {
@@ -157,7 +157,7 @@ impl<T> Default for ActionServerManager<T> {
             current_time: 0,
             next_time: 0,
             contexts: HashMap::new(),
-            pending_cache: HashSet::new(),
+            pending_cache: BTreeSet::new(),
         }
     }
 }
@@ -208,7 +208,7 @@ impl<T> ActionServerManager<T> {
             current_time: data.current_time,
             next_time: data.current_time,
             contexts,
-            pending_cache: HashSet::new(),
+            pending_cache: BTreeSet::new(),
         }
     }
 
@@ -282,7 +282,7 @@ impl<T> ActionServerManager<T> {
     /**
      * Get free entity ids after update_actions
      */
-    pub fn clean_pending_entity_ids(&mut self) -> HashSet<EntityId> {
+    pub fn clean_pending_entity_ids(&mut self) -> BTreeSet<EntityId> {
         std::mem::take(&mut self.pending_cache)
     }
 
