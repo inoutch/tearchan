@@ -76,12 +76,12 @@ impl<T> ComponentGroup<T> {
 
     pub fn get_with_err(&self, entity_id: EntityId) -> Result<&T, ComponentGroupError> {
         self.get(entity_id)
-            .ok_or_else(|| ComponentGroupError::NotFoundEntity { id: entity_id })
+            .ok_or(ComponentGroupError::NotFoundEntity { id: entity_id })
     }
 
     pub fn get_mut_with_err(&mut self, entity_id: EntityId) -> Result<&mut T, ComponentGroupError> {
         self.get_mut(entity_id)
-            .ok_or_else(|| ComponentGroupError::NotFoundEntity { id: entity_id })
+            .ok_or(ComponentGroupError::NotFoundEntity { id: entity_id })
     }
 
     pub fn entity(&self, entity_id: EntityId) -> &T {
