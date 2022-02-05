@@ -6,7 +6,7 @@ pub mod zip;
 
 pub type EntityId = u32;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Component<T> {
     #[serde(rename = "entityId")]
     entity_id: EntityId,

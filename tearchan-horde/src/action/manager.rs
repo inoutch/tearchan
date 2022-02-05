@@ -845,7 +845,7 @@ impl<'a, T> ActionClientReader<'a, T> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ActionManagerData<T> {
     pub actions: Vec<Arc<Action<T>>>,
     #[serde(rename = "entityIds")]

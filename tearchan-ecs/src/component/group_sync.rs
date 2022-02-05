@@ -1,6 +1,7 @@
 use crate::component::group::ComponentGroup;
 use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+#[derive(Clone)]
 pub struct ComponentGroupSync<T>
 where
     T: Sync,

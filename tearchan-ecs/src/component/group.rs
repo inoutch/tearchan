@@ -11,6 +11,7 @@ use std::marker::PhantomData;
 
 pub type ComponentIndex = usize;
 
+#[derive(Clone)]
 pub struct ComponentGroup<T> {
     indices: HashMap<EntityId, ComponentIndex>,
     components: Vec<Component<T>>,

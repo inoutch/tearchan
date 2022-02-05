@@ -1,5 +1,6 @@
 use crate::action::manager::{
-    ActionController, ActionManager, ActionManagerTrait, ActionServerManager, TimeMilliseconds,
+    ActionClientManager, ActionController, ActionManager, ActionManagerData, ActionManagerTrait,
+    ActionServerManager, TimeMilliseconds,
 };
 use crate::action::result::ActionResult;
 use crate::action::Action;
@@ -110,6 +111,13 @@ where
 
     pub fn action_manager_mut(&mut self) -> &mut ActionManager<T::ActionState> {
         &mut self.action_manager
+    }
+
+    pub fn replace_action_manager(&mut self, data: ActionManagerData<T::ActionState>) {
+        self.action_manager = match &self.action_manager {
+            ActionManager::Server(_) => ActionManager::Server(ActionServerManager::new(data)),
+            ActionManager::Client(_) => ActionManager::Client(ActionClientManager::new(data)),
+        };
     }
 }
 
