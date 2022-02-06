@@ -636,7 +636,8 @@ pub mod square {
 
     pub fn create_square_positions_from_frame(origin: &Vec2, frame: &TextureFrame) -> Vec<Vec3> {
         let sx = frame.source.x as f32;
-        let sy = frame.source.y as f32;
+        // NOTICE: Flip the y-axis
+        let sy = (frame.source.h - frame.source.y - frame.rect.h) as f32;
         let sw = frame.rect.w as f32;
         let sh = frame.rect.h as f32;
         create_square_positions(&Rect2 {
