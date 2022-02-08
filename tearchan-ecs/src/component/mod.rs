@@ -4,7 +4,7 @@ pub mod group;
 pub mod group_sync;
 pub mod zip;
 
-pub type EntityId = u32;
+pub type EntityId = u64;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Component<T> {

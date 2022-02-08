@@ -70,7 +70,7 @@ impl<'a, T> ZipEntity1<'a, T> {
 impl<'a, T> ZipEntityBase for ZipEntity1<'a, T> {
     type Item = &'a T;
 
-    fn zip(&self, entity_id: u32) -> Option<&'a T> {
+    fn zip(&self, entity_id: EntityId) -> Option<&'a T> {
         self.group.get(entity_id)
     }
 }
@@ -93,7 +93,7 @@ impl<'a, 'b, T1, T2> ZipEntity2<'a, 'b, T1, T2> {
 impl<'a, 'b, T1, T2> ZipEntityBase for ZipEntity2<'a, 'b, T1, T2> {
     type Item = (&'a T1, &'b T2);
 
-    fn zip(&self, entity_id: u32) -> Option<(&'a T1, &'b T2)> {
+    fn zip(&self, entity_id: EntityId) -> Option<(&'a T1, &'b T2)> {
         let group1 = self.groups.0.get(entity_id)?;
         let group2 = self.groups.1.get(entity_id)?;
         Some((group1, group2))

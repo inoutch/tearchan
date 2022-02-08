@@ -38,7 +38,7 @@ pub trait HordeInterface {
 
     fn on_first(
         &self,
-        entity_id: u32,
+        entity_id: EntityId,
         priority: u32,
         reader: &ActionServerReader<Self::ActionState>,
     ) -> Option<Self::Job>;
