@@ -11,6 +11,8 @@ use std::option::Option::Some;
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
+const MAX_LOOP_SIZE_PER_FRAME: usize = 1000usize;
+
 pub struct JobManager<T>
 where
     T: HordeInterface,
@@ -38,6 +40,7 @@ where
             ActionManager::Server(action_manager) => {
                 action_manager.update(elapsed_time);
 
+                let mut loop_count = 0;
                 loop {
                     update_action(provider, action_manager);
 
@@ -92,6 +95,8 @@ where
                     if !is_changed {
                         break;
                     }
+                    loop_count += 1;
+                    debug_assert!(loop_count < MAX_LOOP_SIZE_PER_FRAME);
                 }
             }
             ActionManager::Client(action_manager) => {
