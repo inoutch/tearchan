@@ -120,6 +120,12 @@ where
         values.remove(index)
     }
 
+    pub fn first_key_value(&self) -> Option<(&K, &V)> {
+        self.btree
+            .first_key_value()
+            .and_then(|(key, values)| values.front().map(|value| (key, value)))
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         self.btree.len()
