@@ -4,10 +4,11 @@ use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
 pub mod context;
+pub mod initializer;
 pub mod manager;
 pub mod result;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Action<T> {
     #[serde(rename = "entityId")]
     entity_id: EntityId,

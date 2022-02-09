@@ -3,7 +3,6 @@ use crate::action::manager::{
     ActionServerManager, TimeMilliseconds,
 };
 use crate::action::result::ActionResult;
-use crate::action::Action;
 use crate::HordeInterface;
 use std::collections::VecDeque;
 use std::ops::Deref;
@@ -41,10 +40,14 @@ where
                 action_manager.update(elapsed_time);
 
                 let mut loop_count = 0;
+                let mut next_action_time = action_manager.next_action_time();
                 loop {
-                    update_action(provider, action_manager);
+                    if next_action_time != action_manager.next_action_time() {
+                        update_change_time(provider, action_manager);
+                        next_action_time = action_manager.next_action_time();
+                    }
 
-                    let mut is_changed = false;
+                    let mut is_changed = update_action(provider, action_manager);
                     let entity_ids = action_manager.clean_pending_entity_ids();
                     for entity_id in entity_ids {
                         let mut priority = 0;
@@ -132,63 +135,34 @@ impl<T: HordeInterface> From<ActionManager<T::ActionState>> for JobManager<T> {
     }
 }
 
-fn update_action<T>(provider: &mut T, action_manager: &mut ActionServerManager<T::ActionState>)
+fn update_action<T>(
+    provider: &mut T,
+    action_manager: &mut ActionServerManager<T::ActionState>,
+) -> bool
 where
     T: HordeInterface,
 {
-    let mut time: Option<TimeMilliseconds> = None;
-    while let Some(result) = action_manager.pull() {
-        let current_time = match &result {
-            ActionResult::Start { action, .. } => Some(action.start_time()),
-            ActionResult::Update { current_time, .. } => Some(*current_time),
-            ActionResult::End { action, .. } => Some(action.end_time()),
-            _ => None,
+    let next_action_time = action_manager.next_action_time();
+    while next_action_time == action_manager.next_action_time() {
+        let result = match action_manager.pull() {
+            None => return false,
+            Some(result) => result,
         };
-        if time != current_time {
-            if let Some(time) = time {
-                for result in provider
-                    .on_change_time(&action_manager.reader())
-                    .into_iter()
-                    .map(|(entity_id, action_state)| {
-                        let action = Arc::new(Action::new(entity_id, time, time, action_state));
-                        vec![
-                            ActionResult::Start {
-                                action: Arc::clone(&action),
-                            },
-                            ActionResult::End { action },
-                        ]
-                    })
-                    .flatten()
-                {
-                    let mut controller = action_manager.controller();
-                    update_event(provider, &mut controller, result);
-                }
-            }
-            time = current_time;
-        }
-
         let mut controller = action_manager.controller();
         update_event(provider, &mut controller, result);
     }
+    true
+}
 
-    if let Some(time) = time {
-        for result in provider
-            .on_change_time(&action_manager.reader())
-            .into_iter()
-            .map(|(entity_id, action_state)| {
-                let action = Arc::new(Action::new(entity_id, time, time, action_state));
-                vec![
-                    ActionResult::Start {
-                        action: Arc::clone(&action),
-                    },
-                    ActionResult::End { action },
-                ]
-            })
-            .flatten()
-        {
-            let mut controller = action_manager.controller();
-            update_event(provider, &mut controller, result);
-        }
+fn update_change_time<T>(provider: &mut T, action_manager: &mut ActionServerManager<T::ActionState>)
+where
+    T: HordeInterface,
+{
+    for (entity_id, state) in provider
+        .on_change_time(&action_manager.reader())
+        .into_iter()
+    {
+        action_manager.push_states(entity_id, vec![state]);
     }
 }
 
@@ -273,11 +247,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::action::manager::{ActionController, ActionServerReader};
+    use crate::action::manager::{ActionController, ActionServerReader, TimeMilliseconds};
     use crate::action::Action;
     use crate::job::manager::JobManager;
     use crate::job::result::JobResult;
-    use crate::HordeInterface;
+    use crate::{HordeInterface, ProgressState};
+    use std::cell::RefCell;
     use tearchan_ecs::component::group::ComponentGroup;
     use tearchan_ecs::component::EntityId;
     use tearchan_util::id_manager::IdManager;
@@ -289,7 +264,7 @@ mod test {
         Human,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     #[allow(dead_code)]
     enum CustomActionState {
         Move { position: Position },
@@ -298,9 +273,11 @@ mod test {
         Job { salary: u32 },
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct Position((u32, u32));
 
+    #[derive(Debug, Clone)]
+    #[allow(dead_code)]
     enum CustomActionCreator {
         EatLunch {
             position: Position,
@@ -320,8 +297,44 @@ mod test {
             salary: u32,
             position: Position,
         },
-        #[allow(dead_code)]
         Invalid,
+    }
+
+    #[derive(Debug)]
+    #[allow(dead_code)]
+    enum ActionKind {
+        Start {
+            current_time: TimeMilliseconds,
+            action: Action<CustomActionState>,
+        },
+        End {
+            current_time: TimeMilliseconds,
+            action: Action<CustomActionState>,
+        },
+        Update {
+            current_time: TimeMilliseconds,
+            action: Action<CustomActionState>,
+            ratio: f32,
+        },
+        Enqueue {
+            action: Action<CustomActionState>,
+        },
+        First {
+            entity_id: EntityId,
+            priority: u32,
+            current_time: TimeMilliseconds,
+        },
+        Next {
+            entity_id: EntityId,
+            job: CustomActionCreator,
+            current_time: TimeMilliseconds,
+        },
+        Cancel {
+            action: Action<CustomActionState>,
+        },
+        ChangeTime {
+            current_time: TimeMilliseconds,
+        },
     }
 
     struct CustomGame {
@@ -329,6 +342,7 @@ mod test {
         pub kind_components: ComponentGroup<Kind>,
         pub name_components: ComponentGroup<String>,
         pub position_components: ComponentGroup<Position>,
+        pub actions: RefCell<Vec<ActionKind>>,
     }
 
     impl HordeInterface for CustomGame {
@@ -337,27 +351,39 @@ mod test {
 
         fn on_start(
             &mut self,
-            _action: &Action<Self::ActionState>,
+            action: &Action<Self::ActionState>,
             _controller: &mut ActionController<CustomActionState>,
         ) {
-            println!("start  : {:?}", _action);
+            self.actions.borrow_mut().push(ActionKind::Start {
+                current_time: action.start_time(),
+                action: action.clone(),
+            });
         }
 
         fn on_update(
             &mut self,
-            _action: &Action<Self::ActionState>,
-            _ratio: f32,
+            action: &Action<Self::ActionState>,
+            ratio: f32,
             _controller: &mut ActionController<CustomActionState>,
         ) {
-            println!("update : {:?}", _action);
+            self.actions.borrow_mut().push(ActionKind::Update {
+                current_time: (((action.end_time() - action.start_time()) as f32 * ratio)
+                    as TimeMilliseconds
+                    + action.start_time()),
+                action: action.clone(),
+                ratio,
+            });
         }
 
         fn on_end(
             &mut self,
-            _action: &Action<Self::ActionState>,
+            action: &Action<Self::ActionState>,
             _controller: &mut ActionController<CustomActionState>,
         ) {
-            println!("end    : {:?}", _action);
+            self.actions.borrow_mut().push(ActionKind::End {
+                current_time: action.end_time(),
+                action: action.clone(),
+            });
         }
 
         fn on_enqueue(
@@ -365,15 +391,22 @@ mod test {
             action: &Action<Self::ActionState>,
             _controller: &mut ActionController<CustomActionState>,
         ) {
-            println!("queue  : {:?}", action);
+            self.actions.borrow_mut().push(ActionKind::Enqueue {
+                action: action.clone(),
+            });
         }
 
         fn on_first(
             &self,
-            entity_id: u32,
-            _priority: u32,
-            _reader: &ActionServerReader<Self::ActionState>,
+            entity_id: EntityId,
+            priority: u32,
+            reader: &ActionServerReader<Self::ActionState>,
         ) -> Option<Self::Job> {
+            self.actions.borrow_mut().push(ActionKind::First {
+                entity_id,
+                priority,
+                current_time: reader.current_time(),
+            });
             let kind = self.kind_components.get(entity_id).unwrap();
             Some(match kind {
                 Kind::Dog => CustomActionCreator::EatLunch {
@@ -390,10 +423,15 @@ mod test {
 
         fn on_next(
             &self,
-            _entity_id: u32,
+            entity_id: EntityId,
             job: Self::Job,
-            _reader: &ActionServerReader<Self::ActionState>,
+            reader: &ActionServerReader<Self::ActionState>,
         ) -> JobResult<Self::Job, Self::ActionState> {
+            self.actions.borrow_mut().push(ActionKind::Next {
+                entity_id,
+                job: job.clone(),
+                current_time: reader.current_time(),
+            });
             let mut result = JobResult::default();
             match job {
                 CustomActionCreator::EatLunch {
@@ -451,20 +489,24 @@ mod test {
             action: &Action<Self::ActionState>,
             _controller: &mut ActionController<Self::ActionState>,
         ) {
-            println!("cancel : {}", action.entity_id());
+            self.actions.borrow_mut().push(ActionKind::Cancel {
+                action: action.clone(),
+            });
         }
 
         fn on_change_time(
             &mut self,
             reader: &ActionServerReader<Self::ActionState>,
-        ) -> Vec<(EntityId, Self::ActionState)> {
-            println!("changed time : {}", reader.current_time());
+        ) -> Vec<(EntityId, ProgressState<Self::ActionState>)> {
+            self.actions.borrow_mut().push(ActionKind::ChangeTime {
+                current_time: reader.current_time(),
+            });
             Vec::with_capacity(0)
         }
     }
 
     #[test]
-    fn test() {
+    fn test_custom_game() {
         let entity_id_manager: IdManager<EntityId> = IdManager::new(0, |id| id + 1);
         let kind_components: ComponentGroup<Kind> = ComponentGroup::default();
         let name_components: ComponentGroup<String> = ComponentGroup::default();
@@ -476,6 +518,7 @@ mod test {
             kind_components,
             name_components,
             position_components,
+            actions: RefCell::new(Vec::new()),
         };
 
         // Create cat
@@ -516,6 +559,8 @@ mod test {
         }
 
         // Process horde
-        job_manager.run(&mut custom_game, 50000);
+        job_manager.run(&mut custom_game, 10000);
+
+        insta::assert_debug_snapshot!("actions", custom_game.actions.borrow());
     }
 }

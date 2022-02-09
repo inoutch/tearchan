@@ -422,6 +422,23 @@ impl<T> ActionServerManager<T> {
         self.current_time
     }
 
+    pub fn next_action_time(&self) -> TimeMilliseconds {
+        self.commands
+            .iter()
+            .find_map(|(key, values)| {
+                if values
+                    .iter()
+                    .find(|command| command.state().is_active())
+                    .is_some()
+                {
+                    Some(*key)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(self.current_time)
+    }
+
     pub fn create_data(&self) -> ActionManagerData<T> {
         let mut actions = Vec::new();
         for (_, commands) in self.commands.iter() {

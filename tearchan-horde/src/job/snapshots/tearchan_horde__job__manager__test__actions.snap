@@ -1,0 +1,862 @@
+---
+source: tearchan-horde/src/job/manager.rs
+expression: custom_game.actions.borrow()
+
+---
+[
+    First {
+        entity_id: 0,
+        priority: 0,
+        current_time: 0,
+    },
+    Next {
+        entity_id: 0,
+        job: Sleep,
+        current_time: 0,
+    },
+    First {
+        entity_id: 1,
+        priority: 0,
+        current_time: 0,
+    },
+    Next {
+        entity_id: 1,
+        job: EatLunch {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+            food_name: "dog food",
+        },
+        current_time: 0,
+    },
+    Next {
+        entity_id: 1,
+        job: MoveTo {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 0,
+    },
+    Next {
+        entity_id: 1,
+        job: EatFood {
+            food_name: "dog food",
+        },
+        current_time: 0,
+    },
+    First {
+        entity_id: 2,
+        priority: 0,
+        current_time: 0,
+    },
+    Next {
+        entity_id: 2,
+        job: Work {
+            salary: 200,
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 0,
+    },
+    Next {
+        entity_id: 2,
+        job: MoveTo {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 0,
+    },
+    Next {
+        entity_id: 2,
+        job: Job {
+            salary: 200,
+        },
+        current_time: 0,
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 0,
+            start_time: 0,
+            end_time: 3000,
+            inner: Sleep,
+        },
+    },
+    Start {
+        current_time: 0,
+        action: Action {
+            entity_id: 0,
+            start_time: 0,
+            end_time: 3000,
+            inner: Sleep,
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 1000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 0,
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 1000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 1000,
+            end_time: 3000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 2,
+            start_time: 0,
+            end_time: 1000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 0,
+        action: Action {
+            entity_id: 2,
+            start_time: 0,
+            end_time: 1000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 2,
+            start_time: 1000,
+            end_time: 6000,
+            inner: Job {
+                salary: 200,
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 0,
+    },
+    End {
+        current_time: 1000,
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 1000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 1000,
+        action: Action {
+            entity_id: 1,
+            start_time: 1000,
+            end_time: 3000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    End {
+        current_time: 1000,
+        action: Action {
+            entity_id: 2,
+            start_time: 0,
+            end_time: 1000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 1000,
+        action: Action {
+            entity_id: 2,
+            start_time: 1000,
+            end_time: 6000,
+            inner: Job {
+                salary: 200,
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 1000,
+    },
+    End {
+        current_time: 3000,
+        action: Action {
+            entity_id: 0,
+            start_time: 0,
+            end_time: 3000,
+            inner: Sleep,
+        },
+    },
+    End {
+        current_time: 3000,
+        action: Action {
+            entity_id: 1,
+            start_time: 1000,
+            end_time: 3000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    First {
+        entity_id: 0,
+        priority: 0,
+        current_time: 3000,
+    },
+    Next {
+        entity_id: 0,
+        job: Sleep,
+        current_time: 3000,
+    },
+    First {
+        entity_id: 1,
+        priority: 0,
+        current_time: 3000,
+    },
+    Next {
+        entity_id: 1,
+        job: EatLunch {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+            food_name: "dog food",
+        },
+        current_time: 3000,
+    },
+    Next {
+        entity_id: 1,
+        job: MoveTo {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 3000,
+    },
+    Next {
+        entity_id: 1,
+        job: EatFood {
+            food_name: "dog food",
+        },
+        current_time: 3000,
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 0,
+            start_time: 3000,
+            end_time: 6000,
+            inner: Sleep,
+        },
+    },
+    Start {
+        current_time: 3000,
+        action: Action {
+            entity_id: 0,
+            start_time: 3000,
+            end_time: 6000,
+            inner: Sleep,
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 3000,
+            end_time: 4000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 3000,
+        action: Action {
+            entity_id: 1,
+            start_time: 3000,
+            end_time: 4000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 4000,
+            end_time: 6000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 3000,
+    },
+    End {
+        current_time: 4000,
+        action: Action {
+            entity_id: 1,
+            start_time: 3000,
+            end_time: 4000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 4000,
+        action: Action {
+            entity_id: 1,
+            start_time: 4000,
+            end_time: 6000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 4000,
+    },
+    End {
+        current_time: 6000,
+        action: Action {
+            entity_id: 2,
+            start_time: 1000,
+            end_time: 6000,
+            inner: Job {
+                salary: 200,
+            },
+        },
+    },
+    End {
+        current_time: 6000,
+        action: Action {
+            entity_id: 0,
+            start_time: 3000,
+            end_time: 6000,
+            inner: Sleep,
+        },
+    },
+    End {
+        current_time: 6000,
+        action: Action {
+            entity_id: 1,
+            start_time: 4000,
+            end_time: 6000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    First {
+        entity_id: 0,
+        priority: 0,
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 0,
+        job: Sleep,
+        current_time: 6000,
+    },
+    First {
+        entity_id: 1,
+        priority: 0,
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 1,
+        job: EatLunch {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+            food_name: "dog food",
+        },
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 1,
+        job: MoveTo {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 1,
+        job: EatFood {
+            food_name: "dog food",
+        },
+        current_time: 6000,
+    },
+    First {
+        entity_id: 2,
+        priority: 0,
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 2,
+        job: Work {
+            salary: 200,
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 2,
+        job: MoveTo {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 6000,
+    },
+    Next {
+        entity_id: 2,
+        job: Job {
+            salary: 200,
+        },
+        current_time: 6000,
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 0,
+            start_time: 6000,
+            end_time: 9000,
+            inner: Sleep,
+        },
+    },
+    Start {
+        current_time: 6000,
+        action: Action {
+            entity_id: 0,
+            start_time: 6000,
+            end_time: 9000,
+            inner: Sleep,
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 6000,
+            end_time: 7000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 6000,
+        action: Action {
+            entity_id: 1,
+            start_time: 6000,
+            end_time: 7000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 7000,
+            end_time: 9000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 2,
+            start_time: 6000,
+            end_time: 7000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 6000,
+        action: Action {
+            entity_id: 2,
+            start_time: 6000,
+            end_time: 7000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 2,
+            start_time: 7000,
+            end_time: 12000,
+            inner: Job {
+                salary: 200,
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 6000,
+    },
+    End {
+        current_time: 7000,
+        action: Action {
+            entity_id: 1,
+            start_time: 6000,
+            end_time: 7000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 7000,
+        action: Action {
+            entity_id: 1,
+            start_time: 7000,
+            end_time: 9000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    End {
+        current_time: 7000,
+        action: Action {
+            entity_id: 2,
+            start_time: 6000,
+            end_time: 7000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 7000,
+        action: Action {
+            entity_id: 2,
+            start_time: 7000,
+            end_time: 12000,
+            inner: Job {
+                salary: 200,
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 7000,
+    },
+    End {
+        current_time: 9000,
+        action: Action {
+            entity_id: 0,
+            start_time: 6000,
+            end_time: 9000,
+            inner: Sleep,
+        },
+    },
+    End {
+        current_time: 9000,
+        action: Action {
+            entity_id: 1,
+            start_time: 7000,
+            end_time: 9000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    First {
+        entity_id: 0,
+        priority: 0,
+        current_time: 9000,
+    },
+    Next {
+        entity_id: 0,
+        job: Sleep,
+        current_time: 9000,
+    },
+    First {
+        entity_id: 1,
+        priority: 0,
+        current_time: 9000,
+    },
+    Next {
+        entity_id: 1,
+        job: EatLunch {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+            food_name: "dog food",
+        },
+        current_time: 9000,
+    },
+    Next {
+        entity_id: 1,
+        job: MoveTo {
+            position: Position(
+                (
+                    100,
+                    200,
+                ),
+            ),
+        },
+        current_time: 9000,
+    },
+    Next {
+        entity_id: 1,
+        job: EatFood {
+            food_name: "dog food",
+        },
+        current_time: 9000,
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 0,
+            start_time: 9000,
+            end_time: 12000,
+            inner: Sleep,
+        },
+    },
+    Start {
+        current_time: 9000,
+        action: Action {
+            entity_id: 0,
+            start_time: 9000,
+            end_time: 12000,
+            inner: Sleep,
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 9000,
+            end_time: 10000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 9000,
+        action: Action {
+            entity_id: 1,
+            start_time: 9000,
+            end_time: 10000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 10000,
+            end_time: 12000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    ChangeTime {
+        current_time: 9000,
+    },
+    Update {
+        current_time: 10000,
+        action: Action {
+            entity_id: 2,
+            start_time: 7000,
+            end_time: 12000,
+            inner: Job {
+                salary: 200,
+            },
+        },
+        ratio: 0.6,
+    },
+    End {
+        current_time: 10000,
+        action: Action {
+            entity_id: 1,
+            start_time: 9000,
+            end_time: 10000,
+            inner: Move {
+                position: Position(
+                    (
+                        100,
+                        200,
+                    ),
+                ),
+            },
+        },
+    },
+    Start {
+        current_time: 10000,
+        action: Action {
+            entity_id: 1,
+            start_time: 10000,
+            end_time: 12000,
+            inner: Eat {
+                food_name: "dog food",
+            },
+        },
+    },
+    Update {
+        current_time: 10000,
+        action: Action {
+            entity_id: 0,
+            start_time: 9000,
+            end_time: 12000,
+            inner: Sleep,
+        },
+        ratio: 0.33333334,
+    },
+    ChangeTime {
+        current_time: 10000,
+    },
+]

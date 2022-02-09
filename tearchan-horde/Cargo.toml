@@ -7,3 +7,6 @@ edition = "2018"
 serde = { version = "1.0.125", features = ["rc"] }
 tearchan-ecs = { path = "../tearchan-ecs" }
 tearchan-util = { path = "../tearchan-util" }
+
+[dev-dependencies]
+insta = "1.8.0"

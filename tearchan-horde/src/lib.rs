@@ -1,6 +1,6 @@
 use crate::action::manager::{ActionController, ActionServerReader};
 use crate::action::Action;
-use crate::job::result::JobResult;
+use crate::job::result::{JobResult, ProgressState};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
@@ -61,5 +61,5 @@ pub trait HordeInterface {
     fn on_change_time(
         &mut self,
         reader: &ActionServerReader<Self::ActionState>,
-    ) -> Vec<(EntityId, Self::ActionState)>;
+    ) -> Vec<(EntityId, ProgressState<Self::ActionState>)>;
 }
