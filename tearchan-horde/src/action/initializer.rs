@@ -4,7 +4,7 @@ use tearchan_ecs::component::EntityId;
 
 pub enum ActionInitializer<'a, T> {
     Controller(ActionController<'a, T>),
-    Data(ActionManagerData<T>),
+    Data(&'a mut ActionManagerData<T>),
 }
 
 impl<'a, T> ActionInitializer<'a, T> {
@@ -14,7 +14,7 @@ impl<'a, T> ActionInitializer<'a, T> {
                 controller.attach(entity_id);
             }
             ActionInitializer::Data(data) => {
-                data.entity_ids.insert(entity_id);
+                data.attach(entity_id);
             }
         }
     }
@@ -25,7 +25,7 @@ impl<'a, T> ActionInitializer<'a, T> {
                 controller.detach(entity_id);
             }
             ActionInitializer::Data(data) => {
-                data.entity_ids.remove(&entity_id);
+                data.detach(entity_id);
             }
         }
     }

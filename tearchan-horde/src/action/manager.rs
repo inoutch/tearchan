@@ -2,7 +2,7 @@ use crate::action::context::ActionContext;
 use crate::action::result::ActionResult;
 use crate::action::Action;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
@@ -168,8 +168,11 @@ impl<T> ActionServerManager<T> {
         let mut actions = HashMap::new();
         let mut running_actions = BTreeMap::new();
         let mut contexts = HashMap::default();
+        let mut pending_cache: BTreeSet<EntityId> = data.entity_ids.iter().copied().collect();
 
         for action in data.actions {
+            pending_cache.remove(&action.entity_id);
+
             let mut context =
                 get_or_create_context_mut(action.entity_id, data.current_time, &mut contexts);
 
@@ -201,6 +204,12 @@ impl<T> ActionServerManager<T> {
                 .push_back(action.start_time, command_state);
         }
 
+        //
+        for entity_id in pending_cache.iter() {
+            get_or_create_context_mut(*entity_id, data.current_time, &mut contexts);
+            actions.insert(*entity_id, DuplicatableBTreeMap::default());
+        }
+
         ActionServerManager {
             commands,
             actions,
@@ -208,7 +217,7 @@ impl<T> ActionServerManager<T> {
             current_time: data.current_time,
             next_time: data.current_time,
             contexts,
-            pending_cache: BTreeSet::new(),
+            pending_cache,
         }
     }
 
@@ -864,20 +873,39 @@ impl<'a, T> ActionClientReader<'a, T> {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ActionManagerData<T> {
-    pub actions: Vec<Arc<Action<T>>>,
+    actions: Vec<Arc<Action<T>>>,
     #[serde(rename = "entityIds")]
-    pub entity_ids: HashSet<EntityId>,
+    entity_ids: BTreeSet<EntityId>,
     #[serde(rename = "currentTime")]
-    pub current_time: TimeMilliseconds,
+    current_time: TimeMilliseconds,
 }
 
 impl<T> Default for ActionManagerData<T> {
     fn default() -> Self {
         ActionManagerData {
             actions: Vec::new(),
-            entity_ids: HashSet::new(),
+            entity_ids: BTreeSet::new(),
             current_time: 0,
         }
+    }
+}
+
+impl<T> ActionManagerData<T> {
+    pub fn attach(&mut self, entity_id: EntityId) {
+        self.entity_ids.insert(entity_id);
+    }
+
+    pub fn detach(&mut self, entity_id: EntityId) {
+        self.actions.retain(|action| action.entity_id != entity_id);
+        self.entity_ids.remove(&entity_id);
+    }
+
+    pub fn clear_actions(&mut self, entity_id: EntityId) {
+        self.actions.retain(|action| action.entity_id != entity_id);
+    }
+
+    pub fn entity_ids(&self) -> &BTreeSet<EntityId> {
+        &self.entity_ids
     }
 }
 
@@ -888,7 +916,9 @@ mod test {
     };
     use crate::action::result::ActionResult;
     use crate::action::Action;
+    use std::collections::BTreeSet;
     use std::sync::Arc;
+    use tearchan_ecs::component::EntityId;
 
     type TestActionState = &'static str;
 
@@ -1728,5 +1758,40 @@ mod test {
         );
 
         asset_action_result(action_manager.pull(), None);
+    }
+
+    #[test]
+    fn test_action_manager_data() {
+        let mut entity_ids = BTreeSet::new();
+        entity_ids.insert(2);
+
+        let mut data: ActionManagerData<TestActionState> = ActionManagerData {
+            actions: vec![
+                Arc::new(Action::new(2, 100, 200, "First")),
+                Arc::new(Action::new(2, 200, 300, "Second")),
+            ],
+            entity_ids,
+            current_time: 100,
+        };
+        data.attach(4);
+        data.attach(3);
+
+        assert_eq!(
+            data.entity_ids.iter().copied().collect::<Vec<EntityId>>(),
+            vec![2, 3, 4]
+        );
+
+        data.detach(3);
+        assert_eq!(
+            data.entity_ids.iter().copied().collect::<Vec<EntityId>>(),
+            vec![2, 4]
+        );
+
+        data.clear_actions(2);
+        assert_eq!(
+            data.entity_ids.iter().copied().collect::<Vec<EntityId>>(),
+            vec![2, 4]
+        );
+        assert_eq!(data.actions.len(), 0);
     }
 }
