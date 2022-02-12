@@ -204,7 +204,7 @@ impl<T> ActionServerManager<T> {
                 .push_back(action.start_time, command_state);
         }
 
-        //
+        // Change to allow entities that have no actions in their data
         for entity_id in pending_cache.iter() {
             get_or_create_context_mut(*entity_id, data.current_time, &mut contexts);
             actions.insert(*entity_id, DuplicatableBTreeMap::default());
