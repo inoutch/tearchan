@@ -7,6 +7,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::fmt::Formatter;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
+#[derive(Debug)]
 struct IdManager {
     next_entity_id: EntityId,
     entity_ids: HashSet<EntityId>,
@@ -125,7 +126,7 @@ impl<'de> Deserialize<'de> for IdManager {
     }
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct EntityManager(#[serde(with = "arc_rwlock_serde")] Arc<RwLock<IdManager>>);
 
 impl EntityManager {
