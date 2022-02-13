@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -34,6 +35,15 @@ impl<T> IdManager<T> {
             current: Arc::clone(&self.current),
             incrementer: Arc::clone(&self.incrementer),
         }
+    }
+}
+
+impl<T> Debug for IdManager<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.current)
     }
 }
 
