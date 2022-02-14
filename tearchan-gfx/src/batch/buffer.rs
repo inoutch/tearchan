@@ -128,6 +128,17 @@ where
         self.pending_pointers.push_back(pointer.size, pointer);
     }
 
+    pub fn write(
+        &self,
+        queue: &TBuffer::Queue,
+        pointer: &BatchPointer,
+        data: &[TBuffer::DataType],
+    ) {
+        assert!(data.len() <= pointer.size);
+        self.buffer
+            .write(queue, bytemuck::cast_slice(data), pointer.first);
+    }
+
     pub fn buffer(&self) -> &TBuffer {
         &self.buffer
     }
@@ -233,5 +244,140 @@ where
         // Update the size copied to the buffer.
         // This will determine how much of the existing buffer should be restored when the buffer is recreated.
         self.flushed_last = self.last;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::batch::buffer::BatchBuffer;
+    use crate::buffer::BufferInterface;
+    use std::cell::RefCell;
+
+    struct MockBuffer(RefCell<Vec<u32>>);
+
+    impl BufferInterface for MockBuffer {
+        type DataType = u32;
+        type Device = ();
+        type Queue = ();
+        type Encoder = ();
+
+        fn write(&self, _queue: &Self::Queue, data: &[Self::DataType], offset: usize) {
+            self.0.borrow_mut()[offset..(offset + data.len())].clone_from_slice(data);
+        }
+
+        fn len(&self) -> usize {
+            self.0.borrow().len()
+        }
+
+        fn is_empty(&self) -> bool {
+            self.0.borrow().is_empty()
+        }
+
+        fn clear(&self, _queue: &Self::Queue, offset: usize, len: usize) {
+            self.0.borrow_mut()[offset..(offset + len)].fill(0);
+        }
+    }
+
+    #[test]
+    fn test_allocate() {
+        let mut buffer: BatchBuffer<MockBuffer> =
+            BatchBuffer::new(&(), &(), &mut None, |_, _, _, prev, len| {
+                MockBuffer(RefCell::new(if let Some((prev_buffer, prev_len)) = prev {
+                    let mut v = prev_buffer.0.borrow().clone();
+                    for _ in prev_len..len {
+                        v.push(0);
+                    }
+                    v
+                } else {
+                    vec![0; len]
+                }))
+            });
+        let p0 = buffer.allocate(&(), &(), &mut None, 1, 10).clone();
+        buffer.write(&(), &p0, &[1; 10]);
+        assert_eq!(p0.first, 0);
+        assert_eq!(p0.size, 10);
+
+        let p1 = buffer.allocate(&(), &(), &mut None, 2, 15).clone();
+        buffer.write(&(), &p1, &[2; 15]);
+        assert_eq!(p1.first, 10);
+        assert_eq!(p1.size, 15);
+
+        let p2 = buffer.allocate(&(), &(), &mut None, 3, 5).clone();
+        buffer.write(&(), &p2, &[3; 5]);
+        assert_eq!(p2.first, 25);
+        assert_eq!(p2.size, 5);
+
+        let p3 = buffer.allocate(&(), &(), &mut None, 4, 12).clone();
+        buffer.write(&(), &p3, &[4; 12]);
+        assert_eq!(p3.first, 30);
+        assert_eq!(p3.size, 12);
+
+        buffer.flush();
+
+        assert_eq!(
+            &buffer.buffer.0.borrow()[0..buffer.last()],
+            &vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3,
+                3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
+            ]
+        );
+    }
+
+    #[test]
+    fn test_free() {
+        let mut buffer: BatchBuffer<MockBuffer> =
+            BatchBuffer::new(&(), &(), &mut None, |_, _, _, prev, len| {
+                MockBuffer(RefCell::new(if let Some((prev_buffer, prev_len)) = prev {
+                    let mut v = prev_buffer.0.borrow().clone();
+                    for _ in prev_len..len {
+                        v.push(0);
+                    }
+                    v
+                } else {
+                    vec![0; len]
+                }))
+            });
+        let p0 = buffer.allocate(&(), &(), &mut None, 1, 10).clone();
+        buffer.write(&(), &p0, &[1; 10]);
+
+        let p1 = buffer.allocate(&(), &(), &mut None, 2, 15).clone();
+        buffer.write(&(), &p1, &[2; 15]);
+
+        let p2 = buffer.allocate(&(), &(), &mut None, 3, 5).clone();
+        buffer.write(&(), &p2, &[3; 5]);
+
+        let p3 = buffer.allocate(&(), &(), &mut None, 4, 12).clone();
+        buffer.write(&(), &p3, &[4; 12]);
+        buffer.flush();
+
+        buffer.free(&(), 1);
+        buffer.free(&(), 2);
+        buffer.free(&(), 3);
+        buffer.free(&(), 4);
+        assert_eq!(&buffer.buffer.0.borrow()[0..buffer.last()], &vec![0; 42]);
+
+        let p4 = buffer.allocate(&(), &(), &mut None, 5, 16).clone();
+        buffer.write(&(), &p4, &[5; 16]);
+        assert_eq!(p4.first, 42);
+        assert_eq!(p4.size, 16);
+
+        let p5 = buffer.allocate(&(), &(), &mut None, 6, 12).clone();
+        buffer.write(&(), &p5, &[6; 12]);
+        assert_eq!(p5.first, 30);
+        assert_eq!(p5.size, 12);
+
+        let p6 = buffer.allocate(&(), &(), &mut None, 7, 5).clone();
+        buffer.write(&(), &p6, &[7; 5]);
+        assert_eq!(p6.first, 25);
+        assert_eq!(p6.size, 5);
+
+        assert_eq!(
+            &buffer.buffer.0.borrow()[0..buffer.last()],
+            &vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7,
+                7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+                5, 5
+            ]
+        );
     }
 }
