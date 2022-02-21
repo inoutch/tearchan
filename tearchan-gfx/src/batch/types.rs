@@ -1,6 +1,6 @@
 use nalgebra_glm::{
     vec2, vec3, vec3_to_vec2, vec4, vec4_to_vec3, Mat2, Mat3, Mat4, TMat2, TMat3, TMat4, TVec2,
-    TVec3, TVec4, Vec3, Vec4,
+    TVec3, TVec4, Vec2, Vec3, Vec4,
 };
 use std::option::Option::Some;
 
@@ -39,6 +39,41 @@ impl BatchTypeArray {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub fn get_v1f32(&self) -> Option<&Vec<f32>> {
+        match self {
+            BatchTypeArray::V1F32 { data } => Some(data),
+            _ => None,
+        }
+    }
+
+    pub fn get_v1u32(&self) -> Option<&Vec<u32>> {
+        match self {
+            BatchTypeArray::V1U32 { data } => Some(data),
+            _ => None,
+        }
+    }
+
+    pub fn get_v2f32(&self) -> Option<&Vec<Vec2>> {
+        match self {
+            BatchTypeArray::V2F32 { data } => Some(data),
+            _ => None,
+        }
+    }
+
+    pub fn get_v3f32(&self) -> Option<&Vec<Vec3>> {
+        match self {
+            BatchTypeArray::V3F32 { data } => Some(data),
+            _ => None,
+        }
+    }
+
+    pub fn get_v4f32(&self) -> Option<&Vec<Vec4>> {
+        match self {
+            BatchTypeArray::V4F32 { data } => Some(data),
+            _ => None,
+        }
     }
 
     pub fn transform(&self, transform: &BatchTypeTransform) -> Option<Self> {

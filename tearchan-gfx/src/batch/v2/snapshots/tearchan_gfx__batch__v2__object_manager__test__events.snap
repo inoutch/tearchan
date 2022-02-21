@@ -1,0 +1,41 @@
+---
+source: tearchan-gfx/src/batch/v2/object_manager.rs
+expression: events
+
+---
+[
+    Add {
+        id: BatchObjectId(
+            0,
+        ),
+    },
+    Add {
+        id: BatchObjectId(
+            1,
+        ),
+    },
+    Write {
+        id: BatchObjectId(
+            0,
+        ),
+        attribute: 0,
+    },
+    Write {
+        id: BatchObjectId(
+            0,
+        ),
+        attribute: 1,
+    },
+    Write {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 0,
+    },
+    Write {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 1,
+    },
+]

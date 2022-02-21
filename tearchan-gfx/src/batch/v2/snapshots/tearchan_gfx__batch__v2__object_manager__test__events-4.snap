@@ -1,0 +1,12 @@
+---
+source: tearchan-gfx/src/batch/v2/object_manager.rs
+expression: events
+
+---
+[
+    Remove {
+        id: BatchObjectId(
+            1,
+        ),
+    },
+]

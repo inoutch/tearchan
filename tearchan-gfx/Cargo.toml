@@ -26,3 +26,6 @@ wasm-bindgen-futures = "0.4.19"
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 version = "0.3.45"
 features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
+
+[dev-dependencies]
+insta = "1.8.0"

@@ -1,0 +1,33 @@
+---
+source: tearchan-gfx/src/batch/v2/object_manager.rs
+expression: convert_events(&mut manager)
+
+---
+[
+    Resize {
+        len: 10,
+    },
+    Add {
+        id: BatchObjectId(
+            1,
+        ),
+    },
+    Write {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 0,
+    },
+    Write {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 1,
+    },
+    Write {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 2,
+    },
+]

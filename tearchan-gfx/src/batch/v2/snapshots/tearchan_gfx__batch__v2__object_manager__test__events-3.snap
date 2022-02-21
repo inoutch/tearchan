@@ -1,0 +1,18 @@
+---
+source: tearchan-gfx/src/batch/v2/object_manager.rs
+expression: events
+
+---
+[
+    Remove {
+        id: BatchObjectId(
+            0,
+        ),
+    },
+    Clear {
+        pointer: BatchBufferPointer {
+            first: 0,
+            len: 1,
+        },
+    },
+]

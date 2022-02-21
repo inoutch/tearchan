@@ -17,6 +17,7 @@ pub mod batch_line;
 pub mod buffer;
 pub mod object;
 pub mod types;
+pub mod v2;
 
 pub enum BatchProviderCommand<'a> {
     Add {

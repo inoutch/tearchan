@@ -1,0 +1,13 @@
+---
+source: tearchan-gfx/src/batch/v2/buffer.rs
+expression: events
+
+---
+[
+    Clear(
+        BatchBufferPointer {
+            first: 3,
+            len: 4,
+        },
+    ),
+]

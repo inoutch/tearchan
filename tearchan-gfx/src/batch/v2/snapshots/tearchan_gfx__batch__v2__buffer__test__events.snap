@@ -1,0 +1,37 @@
+---
+source: tearchan-gfx/src/batch/v2/buffer.rs
+expression: events
+
+---
+[
+    Write(
+        BatchBufferPointer {
+            first: 0,
+            len: 1,
+        },
+    ),
+    Write(
+        BatchBufferPointer {
+            first: 1,
+            len: 2,
+        },
+    ),
+    Write(
+        BatchBufferPointer {
+            first: 3,
+            len: 4,
+        },
+    ),
+    Write(
+        BatchBufferPointer {
+            first: 7,
+            len: 3,
+        },
+    ),
+    Write(
+        BatchBufferPointer {
+            first: 10,
+            len: 5,
+        },
+    ),
+]

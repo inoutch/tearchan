@@ -13,6 +13,10 @@ name = "batch"
 path = "batch/main.rs"
 
 [[bin]]
+name = "batch_v2"
+path = "batch_v2/main.rs"
+
+[[bin]]
 name = "file"
 path = "file/main.rs"
 
