@@ -1,16 +1,16 @@
 ---
 source: tearchan-gfx/src/batch/v2/object_manager.rs
-expression: events
+expression: convert_events(&mut manager)
 
 ---
 [
-    Write {
+    WriteToVertexBuffer {
         id: BatchObjectId(
             0,
         ),
         attribute: 1,
     },
-    Write {
+    WriteToVertexBuffer {
         id: BatchObjectId(
             1,
         ),

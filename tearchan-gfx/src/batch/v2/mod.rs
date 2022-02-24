@@ -18,16 +18,27 @@ pub enum BatchEvent<'a> {
     Remove {
         id: BatchObjectId,
     },
-    Write {
+    WriteToIndexBuffer {
+        id: BatchObjectId,
+        pointer: BatchBufferPointer,
+        object: &'a BatchObject,
+    },
+    WriteToVertexBuffer {
         id: BatchObjectId,
         pointer: BatchBufferPointer,
         attribute: BatchAttributeIndex,
         object: &'a BatchObject,
     },
-    Clear {
+    ClearToIndexBuffer {
         pointer: BatchBufferPointer,
     },
-    Resize {
+    ClearToVertexBuffer {
+        pointer: BatchBufferPointer,
+    },
+    ResizeIndexBuffer {
+        len: usize,
+    },
+    ResizeVertextBuffer {
         len: usize,
     },
     Error,
@@ -39,10 +50,10 @@ pub struct Batch<T> {
 }
 
 impl<T> Batch<T> {
-    pub fn new(provider: T, len: usize) -> Self {
+    pub fn new(provider: T, index_len: usize, vertex_len: usize) -> Self {
         Batch {
             provider,
-            manager: BatchObjectManager::new(len),
+            manager: BatchObjectManager::new(index_len, vertex_len),
         }
     }
 
@@ -56,27 +67,26 @@ impl<T> Batch<T> {
 
     pub fn add(
         &mut self,
-        data: Vec<BatchTypeArray>,
-        len: usize,
+        indices: BatchTypeArray,
+        vertices: Vec<BatchTypeArray>,
         order: Option<i32>,
     ) -> BatchObjectId {
-        self.manager.add(data, len, order)
+        self.manager.add(indices, vertices, order)
     }
 
     pub fn remove(&mut self, id: BatchObjectId) {
         self.manager.remove(id);
     }
 
-    pub fn replace(&mut self, id: BatchObjectId, len: usize, data: Vec<BatchTypeArray>) {
-        self.manager.replace(id, len, data);
+    pub fn replace_indices(&mut self, id: BatchObjectId, indices: BatchTypeArray) {
+        self.manager.replace_indices(id, indices);
+    }
+    pub fn replace_vertices(&mut self, id: BatchObjectId, vertices: Vec<BatchTypeArray>) {
+        self.manager.replace_vertices(id, vertices);
     }
 
-    pub fn len(&self) -> usize {
-        self.manager.allocator_len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.manager.allocator_is_empty()
+    pub fn index_count(&self) -> usize {
+        self.manager.index_allocator_len()
     }
 
     pub fn transform(
@@ -104,23 +114,40 @@ impl<TProvider> Batch<TProvider> {
                 BatchObjectEvent::Remove { id } => {
                     provider.run(&mut context, BatchEvent::Remove { id });
                 }
-                BatchObjectEvent::Write { id, attribute } => {
+                BatchObjectEvent::WriteToIndexBuffer { id } => {
                     let object = manager.get(id).unwrap();
                     provider.run(
                         &mut context,
-                        BatchEvent::Write {
+                        BatchEvent::WriteToIndexBuffer {
                             id,
-                            pointer: object.pointer(),
+                            pointer: object.index_pointer(),
+                            object,
+                        },
+                    );
+                }
+                BatchObjectEvent::WriteToVertexBuffer { id, attribute } => {
+                    let object = manager.get(id).unwrap();
+                    provider.run(
+                        &mut context,
+                        BatchEvent::WriteToVertexBuffer {
+                            id,
+                            pointer: object.vertex_pointer(),
                             attribute,
                             object,
                         },
                     );
                 }
-                BatchObjectEvent::Clear { pointer } => {
-                    provider.run(&mut context, BatchEvent::Clear { pointer });
+                BatchObjectEvent::ClearToIndexBuffer { pointer } => {
+                    provider.run(&mut context, BatchEvent::ClearToIndexBuffer { pointer });
                 }
-                BatchObjectEvent::Resize { len } => {
-                    provider.run(&mut context, BatchEvent::Resize { len });
+                BatchObjectEvent::ClearToVertexBuffer { pointer } => {
+                    provider.run(&mut context, BatchEvent::ClearToVertexBuffer { pointer });
+                }
+                BatchObjectEvent::ResizeIndexBuffer { len } => {
+                    provider.run(&mut context, BatchEvent::ResizeIndexBuffer { len });
+                }
+                BatchObjectEvent::ResizeVertexBuffer { len } => {
+                    provider.run(&mut context, BatchEvent::ResizeVertextBuffer { len });
                 }
             }
         }
@@ -130,11 +157,11 @@ impl<TProvider> Batch<TProvider> {
 #[cfg(test)]
 mod test {
     use crate::batch::types::BatchTypeArray;
-    use crate::batch::v2::buffer::{IndexBatchBuffer, VertexBatchBuffer};
+    use crate::batch::v2::buffer::BatchBuffer;
     use crate::batch::v2::provider::BatchProvider;
     use crate::batch::v2::{Batch, BatchEvent};
     use crate::v2::buffer::test::{TestBuffer, TestCopier, TestResizer, TestWriter};
-    use nalgebra_glm::{vec3, Vec3};
+    use nalgebra_glm::{vec2, vec3, Vec2, Vec3};
     use std::ops::{Deref, DerefMut};
 
     #[allow(dead_code)]
@@ -161,20 +188,33 @@ mod test {
     }
 
     impl TestBatch {
-        pub fn new(len: usize) -> TestBatch {
+        pub fn new(index_len: usize, vertex_len: usize) -> TestBatch {
             TestBatch(Batch::new(
                 TestBatchProvider {
-                    index_buffer: IndexBatchBuffer::new(TestBuffer::new(vec![0; len])),
-                    position_buffer: VertexBatchBuffer::new(TestBuffer::new(vec![])),
+                    index_buffer: BatchBuffer::new(TestBuffer::new(vec![0; index_len])),
+                    position_buffer: BatchBuffer::new(TestBuffer::new(
+                        vec![(); vertex_len]
+                            .iter()
+                            .map(|_| vec3(0.0f32, 0.0f32, 0.0f32))
+                            .collect(),
+                    )),
+                    texcoord_buffer: BatchBuffer::new(TestBuffer::new(
+                        vec![(); vertex_len]
+                            .iter()
+                            .map(|_| vec2(0.0f32, 0.0f32))
+                            .collect(),
+                    )),
                 },
-                len,
+                index_len,
+                vertex_len,
             ))
         }
     }
 
     struct TestBatchProvider {
-        index_buffer: IndexBatchBuffer<TestBuffer<u32>>,
-        position_buffer: VertexBatchBuffer<TestBuffer<Vec3>, Vec3>,
+        index_buffer: BatchBuffer<TestBuffer<u32>, u32>,
+        position_buffer: BatchBuffer<TestBuffer<Vec3>, Vec3>,
+        texcoord_buffer: BatchBuffer<TestBuffer<Vec2>, Vec2>,
     }
 
     impl<'a> BatchProvider<'a> for TestBatchProvider {
@@ -182,34 +222,45 @@ mod test {
 
         fn run(&mut self, context: &mut Self::Context, event: BatchEvent) {
             match event {
-                BatchEvent::Write {
+                BatchEvent::WriteToIndexBuffer {
+                    pointer, object, ..
+                } => {
+                    self.index_buffer.write(
+                        context.0,
+                        pointer,
+                        &object.get_v1u32_indices().unwrap(),
+                    );
+                }
+                BatchEvent::WriteToVertexBuffer {
                     pointer,
                     attribute,
                     object,
                     ..
                 } => match attribute {
                     0 => {
-                        self.index_buffer.write(
-                            context.0,
-                            pointer,
-                            &object.get_v1u32_data(attribute).unwrap(),
-                        );
-                    }
-                    1 => {
                         self.position_buffer.write(
                             context.0,
                             pointer,
-                            &object.get_v3f32_data(attribute).unwrap(),
+                            &object.get_v3f32_vertices(attribute).unwrap(),
                         );
                     }
+                    1 => self.texcoord_buffer.write(
+                        context.0,
+                        pointer,
+                        &object.get_v2f32_vertices(attribute).unwrap(),
+                    ),
                     _ => {}
                 },
-                BatchEvent::Clear { pointer } => {
+                BatchEvent::ClearToIndexBuffer { pointer } => {
                     self.index_buffer.clear(context.0, pointer);
+                }
+                BatchEvent::ClearToVertexBuffer { pointer } => {
                     self.position_buffer.clear(context.0, pointer);
                 }
-                BatchEvent::Resize { len } => {
+                BatchEvent::ResizeIndexBuffer { len } => {
                     self.index_buffer.resize(context.2, len);
+                }
+                BatchEvent::ResizeVertextBuffer { len } => {
                     self.position_buffer.resize(context.2, len);
                 }
                 _ => {}
@@ -223,32 +274,29 @@ mod test {
         let mut writer = TestWriter;
         let mut copier = TestCopier;
 
-        let mut batch = TestBatch::new(10);
+        let mut batch = TestBatch::new(10, 10);
         batch.add(
-            vec![
-                BatchTypeArray::V1U32 {
-                    data: vec![0, 1, 2],
-                },
-                BatchTypeArray::V3F32 {
-                    data: vec![
-                        vec3(0.0f32, 0.0f32, 0.0f32),
-                        vec3(1.0f32, 0.0f32, 0.0f32),
-                        vec3(1.0f32, 1.0f32, 0.0f32),
-                    ],
-                },
-            ],
-            3,
+            BatchTypeArray::V1U32 {
+                data: vec![0, 1, 2],
+            },
+            vec![BatchTypeArray::V3F32 {
+                data: vec![
+                    vec3(0.0f32, 0.0f32, 0.0f32),
+                    vec3(1.0f32, 0.0f32, 0.0f32),
+                    vec3(1.0f32, 1.0f32, 0.0f32),
+                ],
+            }],
             None,
         );
 
         batch.flush((&mut writer, &mut copier, &mut resizer));
 
         assert_eq!(
-            batch.provider().index_buffer.buffer().data.borrow()[0..batch.len()],
+            batch.provider().index_buffer.buffer().data.borrow()[0..batch.index_count()],
             vec![0, 1, 2]
         );
         assert_eq!(
-            batch.provider().position_buffer.buffer().data.borrow()[0..batch.len()],
+            batch.provider().position_buffer.buffer().data.borrow()[0..batch.index_count()],
             vec![
                 vec3(0.0f32, 0.0f32, 0.0f32),
                 vec3(1.0f32, 0.0f32, 0.0f32),

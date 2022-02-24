@@ -7,6 +7,7 @@ use tearchan::engine::Engine;
 use tearchan::engine_config::EngineStartupConfigBuilder;
 use tearchan::gfx::batch::types::{BatchTypeArray, BatchTypeTransform};
 use tearchan::gfx::batch::v2::batch2d::Batch2D;
+use tearchan::gfx::batch::v2::batch2d::BATCH2D_ATTRIBUTE_POSITION;
 use tearchan::gfx::batch::v2::context::BatchContext;
 use tearchan::gfx::batch::v2::object_manager::BatchObjectId;
 use tearchan::gfx::camera::Camera3D;
@@ -280,7 +281,7 @@ impl Scene for BatchV2Scene {
                 queue,
                 encoder: &mut encoder,
             });
-            let len = self.batch.len() as u32;
+            let index_count = self.batch.index_count() as u32;
             let mut rpass = encoder.begin_render_pass(&tearchan::gfx::wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[tearchan::gfx::wgpu::RenderPassColorAttachment {
@@ -304,7 +305,7 @@ impl Scene for BatchV2Scene {
             self.batch.bind(&mut rpass);
             rpass.pop_debug_group();
             rpass.insert_debug_marker("Draw!");
-            rpass.draw_indexed(0..len, 0, 0..1);
+            rpass.draw_indexed(0..index_count, 0, 0..1);
         }
 
         queue.submit(Some(encoder.finish()));
@@ -325,10 +326,10 @@ fn create_sprite(batch: &mut Batch2D, sprites: &mut VecDeque<BatchObjectId>) {
     let square_colors = create_square_colors(vec4(color.r, color.g, color.b, 1.0f32));
     let square_texcoords = create_square_texcoords(&rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32));
     let id = batch.add(
+        BatchTypeArray::V1U32 {
+            data: square_indices,
+        },
         vec![
-            BatchTypeArray::V1U32 {
-                data: square_indices,
-            },
             BatchTypeArray::V3F32 {
                 data: square_positions,
             },
@@ -339,12 +340,11 @@ fn create_sprite(batch: &mut Batch2D, sprites: &mut VecDeque<BatchObjectId>) {
                 data: square_colors,
             },
         ],
-        6,
         None,
     );
     batch.transform(
         id,
-        1,
+        BATCH2D_ATTRIBUTE_POSITION,
         BatchTypeTransform::Mat4F32 {
             m: rotate_z(&Mat4::identity(), rng.gen_range(0.0f32..PI * 2.0f32)),
         },

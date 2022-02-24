@@ -37,6 +37,19 @@ impl BatchTypeArray {
         }
     }
 
+    pub fn label(&self) -> &'static str {
+        match self {
+            BatchTypeArray::V1F32 { .. } => "v1f32",
+            BatchTypeArray::V1U32 { .. } => "v1u32",
+            BatchTypeArray::V2F32 { .. } => "v2f32",
+            BatchTypeArray::V2U32 { .. } => "v2u32",
+            BatchTypeArray::V3F32 { .. } => "v3f32",
+            BatchTypeArray::V3U32 { .. } => "v3u32",
+            BatchTypeArray::V4F32 { .. } => "v4f32",
+            BatchTypeArray::V4U32 { .. } => "v4u32",
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -76,7 +89,7 @@ impl BatchTypeArray {
         }
     }
 
-    pub fn transform(&self, transform: &BatchTypeTransform) -> Option<Self> {
+    pub fn transform(&self, transform: &BatchTypeTransform) -> Result<Self, BatchTypeArrayError> {
         match transform {
             BatchTypeTransform::Mat2U32 { m } => {
                 if let BatchTypeArray::V1U32 { data } = self {
@@ -87,9 +100,12 @@ impl BatchTypeArray {
                             v.x
                         })
                         .collect();
-                    return Some(BatchTypeArray::V1U32 { data: transformed });
+                    return Ok(BatchTypeArray::V1U32 { data: transformed });
                 }
-                log::debug!("Invalid batch type array for mat2u32 transform");
+                return Err(BatchTypeArrayError::InvalidTransformType {
+                    expect: "v1u32",
+                    actual: self.label(),
+                });
             }
             BatchTypeTransform::Mat2F32 { m } => {
                 if let BatchTypeArray::V1F32 { data } = self {
@@ -100,9 +116,12 @@ impl BatchTypeArray {
                             v.x
                         })
                         .collect();
-                    return Some(BatchTypeArray::V1F32 { data: transformed });
+                    return Ok(BatchTypeArray::V1F32 { data: transformed });
                 }
-                log::debug!("Invalid batch type array for mat2u32 transform");
+                return Err(BatchTypeArrayError::InvalidTransformType {
+                    expect: "v1f32",
+                    actual: self.label(),
+                });
             }
             BatchTypeTransform::Mat3U32 { m } => {
                 if let BatchTypeArray::V2U32 { data } = self {
@@ -113,9 +132,12 @@ impl BatchTypeArray {
                             vec3_to_vec2(&v)
                         })
                         .collect();
-                    return Some(BatchTypeArray::V2U32 { data: transformed });
+                    return Ok(BatchTypeArray::V2U32 { data: transformed });
                 }
-                log::debug!("Invalid batch type array for mat3u32 transform");
+                return Err(BatchTypeArrayError::InvalidTransformType {
+                    expect: "v2u32",
+                    actual: self.label(),
+                });
             }
             BatchTypeTransform::Mat3F32 { m } => {
                 if let BatchTypeArray::V2F32 { data } = self {
@@ -126,9 +148,12 @@ impl BatchTypeArray {
                             vec3_to_vec2(&v)
                         })
                         .collect();
-                    return Some(BatchTypeArray::V2F32 { data: transformed });
+                    return Ok(BatchTypeArray::V2F32 { data: transformed });
                 }
-                log::debug!("Invalid batch type array for mat3f32 transform");
+                return Err(BatchTypeArrayError::InvalidTransformType {
+                    expect: "v2f32",
+                    actual: self.label(),
+                });
             }
             BatchTypeTransform::Mat4U32 { m } => {
                 if let BatchTypeArray::V3U32 { data } = self {
@@ -139,9 +164,12 @@ impl BatchTypeArray {
                             vec4_to_vec3(&v)
                         })
                         .collect();
-                    return Some(BatchTypeArray::V3U32 { data: transformed });
+                    return Ok(BatchTypeArray::V3U32 { data: transformed });
                 }
-                log::debug!("Invalid batch type array for mat4u32 transform");
+                return Err(BatchTypeArrayError::InvalidTransformType {
+                    expect: "v3u32",
+                    actual: self.label(),
+                });
             }
             BatchTypeTransform::Mat4F32 { m } => {
                 if let BatchTypeArray::V3F32 { data } = self {
@@ -152,14 +180,25 @@ impl BatchTypeArray {
                             vec4_to_vec3(&v)
                         })
                         .collect();
-                    return Some(BatchTypeArray::V3F32 { data: transformed });
+                    return Ok(BatchTypeArray::V3F32 { data: transformed });
                 }
-                log::debug!("Invalid batch type array for mat4f32 transform");
+                return Err(BatchTypeArrayError::InvalidTransformType {
+                    expect: "v3f32",
+                    actual: self.label(),
+                });
             }
             BatchTypeTransform::None => {}
         }
-        None
+        Ok(self.clone())
     }
+}
+
+#[derive(Debug)]
+pub enum BatchTypeArrayError {
+    InvalidTransformType {
+        expect: &'static str,
+        actual: &'static str,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -171,6 +210,27 @@ pub enum BatchTypeTransform {
     Mat4U32 { m: TMat4<u32> },
     Mat4F32 { m: Mat4 },
     None,
+}
+
+impl BatchTypeTransform {
+    pub fn label(&self) -> &'static str {
+        match self {
+            BatchTypeTransform::Mat2U32 { .. } => "mat2u32",
+            BatchTypeTransform::Mat2F32 { .. } => "mat2f32",
+            BatchTypeTransform::Mat3U32 { .. } => "mat3u32",
+            BatchTypeTransform::Mat3F32 { .. } => "mat3f32",
+            BatchTypeTransform::Mat4U32 { .. } => "mat4u32",
+            BatchTypeTransform::Mat4F32 { .. } => "mat4f32",
+            BatchTypeTransform::None => "none",
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        match self {
+            BatchTypeTransform::None => true,
+            _ => false,
+        }
+    }
 }
 
 pub type BatchAttributeIndex = u32;

@@ -1,4 +1,4 @@
-use crate::batch::v2::buffer::{IndexBatchBuffer, VertexBatchBuffer};
+use crate::batch::v2::buffer::BatchBuffer;
 use crate::batch::v2::context::BatchContext;
 use crate::batch::v2::provider::BatchProvider;
 use crate::batch::v2::{Batch, BatchEvent};
@@ -7,10 +7,9 @@ use nalgebra_glm::{Vec2, Vec3, Vec4};
 use std::ops::{Deref, DerefMut};
 use wgpu::RenderPass;
 
-pub const BATCH2D_ATTRIBUTE_INDEX: usize = 0;
-pub const BATCH2D_ATTRIBUTE_POSITION: usize = 1;
-pub const BATCH2D_ATTRIBUTE_TEXCOORD: usize = 2;
-pub const BATCH2D_ATTRIBUTE_COLOR: usize = 3;
+pub const BATCH2D_ATTRIBUTE_POSITION: u32 = 0;
+pub const BATCH2D_ATTRIBUTE_TEXCOORD: u32 = 1;
+pub const BATCH2D_ATTRIBUTE_COLOR: u32 = 2;
 
 pub struct Batch2D {
     batch: Batch<Batch2DProvider>,
@@ -39,25 +38,25 @@ impl Batch2D {
             | wgpu::BufferUsages::COPY_DST
             | wgpu::BufferUsages::COPY_SRC;
         let provider = Batch2DProvider {
-            index_buffer: IndexBatchBuffer::new(Buffer::new(
+            index_buffer: BatchBuffer::new(Buffer::new(
                 device,
                 len,
                 "IndexBuffer".to_string(),
                 index_usage,
             )),
-            position_buffer: VertexBatchBuffer::new(Buffer::new(
+            position_buffer: BatchBuffer::new(Buffer::new(
                 device,
                 len,
                 "PositionBuffer".to_string(),
                 vertex_usage,
             )),
-            texcoord_buffer: VertexBatchBuffer::new(Buffer::new(
+            texcoord_buffer: BatchBuffer::new(Buffer::new(
                 device,
                 len,
                 "PositionBuffer".to_string(),
                 vertex_usage,
             )),
-            color_buffer: VertexBatchBuffer::new(Buffer::new(
+            color_buffer: BatchBuffer::new(Buffer::new(
                 device,
                 len,
                 "PositionBuffer".to_string(),
@@ -66,7 +65,7 @@ impl Batch2D {
         };
 
         Batch2D {
-            batch: Batch::new(provider, len),
+            batch: Batch::new(provider, len, len),
         }
     }
 
@@ -76,25 +75,25 @@ impl Batch2D {
             wgpu::IndexFormat::Uint32,
         );
         rpass.set_vertex_buffer(
-            BATCH2D_ATTRIBUTE_POSITION as u32 - 1,
+            BATCH2D_ATTRIBUTE_POSITION as u32,
             self.provider.position_buffer.buffer().slice(..),
         );
         rpass.set_vertex_buffer(
-            BATCH2D_ATTRIBUTE_TEXCOORD as u32 - 1,
+            BATCH2D_ATTRIBUTE_TEXCOORD as u32,
             self.provider.texcoord_buffer.buffer().slice(..),
         );
         rpass.set_vertex_buffer(
-            BATCH2D_ATTRIBUTE_COLOR as u32 - 1,
+            BATCH2D_ATTRIBUTE_COLOR as u32,
             self.provider.color_buffer.buffer().slice(..),
         );
     }
 }
 
 pub struct Batch2DProvider {
-    index_buffer: IndexBatchBuffer<Buffer<u32>>,
-    position_buffer: VertexBatchBuffer<Buffer<f32>, Vec3>,
-    texcoord_buffer: VertexBatchBuffer<Buffer<f32>, Vec2>,
-    color_buffer: VertexBatchBuffer<Buffer<f32>, Vec4>,
+    index_buffer: BatchBuffer<Buffer<u32>, u32>,
+    position_buffer: BatchBuffer<Buffer<f32>, Vec3>,
+    texcoord_buffer: BatchBuffer<Buffer<f32>, Vec2>,
+    color_buffer: BatchBuffer<Buffer<f32>, Vec4>,
 }
 
 impl<'a> BatchProvider<'a> for Batch2DProvider {
@@ -102,50 +101,56 @@ impl<'a> BatchProvider<'a> for Batch2DProvider {
 
     fn run(&mut self, context: &mut Self::Context, event: BatchEvent) {
         match event {
-            BatchEvent::Write {
+            BatchEvent::WriteToIndexBuffer {
+                pointer, object, ..
+            } => {
+                self.index_buffer.write(
+                    context.writer(),
+                    pointer,
+                    &object.get_v1u32_indices().unwrap(),
+                );
+            }
+            BatchEvent::WriteToVertexBuffer {
                 pointer,
                 object,
                 attribute,
                 ..
-            } => match attribute as usize {
-                BATCH2D_ATTRIBUTE_INDEX => {
-                    self.index_buffer.write(
-                        context.writer(),
-                        pointer,
-                        &object.get_v1u32_data(attribute).unwrap(),
-                    );
-                }
+            } => match attribute {
                 BATCH2D_ATTRIBUTE_POSITION => {
                     self.position_buffer.write(
                         context.writer(),
                         pointer,
-                        &object.get_v3f32_data(attribute).unwrap(),
+                        &object.get_v3f32_vertices(attribute).unwrap(),
                     );
                 }
                 BATCH2D_ATTRIBUTE_TEXCOORD => {
                     self.texcoord_buffer.write(
                         context.writer(),
                         pointer,
-                        &object.get_v2f32_data(attribute).unwrap(),
+                        &object.get_v2f32_vertices(attribute).unwrap(),
                     );
                 }
                 BATCH2D_ATTRIBUTE_COLOR => {
                     self.color_buffer.write(
                         context.writer(),
                         pointer,
-                        &object.get_v4f32_data(attribute).unwrap(),
+                        &object.get_v4f32_vertices(attribute).unwrap(),
                     );
                 }
                 _ => {}
             },
-            BatchEvent::Clear { pointer } => {
+            BatchEvent::ClearToIndexBuffer { pointer } => {
                 self.index_buffer.clear(context.writer(), pointer);
+            }
+            BatchEvent::ClearToVertexBuffer { pointer } => {
                 self.position_buffer.clear(context.writer(), pointer);
                 self.texcoord_buffer.clear(context.writer(), pointer);
                 self.color_buffer.clear(context.writer(), pointer);
             }
-            BatchEvent::Resize { len } => {
+            BatchEvent::ResizeIndexBuffer { len } => {
                 self.index_buffer.resize(context.resizer(), len);
+            }
+            BatchEvent::ResizeVertextBuffer { len } => {
                 self.position_buffer.resize(context.resizer(), len);
                 self.texcoord_buffer.resize(context.resizer(), len);
                 self.color_buffer.resize(context.resizer(), len);

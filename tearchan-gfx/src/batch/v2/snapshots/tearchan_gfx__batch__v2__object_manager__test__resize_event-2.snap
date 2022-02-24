@@ -4,7 +4,10 @@ expression: convert_events(&mut manager)
 
 ---
 [
-    Resize {
+    ResizeIndexBuffer {
+        len: 4,
+    },
+    ResizeVertexBuffer {
         len: 10,
     },
     Add {
@@ -12,19 +15,24 @@ expression: convert_events(&mut manager)
             1,
         ),
     },
-    Write {
+    WriteToIndexBuffer {
+        id: BatchObjectId(
+            1,
+        ),
+    },
+    WriteToVertexBuffer {
         id: BatchObjectId(
             1,
         ),
         attribute: 0,
     },
-    Write {
+    WriteToVertexBuffer {
         id: BatchObjectId(
             1,
         ),
         attribute: 1,
     },
-    Write {
+    WriteToVertexBuffer {
         id: BatchObjectId(
             1,
         ),

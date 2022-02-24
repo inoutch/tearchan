@@ -9,19 +9,24 @@ expression: convert_events(&mut manager)
             0,
         ),
     },
-    Write {
+    WriteToIndexBuffer {
+        id: BatchObjectId(
+            0,
+        ),
+    },
+    WriteToVertexBuffer {
         id: BatchObjectId(
             0,
         ),
         attribute: 0,
     },
-    Write {
+    WriteToVertexBuffer {
         id: BatchObjectId(
             0,
         ),
         attribute: 1,
     },
-    Write {
+    WriteToVertexBuffer {
         id: BatchObjectId(
             0,
         ),

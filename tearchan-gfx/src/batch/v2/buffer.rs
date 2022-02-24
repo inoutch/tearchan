@@ -213,59 +213,12 @@ impl BatchBufferPointer {
     }
 }
 
-pub struct IndexBatchBuffer<TBuffer> {
-    buffer: TBuffer,
-}
-
-impl<'a, TBuffer> IndexBatchBuffer<TBuffer>
-where
-    TBuffer: BufferTrait<'a, u32>,
-{
-    pub fn new(buffer: TBuffer) -> Self {
-        Self { buffer }
-    }
-
-    pub fn write(&'a self, writer: TBuffer::Writer, pointer: BatchBufferPointer, data: &[u32]) {
-        assert!(pointer.len <= data.len());
-        self.buffer.write(
-            writer,
-            &data
-                .iter()
-                .map(|v| v + pointer.first as u32)
-                .collect::<Vec<_>>(),
-            pointer.first,
-        );
-    }
-
-    pub fn clear(&'a self, writer: TBuffer::Writer, pointer: BatchBufferPointer) {
-        self.buffer.clear(writer, pointer.first, pointer.len);
-    }
-
-    pub fn resize(&'a self, resizer: TBuffer::Resizer, len: usize) {
-        self.buffer.resize(resizer, len);
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.buffer.len()
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.buffer.is_empty()
-    }
-
-    pub fn buffer(&self) -> &TBuffer {
-        &self.buffer
-    }
-}
-
-pub struct VertexBatchBuffer<TBuffer, TDataType> {
+pub struct BatchBuffer<TBuffer, TDataType> {
     buffer: TBuffer,
     _phantom: PhantomData<TDataType>,
 }
 
-impl<'a, TBuffer, TDataType> VertexBatchBuffer<TBuffer, TDataType>
+impl<'a, TBuffer, TDataType> BatchBuffer<TBuffer, TDataType>
 where
     TBuffer: BufferTrait<'a, TDataType>,
 {
@@ -311,9 +264,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::batch::v2::buffer::{
-        BatchBufferAllocator, BatchBufferAllocatorEvent, IndexBatchBuffer,
-    };
+    use crate::batch::v2::buffer::{BatchBuffer, BatchBufferAllocator, BatchBufferAllocatorEvent};
     use crate::v2::buffer::BufferTrait;
     use std::collections::HashMap;
     use std::marker::PhantomData;
@@ -396,7 +347,7 @@ mod test {
         let mut result = vec![0; 10];
 
         let mut allocator = BatchBufferAllocator::default();
-        let index_buffer = IndexBatchBuffer::new(VecBuffer::new(result.len()));
+        let index_buffer = BatchBuffer::new(VecBuffer::new(result.len()));
         let mut sprites = HashMap::new();
 
         let p0 = allocator.allocate(5);

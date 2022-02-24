@@ -1,6 +1,6 @@
 ---
 source: tearchan-gfx/src/batch/v2/object_manager.rs
-expression: events
+expression: convert_events(&mut manager)
 
 ---
 [
@@ -9,7 +9,13 @@ expression: events
             0,
         ),
     },
-    Clear {
+    ClearToIndexBuffer {
+        pointer: BatchBufferPointer {
+            first: 0,
+            len: 1,
+        },
+    },
+    ClearToVertexBuffer {
         pointer: BatchBufferPointer {
             first: 0,
             len: 1,

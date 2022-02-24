@@ -222,7 +222,7 @@ impl BatchObject {
     }
 
     pub fn get_v1f32_data(&mut self, attribute: BatchAttributeIndex) -> &Vec<f32> {
-        if let Some(data) =
+        if let Ok(data) =
             self.data[attribute as usize].transform(&self.transforms[attribute as usize])
         {
             self.data_cache.insert(attribute, data);
@@ -237,7 +237,7 @@ impl BatchObject {
     }
 
     pub fn get_v1u32_data(&mut self, attribute: BatchAttributeIndex) -> &Vec<u32> {
-        if let Some(data) =
+        if let Ok(data) =
             self.data[attribute as usize].transform(&self.transforms[attribute as usize])
         {
             self.data_cache.insert(attribute, data);
@@ -252,7 +252,7 @@ impl BatchObject {
     }
 
     pub fn get_v2f32_data(&mut self, attribute: BatchAttributeIndex) -> &Vec<TVec2<f32>> {
-        if let Some(data) =
+        if let Ok(data) =
             self.data[attribute as usize].transform(&self.transforms[attribute as usize])
         {
             self.data_cache.insert(attribute, data);
@@ -267,7 +267,7 @@ impl BatchObject {
     }
 
     pub fn get_v2u32_data(&mut self, attribute: BatchAttributeIndex) -> &Vec<TVec2<u32>> {
-        if let Some(data) =
+        if let Ok(data) =
             self.data[attribute as usize].transform(&self.transforms[attribute as usize])
         {
             self.data_cache.insert(attribute, data);
@@ -282,7 +282,7 @@ impl BatchObject {
     }
 
     pub fn get_v3f32_data(&mut self, attribute: BatchAttributeIndex) -> &Vec<TVec3<f32>> {
-        if let Some(data) =
+        if let Ok(data) =
             self.data[attribute as usize].transform(&self.transforms[attribute as usize])
         {
             self.data_cache.insert(attribute, data);
@@ -297,7 +297,7 @@ impl BatchObject {
     }
 
     pub fn get_v3u32_data(&mut self, attribute: BatchAttributeIndex) -> &Vec<TVec3<u32>> {
-        if let Some(data) =
+        if let Ok(data) =
             self.data[attribute as usize].transform(&self.transforms[attribute as usize])
         {
             self.data_cache.insert(attribute, data);

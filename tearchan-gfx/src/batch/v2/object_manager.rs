@@ -24,80 +24,145 @@ pub enum BatchObjectEvent {
     Remove {
         id: BatchObjectId,
     },
-    Write {
+    WriteToIndexBuffer {
+        id: BatchObjectId,
+    },
+    WriteToVertexBuffer {
         id: BatchObjectId,
         attribute: BatchAttributeIndex,
     },
-    Clear {
+    ClearToIndexBuffer {
         pointer: BatchBufferPointer,
     },
-    Resize {
+    ClearToVertexBuffer {
+        pointer: BatchBufferPointer,
+    },
+    ResizeIndexBuffer {
         len: usize,
     },
+    ResizeVertexBuffer {
+        len: usize,
+    },
+}
+
+#[derive(Hash, Eq, PartialEq)]
+enum BatchObjectKey {
+    Index(BatchObjectId),
+    Vertex((BatchObjectId, BatchAttributeIndex)),
 }
 
 pub struct BatchObjectManager {
     id_manager: IdManager<BatchObjectId>,
     objects: HashMap<BatchObjectId, BatchObject>,
-    object_ids_grouped_by_pointer: HashMap<BatchBufferPointer, BatchObjectId>,
-    objects_will_be_rewritten: HashSet<(BatchObjectId, BatchAttributeIndex)>,
-    allocator: BatchBufferAllocator,
+    object_ids_grouped_by_index_pointer: HashMap<BatchBufferPointer, BatchObjectId>,
+    object_ids_grouped_by_vertex_pointer: HashMap<BatchBufferPointer, BatchObjectId>,
+    objects_will_be_rewritten: HashSet<BatchObjectKey>,
+    index_allocator: BatchBufferAllocator,
+    vertex_allocator: BatchBufferAllocator,
     events: VecDeque<BatchObjectEvent>,
-    len: usize,
+    index_len: usize,
+    vertex_len: usize,
 }
 
 impl BatchObjectManager {
-    pub fn new(len: usize) -> Self {
+    pub fn new(index_len: usize, vertex_len: usize) -> Self {
         BatchObjectManager {
             id_manager: IdManager::new(BatchObjectId(0), |id| id.next()),
             objects: HashMap::new(),
+            object_ids_grouped_by_index_pointer: HashMap::new(),
+            object_ids_grouped_by_vertex_pointer: HashMap::new(),
             objects_will_be_rewritten: HashSet::new(),
-            object_ids_grouped_by_pointer: HashMap::new(),
-            allocator: BatchBufferAllocator::default(),
+            index_allocator: BatchBufferAllocator::default(),
+            vertex_allocator: BatchBufferAllocator::default(),
             events: VecDeque::new(),
-            len,
+            index_len,
+            vertex_len,
         }
     }
 
     pub fn pop_event(&mut self) -> Option<BatchObjectEvent> {
-        while let Some(event) = self.allocator.pop_event() {
+        while let Some(event) = self.index_allocator.pop_event() {
             match event {
                 BatchBufferAllocatorEvent::Write(pointer) => {
-                    let object_id = self.object_ids_grouped_by_pointer.get(&pointer).unwrap();
+                    let object_id = self
+                        .object_ids_grouped_by_index_pointer
+                        .get(&pointer)
+                        .unwrap();
+                    self.events
+                        .push_back(BatchObjectEvent::WriteToIndexBuffer { id: *object_id });
+                }
+                BatchBufferAllocatorEvent::Clear(pointer) => {
+                    self.events
+                        .push_back(BatchObjectEvent::ClearToIndexBuffer { pointer });
+                }
+                BatchBufferAllocatorEvent::Reallocate { from, to } => {
+                    let object_id = *self.object_ids_grouped_by_index_pointer.get(&from).unwrap();
+                    let object = self.objects.get_mut(&object_id).unwrap();
+                    self.object_ids_grouped_by_index_pointer
+                        .remove(&object.index_pointer());
+
+                    object.set_index_pointer(to);
+                    self.object_ids_grouped_by_index_pointer
+                        .insert(to, object_id);
+
+                    self.objects_will_be_rewritten
+                        .insert(BatchObjectKey::Index(object_id));
+                }
+            }
+        }
+
+        while let Some(event) = self.vertex_allocator.pop_event() {
+            match event {
+                BatchBufferAllocatorEvent::Write(pointer) => {
+                    let object_id = self
+                        .object_ids_grouped_by_vertex_pointer
+                        .get(&pointer)
+                        .unwrap();
                     let object = self.objects.get(object_id).unwrap();
-                    for (i, _) in object.data().iter().enumerate() {
-                        self.events.push_back(BatchObjectEvent::Write {
-                            id: *object_id,
-                            attribute: i as BatchAttributeIndex,
-                        });
+                    for (i, _) in object.vertices().iter().enumerate() {
+                        self.events
+                            .push_back(BatchObjectEvent::WriteToVertexBuffer {
+                                id: *object_id,
+                                attribute: i as BatchAttributeIndex,
+                            });
                     }
                 }
                 BatchBufferAllocatorEvent::Clear(pointer) => {
-                    self.events.push_back(BatchObjectEvent::Clear { pointer });
+                    self.events
+                        .push_back(BatchObjectEvent::ClearToVertexBuffer { pointer });
                 }
                 BatchBufferAllocatorEvent::Reallocate { from, to } => {
-                    let object_id = *self.object_ids_grouped_by_pointer.get(&from).unwrap();
+                    let object_id = *self
+                        .object_ids_grouped_by_vertex_pointer
+                        .get(&from)
+                        .unwrap();
                     let object = self.objects.get_mut(&object_id).unwrap();
-                    self.object_ids_grouped_by_pointer.remove(&object.pointer());
+                    self.object_ids_grouped_by_vertex_pointer
+                        .remove(&object.vertex_pointer());
 
-                    object.set_pointer(to);
-                    self.object_ids_grouped_by_pointer.insert(to, object_id);
+                    object.set_vertex_pointer(to);
+                    self.object_ids_grouped_by_vertex_pointer
+                        .insert(to, object_id);
 
-                    for i in 0u32..object.data().len() as u32 {
-                        self.objects_will_be_rewritten.insert((object_id, i));
+                    for i in 0u32..object.vertices().len() as u32 {
+                        self.objects_will_be_rewritten
+                            .insert(BatchObjectKey::Vertex((object_id, i)));
                     }
                 }
             }
         }
+
         let event = self.events.pop_front()?;
         match &event {
-            BatchObjectEvent::Add { .. } => {}
-            BatchObjectEvent::Remove { .. } => {}
-            BatchObjectEvent::Write { id, attribute } => {
-                self.objects_will_be_rewritten.remove(&(*id, *attribute));
+            BatchObjectEvent::WriteToIndexBuffer { id } => {
+                self.objects_will_be_rewritten
+                    .remove(&BatchObjectKey::Index(*id));
             }
-            BatchObjectEvent::Clear { .. } => {}
-            BatchObjectEvent::Resize { .. } => {}
+            BatchObjectEvent::WriteToVertexBuffer { id, attribute } => {
+                self.objects_will_be_rewritten
+                    .remove(&BatchObjectKey::Vertex((*id, *attribute)));
+            }
+            _ => {}
         }
         Some(event)
     }
@@ -113,43 +178,73 @@ impl BatchObjectManager {
 
     pub fn add(
         &mut self,
-        data: Vec<BatchTypeArray>,
-        len: usize,
+        indices: BatchTypeArray,
+        vertices: Vec<BatchTypeArray>,
         order: Option<i32>,
     ) -> BatchObjectId {
-        for datum in data.iter() {
-            assert_eq!(datum.len(), len);
+        let mut iter = vertices.iter();
+        let vertex_len = iter.next().map(|array| array.len()).unwrap_or(0);
+        for array in iter {
+            assert_eq!(array.len(), vertex_len);
         }
 
         let id = self.id_manager.gen();
         let order = order.unwrap_or(DEFAULT_ORDER);
-        let transforms = vec![BatchTypeTransform::None; data.len()];
-        let pointer = self.allocator.allocate(len);
-        let object = BatchObject::new(pointer, data, transforms, order);
+        let transforms = vec![BatchTypeTransform::None; vertices.len()];
 
-        if self.allocator.len() > self.len {
-            self.len = self.allocator.len() * 2;
-            self.events
-                .push_back(BatchObjectEvent::Resize { len: self.len });
+        let index_pointer = self.index_allocator.allocate(indices.len());
+        if self.index_allocator.len() > self.index_len {
+            self.index_len = self.index_allocator.len() * 2;
+            self.events.push_back(BatchObjectEvent::ResizeIndexBuffer {
+                len: self.index_len,
+            });
+        }
+        let vertex_pointer = self.vertex_allocator.allocate(vertex_len);
+        if self.vertex_allocator.len() > self.vertex_len {
+            self.vertex_len = self.vertex_allocator.len() * 2;
+            self.events.push_back(BatchObjectEvent::ResizeVertexBuffer {
+                len: self.vertex_len,
+            });
         }
 
-        for i in 0u32..object.data().len() as u32 {
-            self.objects_will_be_rewritten.insert((id, i));
+        let object = BatchObject::new(
+            index_pointer,
+            vertex_pointer,
+            indices,
+            vertices,
+            transforms,
+            order,
+        );
+
+        self.objects_will_be_rewritten
+            .insert(BatchObjectKey::Index(id));
+        for i in 0u32..object.vertices().len() as u32 {
+            self.objects_will_be_rewritten
+                .insert(BatchObjectKey::Vertex((id, i)));
         }
         self.events.push_back(BatchObjectEvent::Add { id });
         self.objects.insert(id, object);
-        self.object_ids_grouped_by_pointer.insert(pointer, id);
+        self.object_ids_grouped_by_index_pointer
+            .insert(index_pointer, id);
+        self.object_ids_grouped_by_vertex_pointer
+            .insert(vertex_pointer, id);
         id
     }
 
     pub fn remove(&mut self, id: BatchObjectId) -> Option<BatchObject> {
         self.events.push_back(BatchObjectEvent::Remove { id });
         let object = self.objects.remove(&id)?;
-        self.allocator.free(object.pointer());
-        self.object_ids_grouped_by_pointer.remove(&object.pointer());
-        for attribute in 0..object.data().len() {
+        self.index_allocator.free(object.index_pointer());
+        self.vertex_allocator.free(object.vertex_pointer());
+        self.object_ids_grouped_by_index_pointer
+            .remove(&object.index_pointer());
+        self.object_ids_grouped_by_vertex_pointer
+            .remove(&object.vertex_pointer());
+        self.objects_will_be_rewritten
+            .remove(&BatchObjectKey::Index(id));
+        for attribute in 0..object.vertices().len() {
             self.objects_will_be_rewritten
-                .remove(&(id, attribute as u32));
+                .remove(&BatchObjectKey::Vertex((id, attribute as u32)));
         }
         Some(object)
     }
@@ -166,72 +261,113 @@ impl BatchObjectManager {
         };
         object.set_transform(attribute, transform);
 
-        let key = (id, attribute);
+        let key = BatchObjectKey::Vertex((id, attribute));
         if self.objects_will_be_rewritten.get(&key).is_none() {
             self.events
-                .push_back(BatchObjectEvent::Write { id, attribute });
+                .push_back(BatchObjectEvent::WriteToVertexBuffer { id, attribute });
             self.objects_will_be_rewritten.insert(key);
         }
     }
 
-    pub fn rewrite(
+    pub fn rewrite_indices(&mut self, id: BatchObjectId, indices: BatchTypeArray) {
+        let object = match self.objects.get_mut(&id) {
+            Some(object) => object,
+            None => return,
+        };
+        assert_eq!(indices.len(), object.indices().len());
+        object.set_indices(indices);
+    }
+
+    pub fn rewrite_vertices(
         &mut self,
         id: BatchObjectId,
         attribute: BatchAttributeIndex,
-        data: BatchTypeArray,
+        vertices: BatchTypeArray,
     ) {
         let object = match self.objects.get_mut(&id) {
             Some(object) => object,
             None => return,
         };
-        let prev_data = match object.data().get(attribute as usize) {
+        let prev_data = match object.vertices().get(attribute as usize) {
             Some(data) => data,
             None => return,
         };
-        assert_eq!(data.len(), prev_data.len());
+        assert_eq!(vertices.len(), prev_data.len());
 
-        object.set_data(attribute, data);
-        let key = (id, attribute);
+        object.set_vertices(attribute, vertices);
+        let key = BatchObjectKey::Vertex((id, attribute));
         if self.objects_will_be_rewritten.get(&key).is_none() {
             self.events
-                .push_back(BatchObjectEvent::Write { id, attribute });
+                .push_back(BatchObjectEvent::WriteToVertexBuffer { id, attribute });
             self.objects_will_be_rewritten.insert(key);
         }
     }
 
-    pub fn replace(&mut self, id: BatchObjectId, len: usize, data: Vec<BatchTypeArray>) {
-        for datum in data.iter() {
-            assert_eq!(datum.len(), len);
+    pub fn replace_indices(&mut self, id: BatchObjectId, indices: BatchTypeArray) {
+        let object = match self.objects.get_mut(&id) {
+            Some(object) => object,
+            None => return,
+        };
+        if object.indices().len() == indices.len() {
+            self.rewrite_indices(id, indices);
+            return;
+        }
+
+        self.object_ids_grouped_by_index_pointer
+            .remove(&object.index_pointer());
+
+        let new_pointer = self
+            .index_allocator
+            .reallocate(object.index_pointer(), indices.len());
+        object.set_index_pointer(new_pointer);
+        self.object_ids_grouped_by_index_pointer
+            .insert(new_pointer, id);
+
+        self.objects_will_be_rewritten
+            .insert(BatchObjectKey::Index(id));
+    }
+
+    pub fn replace_vertices(&mut self, id: BatchObjectId, vertices: Vec<BatchTypeArray>) {
+        let mut iter = vertices.iter();
+        let vertex_len = iter.next().map(|array| array.len()).unwrap_or(0);
+        for array in iter {
+            assert_eq!(array.len(), vertex_len);
         }
 
         let object = match self.objects.get_mut(&id) {
             Some(object) => object,
             None => return,
         };
-        if !object.data().is_empty() && object.data().get(0).unwrap().len() == len {
-            for (i, data) in data.into_iter().enumerate() {
-                self.rewrite(id, i as u32, data);
+        if object
+            .vertices()
+            .first()
+            .map(|vertices| vertices.len() == vertex_len)
+            .unwrap_or(false)
+        {
+            for (i, data) in vertices.into_iter().enumerate() {
+                self.rewrite_vertices(id, i as u32, data);
             }
             return;
         }
 
-        self.object_ids_grouped_by_pointer.remove(&object.pointer());
+        self.object_ids_grouped_by_vertex_pointer
+            .remove(&object.vertex_pointer());
 
-        let new_pointer = self.allocator.reallocate(object.pointer(), len);
-        object.set_pointer(new_pointer);
-        self.object_ids_grouped_by_pointer.insert(new_pointer, id);
+        let new_pointer = self
+            .vertex_allocator
+            .reallocate(object.vertex_pointer(), vertex_len);
+        object.set_vertex_pointer(new_pointer);
+        self.object_ids_grouped_by_vertex_pointer
+            .insert(new_pointer, id);
 
-        for i in 0u32..object.data().len() as u32 {
-            self.objects_will_be_rewritten.insert((id, i));
+        for i in 0u32..object.vertices().len() as u32 {
+            self.objects_will_be_rewritten
+                .insert(BatchObjectKey::Vertex((id, i)));
         }
     }
 
-    pub fn allocator_len(&self) -> usize {
-        self.allocator.len()
-    }
-
-    pub fn allocator_is_empty(&self) -> bool {
-        self.allocator.is_empty()
+    pub fn index_allocator_len(&self) -> usize {
+        self.index_allocator.len()
     }
 }
 
@@ -251,15 +387,15 @@ mod test {
 
     #[test]
     fn test_valid_len() {
-        let mut manager = BatchObjectManager::new(100);
+        let mut manager = BatchObjectManager::new(100, 100);
         manager.add(
+            BatchTypeArray::V1U32 { data: vec![0] },
             vec![
                 BatchTypeArray::V1F32 { data: vec![0.0f32] },
                 BatchTypeArray::V2F32 {
                     data: vec![vec2(0.0f32, 0.0f32)],
                 },
             ],
-            1,
             None,
         );
     }
@@ -267,8 +403,9 @@ mod test {
     #[test]
     #[should_panic]
     fn test_invalid_len() {
-        let mut manager = BatchObjectManager::new(100);
+        let mut manager = BatchObjectManager::new(100, 100);
         manager.add(
+            BatchTypeArray::V1U32 { data: vec![0, 1] },
             vec![
                 BatchTypeArray::V1F32 {
                     data: vec![0.0f32, 0.0f32],
@@ -277,59 +414,62 @@ mod test {
                     data: vec![vec2(0.0f32, 0.0f32)],
                 },
             ],
-            2,
             None,
         );
     }
 
     #[test]
     fn test_cleanup() {
-        let mut manager = BatchObjectManager::new(100);
-        let data = vec![
+        let mut manager = BatchObjectManager::new(100, 100);
+        let indices = BatchTypeArray::V1U32 { data: vec![0] };
+        let vertices = vec![
             BatchTypeArray::V1F32 { data: vec![0.0f32] },
             BatchTypeArray::V2F32 {
                 data: vec![vec2(0.0f32, 0.0f32)],
             },
         ];
-        let id0 = manager.add(data, 1, None);
+        let id0 = manager.add(indices, vertices, None);
 
-        let data = vec![
+        let indices = BatchTypeArray::V1U32 { data: vec![0] };
+        let vertices = vec![
             BatchTypeArray::V1F32 { data: vec![0.0f32] },
             BatchTypeArray::V2F32 {
                 data: vec![vec2(0.0f32, 0.0f32)],
             },
         ];
-        let id1 = manager.add(data, 1, None);
+        let id1 = manager.add(indices, vertices, None);
         manager.remove(id0);
         manager.remove(id1);
 
         assert_eq!(manager.objects.len(), 0);
-        assert_eq!(manager.object_ids_grouped_by_pointer.len(), 0);
+        assert_eq!(manager.object_ids_grouped_by_index_pointer.len(), 0);
+        assert_eq!(manager.object_ids_grouped_by_vertex_pointer.len(), 0);
         assert_eq!(manager.objects_will_be_rewritten.len(), 0);
-        assert_eq!(manager.allocator.len(), 0);
+        assert_eq!(manager.index_allocator.len(), 0);
+        assert_eq!(manager.vertex_allocator.len(), 0);
     }
 
     #[test]
     fn test_events() {
-        let mut manager = BatchObjectManager::new(100);
+        let mut manager = BatchObjectManager::new(100, 100);
         let id0 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![0] },
             vec![
                 BatchTypeArray::V1F32 { data: vec![1.0f32] },
                 BatchTypeArray::V2F32 {
                     data: vec![vec2(1.0f32, 1.0f32)],
                 },
             ],
-            1,
             None,
         );
         let id1 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![0] },
             vec![
                 BatchTypeArray::V1F32 { data: vec![2.0f32] },
                 BatchTypeArray::V2F32 {
                     data: vec![vec2(2.0f32, 2.0f32)],
                 },
             ],
-            1,
             None,
         );
 
@@ -365,8 +505,9 @@ mod test {
 
     #[test]
     fn test_resize_event() {
-        let mut manager = BatchObjectManager::new(2);
+        let mut manager = BatchObjectManager::new(1, 2);
         let _id0 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![0] },
             vec![
                 BatchTypeArray::V1U32 { data: vec![1, 1] },
                 BatchTypeArray::V2F32 {
@@ -376,13 +517,13 @@ mod test {
                     data: vec![vec3(1.0f32, 1.0f32, 1.0f32), vec3(1.0f32, 1.0f32, 1.0f32)],
                 },
             ],
-            2,
             None,
         );
 
         insta::assert_debug_snapshot!(convert_events(&mut manager));
 
         let _id1 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![0] },
             vec![
                 BatchTypeArray::V1U32 {
                     data: vec![2, 2, 2],
@@ -402,7 +543,6 @@ mod test {
                     ],
                 },
             ],
-            3,
             None,
         );
         insta::assert_debug_snapshot!(convert_events(&mut manager));
