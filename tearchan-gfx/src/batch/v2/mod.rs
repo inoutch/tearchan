@@ -5,6 +5,7 @@ use crate::batch::v2::object_manager::{BatchObjectEvent, BatchObjectId, BatchObj
 use crate::batch::v2::provider::BatchProvider;
 
 pub mod batch2d;
+pub mod batch3d;
 pub mod buffer;
 pub mod context;
 pub mod object;
