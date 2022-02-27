@@ -280,7 +280,7 @@ where
     }
 
     pub fn write(
-        &'a self,
+        &mut self,
         writer: TBuffer::Writer,
         pointer: BatchBufferPointer,
         data: &[TDataType],
@@ -289,11 +289,11 @@ where
         self.buffer.write(writer, data, pointer.first);
     }
 
-    pub fn clear(&'a self, writer: TBuffer::Writer, pointer: BatchBufferPointer) {
+    pub fn clear(&mut self, writer: TBuffer::Writer, pointer: BatchBufferPointer) {
         self.buffer.clear(writer, pointer.first, pointer.len);
     }
 
-    pub fn resize(&'a self, resizer: TBuffer::Resizer, len: usize) {
+    pub fn resize(&mut self, resizer: TBuffer::Resizer, len: usize) {
         self.buffer.resize(resizer, len);
     }
 
@@ -319,61 +319,54 @@ mod test {
     };
     use crate::v2::buffer::BufferTrait;
     use std::collections::HashMap;
-    use std::marker::PhantomData;
 
-    type Result = Vec<u32>;
-    struct ResultContext<'a>(&'a mut Result);
+    struct ResultContext;
 
     #[derive(Default)]
-    struct VecBuffer<'a, T> {
-        len: usize,
-        _p: PhantomData<&'a T>,
+    struct VecBuffer {
+        data: Vec<u32>,
     }
 
-    impl<'a, T> VecBuffer<'a, T> {
-        pub fn new(len: usize) -> VecBuffer<'a, T> {
-            VecBuffer {
-                len,
-                _p: PhantomData,
-            }
+    impl VecBuffer {
+        pub fn new(len: usize) -> VecBuffer {
+            VecBuffer { data: vec![0; len] }
         }
     }
 
-    impl<'a> BufferTrait<'a, u32> for VecBuffer<'a, u32> {
-        type Resizer = ResultContext<'a>;
-        type Writer = ResultContext<'a>;
-        type Copier = ResultContext<'a>;
+    impl<'a> BufferTrait<'a, u32> for VecBuffer {
+        type Resizer = &'a mut ResultContext;
+        type Writer = &'a mut ResultContext;
+        type Copier = &'a mut ResultContext;
 
-        fn resize(&'a self, resizer: Self::Resizer, len: usize) {
-            resizer.0.resize(len, 0);
+        fn resize(&mut self, _resizer: Self::Resizer, len: usize) {
+            self.data.resize(len, 0);
         }
 
-        fn write(&'a self, writer: ResultContext<'a>, data: &[u32], offset: usize) {
-            writer
-                .0
+        fn write(&mut self, _writer: &mut ResultContext, data: &[u32], offset: usize) {
+            self.data
                 .splice(offset..(offset + data.len()), data.iter().copied());
         }
 
-        fn copy(&'a self, copy: ResultContext<'a>, from: usize, to: usize, len: usize) {
+        fn copy(&mut self, _copy: &mut ResultContext, from: usize, to: usize, len: usize) {
             let from = {
-                copy.0.as_slice()[from..(from + len)]
+                self.data.as_slice()[from..(from + len)]
                     .iter()
                     .copied()
                     .collect::<Vec<_>>()
             };
-            copy.0.splice(to..(to + len), from);
+            self.data.splice(to..(to + len), from);
         }
 
         fn len(&self) -> usize {
-            self.len
+            self.data.len()
         }
 
         fn is_empty(&self) -> bool {
-            self.len == 0
+            self.data.is_empty()
         }
 
-        fn clear(&self, writer: ResultContext<'a>, offset: usize, len: usize) {
-            writer.0.splice(offset..(offset + len), vec![0; len]);
+        fn clear(&mut self, _writer: &mut ResultContext, offset: usize, len: usize) {
+            self.data.splice(offset..(offset + len), vec![0; len]);
         }
     }
 
@@ -396,11 +389,10 @@ mod test {
 
     #[test]
     fn test_basic_write() {
-        let mut result = vec![0; 10];
-
         let mut allocator = BatchBufferAllocator::default();
-        let index_buffer = BatchBuffer::new(VecBuffer::new(result.len()));
+        let mut index_buffer = BatchBuffer::new(VecBuffer::new(10));
         let mut sprites = HashMap::new();
+        let mut context = ResultContext;
 
         let p0 = allocator.allocate(5);
         sprites.insert(p0, 1);
@@ -409,60 +401,14 @@ mod test {
         while let Some(event) = allocator.pop_event() {
             match event {
                 BatchBufferAllocatorEvent::Clear(pointer) => {
-                    index_buffer.clear(ResultContext(&mut result), pointer);
+                    index_buffer.clear(&mut context, pointer);
                 }
                 BatchBufferAllocatorEvent::Write(pointer) => {
                     if index_buffer.len() < allocator_len {
-                        index_buffer.resize(ResultContext(&mut result), allocator_len * 2);
+                        index_buffer.resize(&mut context, allocator_len * 2);
                     }
                     let sprite = sprites.get(&pointer).unwrap();
-                    index_buffer.write(
-                        ResultContext(&mut result),
-                        pointer,
-                        &v(pointer.len, *sprite),
-                    );
-                }
-                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
-                    for pair in pairs.iter() {
-                        sprites.remove(&pair.from);
-                    }
-                    for (sprite, pointer) in pairs
-                        .iter()
-                        .filter_map(|pair| {
-                            sprites.remove(&pair.from).map(|sprite| (sprite, pair.to))
-                        })
-                        .collect::<Vec<_>>()
-                    {
-                        sprites.insert(pointer, sprite);
-                    }
-                }
-            }
-        }
-
-        assert_eq!(result[0..allocator.len()], [1, 1, 1, 1, 1]);
-
-        let p1 = allocator.allocate(3);
-        sprites.insert(p1, 2);
-
-        let p2 = allocator.allocate(4);
-        sprites.insert(p2, 3);
-
-        let allocator_len = allocator.len();
-        while let Some(event) = allocator.pop_event() {
-            match event {
-                BatchBufferAllocatorEvent::Clear(pointer) => {
-                    index_buffer.clear(ResultContext(&mut result), pointer);
-                }
-                BatchBufferAllocatorEvent::Write(pointer) => {
-                    if index_buffer.len() < allocator_len {
-                        index_buffer.resize(ResultContext(&mut result), allocator_len * 2);
-                    }
-                    let sprite = sprites.get(&pointer).unwrap();
-                    index_buffer.write(
-                        ResultContext(&mut result),
-                        pointer,
-                        &v(pointer.len, *sprite),
-                    );
+                    index_buffer.write(&mut context, pointer, &v(pointer.len, *sprite));
                 }
                 BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
                     for pair in pairs.iter() {
@@ -482,7 +428,48 @@ mod test {
         }
 
         assert_eq!(
-            result[0..allocator.len()],
+            index_buffer.buffer.data[0..allocator.len()],
+            [1, 1, 1, 1, 1]
+        );
+
+        let p1 = allocator.allocate(3);
+        sprites.insert(p1, 2);
+
+        let p2 = allocator.allocate(4);
+        sprites.insert(p2, 3);
+
+        let allocator_len = allocator.len();
+        while let Some(event) = allocator.pop_event() {
+            match event {
+                BatchBufferAllocatorEvent::Clear(pointer) => {
+                    index_buffer.clear(&mut context, pointer);
+                }
+                BatchBufferAllocatorEvent::Write(pointer) => {
+                    if index_buffer.len() < allocator_len {
+                        index_buffer.resize(&mut context, allocator_len * 2);
+                    }
+                    let sprite = sprites.get(&pointer).unwrap();
+                    index_buffer.write(&mut context, pointer, &v(pointer.len, *sprite));
+                }
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    for pair in pairs.iter() {
+                        sprites.remove(&pair.from);
+                    }
+                    for (sprite, pointer) in pairs
+                        .iter()
+                        .filter_map(|pair| {
+                            sprites.remove(&pair.from).map(|sprite| (sprite, pair.to))
+                        })
+                        .collect::<Vec<_>>()
+                    {
+                        sprites.insert(pointer, sprite);
+                    }
+                }
+            }
+        }
+
+        assert_eq!(
+            index_buffer.buffer.data[0..allocator.len()],
             [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3]
         );
     }

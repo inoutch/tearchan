@@ -91,9 +91,9 @@ impl Batch2D {
 
 pub struct Batch2DProvider {
     index_buffer: BatchBuffer<Buffer<u32>, u32>,
-    position_buffer: BatchBuffer<Buffer<f32>, Vec3>,
-    texcoord_buffer: BatchBuffer<Buffer<f32>, Vec2>,
-    color_buffer: BatchBuffer<Buffer<f32>, Vec4>,
+    position_buffer: BatchBuffer<Buffer<Vec3>, Vec3>,
+    texcoord_buffer: BatchBuffer<Buffer<Vec2>, Vec2>,
+    color_buffer: BatchBuffer<Buffer<Vec4>, Vec4>,
 }
 
 impl<'a> BatchProvider<'a> for Batch2DProvider {
@@ -115,30 +115,32 @@ impl<'a> BatchProvider<'a> for Batch2DProvider {
                 object,
                 attribute,
                 ..
-            } => match attribute {
-                BATCH2D_ATTRIBUTE_POSITION => {
-                    self.position_buffer.write(
-                        context.writer(),
-                        pointer,
-                        &object.get_v3f32_vertices(attribute).unwrap(),
-                    );
-                }
-                BATCH2D_ATTRIBUTE_TEXCOORD => {
-                    self.texcoord_buffer.write(
-                        context.writer(),
-                        pointer,
-                        &object.get_v2f32_vertices(attribute).unwrap(),
-                    );
-                }
-                BATCH2D_ATTRIBUTE_COLOR => {
-                    self.color_buffer.write(
-                        context.writer(),
-                        pointer,
-                        &object.get_v4f32_vertices(attribute).unwrap(),
-                    );
-                }
-                _ => {}
-            },
+            } => {
+                match attribute {
+                    BATCH2D_ATTRIBUTE_POSITION => {
+                        self.position_buffer.write(
+                            context.writer(),
+                            pointer,
+                            &object.get_v3f32_vertices(attribute).unwrap(),
+                        );
+                    }
+                    BATCH2D_ATTRIBUTE_TEXCOORD => {
+                        self.texcoord_buffer.write(
+                            context.writer(),
+                            pointer,
+                            &object.get_v2f32_vertices(attribute).unwrap(),
+                        );
+                    }
+                    BATCH2D_ATTRIBUTE_COLOR => {
+                        self.color_buffer.write(
+                            context.writer(),
+                            pointer,
+                            &object.get_v4f32_vertices(attribute).unwrap(),
+                        );
+                    }
+                    _ => {}
+                };
+            }
             BatchEvent::ClearToIndexBuffer { pointer } => {
                 self.index_buffer.clear(context.writer(), pointer);
             }

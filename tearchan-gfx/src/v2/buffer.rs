@@ -9,21 +9,21 @@ use wgpu::util::DeviceExt;
 use wgpu::{BufferAddress, BufferSlice, BufferUsages};
 
 pub trait BufferTrait<'a, TDataType> {
-    type Resizer;
-    type Writer;
-    type Copier;
+    type Resizer: 'a;
+    type Writer: 'a;
+    type Copier: 'a;
 
-    fn resize(&'a self, resizer: Self::Resizer, len: usize);
+    fn resize(&mut self, resizer: Self::Resizer, len: usize);
 
-    fn write(&'a self, writer: Self::Writer, data: &[TDataType], offset: usize);
+    fn write(&mut self, writer: Self::Writer, data: &[TDataType], offset: usize);
 
-    fn copy(&'a self, copy: Self::Copier, from: usize, to: usize, len: usize);
+    fn copy(&mut self, copy: Self::Copier, from: usize, to: usize, len: usize);
 
     fn len(&self) -> usize;
 
     fn is_empty(&self) -> bool;
 
-    fn clear(&'a self, writer: Self::Writer, offset: usize, len: usize);
+    fn clear(&mut self, writer: Self::Writer, offset: usize, len: usize);
 }
 
 pub struct Buffer<T> {
@@ -97,15 +97,20 @@ pub struct BufferCopier<'a> {
     pub encoder: &'a mut wgpu::CommandEncoder,
 }
 
-impl<'a, T> BufferTrait<'a, T> for Buffer<T>
-where
-    T: Pod,
-{
+pub trait Primitive: Pod {}
+
+impl Primitive for i32 {}
+impl Primitive for f32 {}
+impl Primitive for u32 {}
+impl Primitive for f64 {}
+impl Primitive for u64 {}
+
+impl<'a, T: Primitive> BufferTrait<'a, T> for Buffer<T> {
     type Resizer = BufferResizer<'a>;
     type Writer = BufferWriter<'a>;
     type Copier = BufferCopier<'a>;
 
-    fn resize(&'a self, resizer: BufferResizer<'a>, len: usize) {
+    fn resize(&mut self, resizer: BufferResizer<'a>, len: usize) {
         let u8_len = len * size_of::<T>();
         let bytes: Vec<u8> = vec![0u8; u8_len];
         let buffer = resizer
@@ -116,20 +121,22 @@ where
                 usage: self.usage,
             });
 
-        let copy_len = min(len, self.len) * size_of::<T>();
+        let copy_u8_len = min(len, self.len) * size_of::<T>();
         resizer
             .encoder
-            .copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_len as u64);
+            .copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        self.buffer = buffer;
+        self.len = len;
     }
 
-    fn write(&'a self, writer: BufferWriter<'a>, data: &[T], offset: usize) {
+    fn write(&mut self, writer: BufferWriter<'a>, data: &[T], offset: usize) {
         let u8_offset = offset * size_of::<T>();
         writer
             .queue
             .write_buffer(&self.buffer, u8_offset as u64, bytemuck::cast_slice(data));
     }
 
-    fn copy(&self, copy: BufferCopier, from: usize, to: usize, len: usize) {
+    fn copy(&mut self, copy: BufferCopier, from: usize, to: usize, len: usize) {
         let from_u8_offset = from * size_of::<T>();
         let to_u8_offset = to * size_of::<T>();
         let u8_len = len * size_of::<T>();
@@ -150,7 +157,7 @@ where
         self.len == 0
     }
 
-    fn clear(&'a self, writer: BufferWriter<'a>, offset: usize, len: usize) {
+    fn clear(&mut self, writer: BufferWriter<'a>, offset: usize, len: usize) {
         let u8_offset = offset * size_of::<T>() as usize;
         let u8_size = len * size_of::<T>() as usize;
 
@@ -161,13 +168,13 @@ where
     }
 }
 
-impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<T> {
+impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<TVec<T, D>> {
     type Resizer = BufferResizer<'a>;
     type Writer = BufferWriter<'a>;
     type Copier = BufferCopier<'a>;
 
-    fn resize(&'a self, resizer: BufferResizer<'a>, len: usize) {
-        let u8_len = len * size_of::<T>();
+    fn resize(&mut self, resizer: BufferResizer<'a>, len: usize) {
+        let u8_len = len * size_of::<TVec<T, D>>();
         let bytes: Vec<u8> = vec![0u8; u8_len];
         let buffer = resizer
             .device
@@ -177,23 +184,25 @@ impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<T>
                 usage: self.usage,
             });
 
-        let copy_len = min(len, self.len) * size_of::<T>();
+        let copy_u8_len = min(len, self.len) * size_of::<TVec<T, D>>();
         resizer
             .encoder
-            .copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_len as u64);
+            .copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        self.buffer = buffer;
+        self.len = len;
     }
 
-    fn write(&self, writer: BufferWriter, data: &[TVec<T, D>], offset: usize) {
+    fn write(&mut self, writer: BufferWriter, data: &[TVec<T, D>], offset: usize) {
         let u8_offset = offset * size_of::<TVec<T, D>>();
         writer
             .queue
             .write_buffer(&self.buffer, u8_offset as u64, vec_to_bytes(data));
     }
 
-    fn copy(&self, copy: BufferCopier, from: usize, to: usize, len: usize) {
-        let from_u8_offset = from * size_of::<T>();
-        let to_u8_offset = to * size_of::<T>();
-        let u8_len = len * size_of::<T>();
+    fn copy(&mut self, copy: BufferCopier, from: usize, to: usize, len: usize) {
+        let from_u8_offset = from * size_of::<TVec<T, D>>();
+        let to_u8_offset = to * size_of::<TVec<T, D>>();
+        let u8_len = len * size_of::<TVec<T, D>>();
         copy.encoder.copy_buffer_to_buffer(
             &self.buffer,
             from_u8_offset as u64,
@@ -211,9 +220,9 @@ impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<T>
         self.len == 0
     }
 
-    fn clear(&self, writer: BufferWriter, offset: usize, len: usize) {
-        let u8_offset = offset * size_of::<T>() as usize;
-        let u8_size = len * size_of::<T>() as usize;
+    fn clear(&mut self, writer: BufferWriter, offset: usize, len: usize) {
+        let u8_offset = offset * size_of::<TVec<T, D>>() as usize;
+        let u8_size = len * size_of::<TVec<T, D>>() as usize;
 
         let bytes: Vec<u8> = vec![0u8; u8_size];
         writer
@@ -251,17 +260,17 @@ pub mod test {
         type Writer = &'a TestWriter;
         type Copier = &'a TestCopier;
 
-        fn resize(&'a self, _resizer: Self::Resizer, len: usize) {
+        fn resize(&mut self, _resizer: Self::Resizer, len: usize) {
             self.data.borrow_mut().resize(len, T::default());
         }
 
-        fn write(&'a self, _writer: Self::Writer, data: &[T], offset: usize) {
+        fn write(&mut self, _writer: Self::Writer, data: &[T], offset: usize) {
             self.data
                 .borrow_mut()
                 .splice(offset..(offset + data.len()), data.iter().copied());
         }
 
-        fn copy(&'a self, _copy: Self::Copier, from: usize, to: usize, len: usize) {
+        fn copy(&mut self, _copy: Self::Copier, from: usize, to: usize, len: usize) {
             let from = {
                 self.data.borrow_mut().as_slice()[from..(from + len)]
                     .iter()
@@ -279,7 +288,7 @@ pub mod test {
             self.data.borrow().is_empty()
         }
 
-        fn clear(&'a self, _writer: Self::Writer, offset: usize, len: usize) {
+        fn clear(&mut self, _writer: Self::Writer, offset: usize, len: usize) {
             self.data
                 .borrow_mut()
                 .splice(offset..(offset + len), vec![T::default(); len]);
