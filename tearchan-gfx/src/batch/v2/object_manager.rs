@@ -3,9 +3,10 @@ use crate::batch::v2::buffer::{
     BatchBufferAllocator, BatchBufferAllocatorEvent, BatchBufferPointer,
 };
 use crate::batch::v2::object::BatchObject;
-use crate::batch::DEFAULT_ORDER;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tearchan_util::id_manager::IdManager;
+
+const DEFAULT_ORDER: i32 = i32::MAX;
 
 #[derive(Hash, Eq, PartialEq, Copy, Clone, Debug)]
 pub struct BatchObjectId(u64);
@@ -62,6 +63,7 @@ pub struct BatchObjectManager {
     events: VecDeque<BatchObjectEvent>,
     index_len: usize,
     vertex_len: usize,
+    should_sort_indices: bool,
 }
 
 impl BatchObjectManager {
@@ -77,10 +79,23 @@ impl BatchObjectManager {
             events: VecDeque::new(),
             index_len,
             vertex_len,
+            should_sort_indices: false,
         }
     }
 
     pub fn pop_event(&mut self) -> Option<BatchObjectEvent> {
+        if self.should_sort_indices {
+            let object_ids_grouped_by_index_pointer = &self.object_ids_grouped_by_index_pointer;
+            let objects = &self.objects;
+            self.index_allocator.sort_by(|a, b| {
+                let a = object_ids_grouped_by_index_pointer.get(a).unwrap();
+                let b = object_ids_grouped_by_index_pointer.get(b).unwrap();
+                let a = objects.get(a).unwrap();
+                let b = objects.get(b).unwrap();
+                a.order().cmp(&b.order())
+            });
+            self.should_sort_indices = false;
+        }
         while let Some(event) = self.index_allocator.pop_event() {
             match event {
                 BatchBufferAllocatorEvent::Write(pointer) => {
@@ -182,6 +197,9 @@ impl BatchObjectManager {
         vertices: Vec<BatchTypeArray>,
         order: Option<i32>,
     ) -> BatchObjectId {
+        if order.is_some() {
+            self.should_sort_indices = true;
+        }
         let mut iter = vertices.iter();
         let vertex_len = iter.next().map(|array| array.len()).unwrap_or(0);
         for array in iter {

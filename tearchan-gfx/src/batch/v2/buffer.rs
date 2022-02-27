@@ -52,7 +52,7 @@ impl BatchBufferAllocator {
             .map(|(key, pointer)| *key + pointer.len)
             .unwrap_or(0);
         let pointer = BatchBufferPointer::new(first, len);
-        self.pointers.insert(first, pointer.clone());
+        self.pointers.insert(first, pointer);
         self.len += len;
         self.events.push_back(Event::Write { first });
         pointer
@@ -97,20 +97,23 @@ impl BatchBufferAllocator {
 
     pub fn defragmentation(&mut self) {
         let prev_pointers = std::mem::take(&mut self.pointers);
-        let mut first = 0;
+        let mut seek = 0;
         for (_, pointer) in prev_pointers.into_iter() {
             let len = pointer.len;
-            let new_pointer = BatchBufferPointer::new(first, len);
-            self.pointers.insert(first, new_pointer);
+            let new_pointer = BatchBufferPointer::new(seek, len);
+            self.pointers.insert(seek, new_pointer);
 
             self.events.push_back(Event::Replace {
                 from: pointer,
-                to_first: first,
+                to_first: new_pointer.first,
+            });
+            self.events.push_back(Event::Write {
+                first: new_pointer.first,
             });
 
-            first += len;
+            seek += len;
         }
-        self.len = first;
+        self.len = seek;
     }
 
     pub fn pop_event(&mut self) -> Option<BatchBufferAllocatorEvent> {
@@ -135,6 +138,35 @@ impl BatchBufferAllocator {
         self.len == 0
     }
 
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(&BatchBufferPointer, &BatchBufferPointer) -> Ordering,
+    {
+        let mut pointers = self.pointers.iter().map(|(_, p)| *p).collect::<Vec<_>>();
+        pointers.sort_by(compare);
+
+        self.events.clear();
+        self.pointers.clear();
+        self.pending_pointers.clear();
+        self.pending_pointers_grouped_by_last.clear();
+
+        let mut seek = 0;
+        for pointer in pointers {
+            let new_pointer = BatchBufferPointer::new(seek, pointer.len);
+            self.pointers.insert(new_pointer.first, new_pointer);
+            self.events.push_back(Event::Replace {
+                from: pointer,
+                to_first: new_pointer.first,
+            });
+            self.events.push_back(Event::Write {
+                first: new_pointer.first,
+            });
+            seek += new_pointer.len;
+        }
+        assert!(seek <= self.len, "{} <= {}", seek, self.len);
+        self.len = seek;
+    }
+
     fn allocate_from_pending_pointers(&mut self, len: usize) -> Option<BatchBufferPointer> {
         let last = self
             .pending_pointers
@@ -155,7 +187,7 @@ impl BatchBufferAllocator {
                     )),
                 )
             };
-            self.pointers.insert(pointer.first, pointer.clone());
+            self.pointers.insert(pointer.first, pointer);
             if let Some(pending_pointer) = pending_pointer {
                 self.push_pending_pointer(pending_pointer);
             }
@@ -165,8 +197,7 @@ impl BatchBufferAllocator {
 
     fn push_pending_pointer(&mut self, pointer: BatchBufferPointer) {
         let last = pointer.first + pointer.len;
-        self.pending_pointers_grouped_by_last
-            .insert(last, pointer.clone());
+        self.pending_pointers_grouped_by_last.insert(last, pointer);
         self.pending_pointers.push_front(pointer.len, last);
     }
 }
@@ -264,7 +295,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::batch::v2::buffer::{BatchBuffer, BatchBufferAllocator, BatchBufferAllocatorEvent};
+    use crate::batch::v2::buffer::{
+        BatchBuffer, BatchBufferAllocator, BatchBufferAllocatorEvent, BatchBufferPointer,
+    };
     use crate::v2::buffer::BufferTrait;
     use std::collections::HashMap;
     use std::marker::PhantomData;
@@ -550,5 +583,31 @@ mod test {
         let _p0 = allocator.reallocate(p0, 5);
 
         insta::assert_debug_snapshot!(convert_events(&mut allocator));
+    }
+
+    #[test]
+    fn test_sort() {
+        let mut allocator = BatchBufferAllocator::default();
+
+        // 5, 3, 4, 1
+        let _p0 = allocator.allocate(5);
+        let _p1 = allocator.allocate(3);
+        let _p2 = allocator.allocate(4);
+        let _p3 = allocator.allocate(1);
+
+        allocator.sort_by(|p0, p1| p0.len.cmp(&p1.len)); // 1, 3, 4, 5
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        let p1 = BatchBufferPointer::new(1, 3);
+        allocator.free(p1); // 1, _, 4, 5
+
+        allocator.allocate(2); // 1, 2, 4, 5
+
+        allocator.sort_by(|p0, p1| p0.len.cmp(&p1.len));
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        assert_eq!(allocator.len, 12);
     }
 }

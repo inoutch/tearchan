@@ -38,7 +38,7 @@ pub enum BatchEvent<'a> {
     ResizeIndexBuffer {
         len: usize,
     },
-    ResizeVertextBuffer {
+    ResizeVertexBuffer {
         len: usize,
     },
     Error,
@@ -147,7 +147,7 @@ impl<TProvider> Batch<TProvider> {
                     provider.run(&mut context, BatchEvent::ResizeIndexBuffer { len });
                 }
                 BatchObjectEvent::ResizeVertexBuffer { len } => {
-                    provider.run(&mut context, BatchEvent::ResizeVertextBuffer { len });
+                    provider.run(&mut context, BatchEvent::ResizeVertexBuffer { len });
                 }
             }
         }
@@ -260,7 +260,7 @@ mod test {
                 BatchEvent::ResizeIndexBuffer { len } => {
                     self.index_buffer.resize(context.2, len);
                 }
-                BatchEvent::ResizeVertextBuffer { len } => {
+                BatchEvent::ResizeVertexBuffer { len } => {
                     self.position_buffer.resize(context.2, len);
                 }
                 _ => {}

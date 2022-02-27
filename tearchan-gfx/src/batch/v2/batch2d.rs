@@ -150,7 +150,7 @@ impl<'a> BatchProvider<'a> for Batch2DProvider {
             BatchEvent::ResizeIndexBuffer { len } => {
                 self.index_buffer.resize(context.resizer(), len);
             }
-            BatchEvent::ResizeVertextBuffer { len } => {
+            BatchEvent::ResizeVertexBuffer { len } => {
                 self.position_buffer.resize(context.resizer(), len);
                 self.texcoord_buffer.resize(context.resizer(), len);
                 self.color_buffer.resize(context.resizer(), len);

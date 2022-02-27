@@ -96,7 +96,7 @@ impl BatchTypeArray {
                     let transformed = data
                         .iter()
                         .map(|x| {
-                            let v = m * &vec2(*x, 1u32);
+                            let v = m * vec2(*x, 1u32);
                             v.x
                         })
                         .collect();
@@ -112,7 +112,7 @@ impl BatchTypeArray {
                     let transformed = data
                         .iter()
                         .map(|x| {
-                            let v = m * &vec2(*x, 1f32);
+                            let v = m * vec2(*x, 1f32);
                             v.x
                         })
                         .collect();
@@ -128,7 +128,7 @@ impl BatchTypeArray {
                     let transformed = data
                         .iter()
                         .map(|x| {
-                            let v = m * &vec3(x.x, x.y, 1u32);
+                            let v = m * vec3(x.x, x.y, 1u32);
                             vec3_to_vec2(&v)
                         })
                         .collect();
@@ -144,7 +144,7 @@ impl BatchTypeArray {
                     let transformed = data
                         .iter()
                         .map(|x| {
-                            let v = m * &vec3(x.x, x.y, 1f32);
+                            let v = m * vec3(x.x, x.y, 1f32);
                             vec3_to_vec2(&v)
                         })
                         .collect();
@@ -160,7 +160,7 @@ impl BatchTypeArray {
                     let transformed = data
                         .iter()
                         .map(|x| {
-                            let v = m * &vec4(x.x, x.y, x.z, 1u32);
+                            let v = m * vec4(x.x, x.y, x.z, 1u32);
                             vec4_to_vec3(&v)
                         })
                         .collect();
@@ -176,7 +176,7 @@ impl BatchTypeArray {
                     let transformed = data
                         .iter()
                         .map(|x| {
-                            let v = m * &vec4(x.x, x.y, x.z, 1.0f32);
+                            let v = m * vec4(x.x, x.y, x.z, 1.0f32);
                             vec4_to_vec3(&v)
                         })
                         .collect();
@@ -226,10 +226,7 @@ impl BatchTypeTransform {
     }
 
     pub fn is_none(&self) -> bool {
-        match self {
-            BatchTypeTransform::None => true,
-            _ => false,
-        }
+        matches!(self, BatchTypeTransform::None)
     }
 }
 
