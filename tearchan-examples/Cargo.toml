@@ -13,6 +13,10 @@ name = "batch"
 path = "batch/main.rs"
 
 [[bin]]
+name = "batch3d"
+path = "batch3d/main.rs"
+
+[[bin]]
 name = "batch_v2"
 path = "batch_v2/main.rs"
 
@@ -33,6 +37,7 @@ rand = "0.8.3"
 color-rs = "0.6.1"
 env_logger = "0.8.4"
 tearchan = { path = ".." }
+wavefront_obj = "9.0.0"
 
 [build-dependencies]
 shaderc = "0.6.2"
