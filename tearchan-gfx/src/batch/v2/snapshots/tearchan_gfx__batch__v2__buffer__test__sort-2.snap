@@ -4,15 +4,49 @@ expression: convert_events(&mut allocator)
 
 ---
 [
-    Reallocate {
-        from: BatchBufferPointer {
-            first: 0,
-            len: 1,
-        },
-        to: BatchBufferPointer {
-            first: 0,
-            len: 1,
-        },
+    ReallocateAll {
+        pairs: [
+            BatchBufferAllocatorReallocPair {
+                from: BatchBufferPointer {
+                    first: 0,
+                    len: 1,
+                },
+                to: BatchBufferPointer {
+                    first: 0,
+                    len: 1,
+                },
+            },
+            BatchBufferAllocatorReallocPair {
+                from: BatchBufferPointer {
+                    first: 1,
+                    len: 2,
+                },
+                to: BatchBufferPointer {
+                    first: 1,
+                    len: 2,
+                },
+            },
+            BatchBufferAllocatorReallocPair {
+                from: BatchBufferPointer {
+                    first: 4,
+                    len: 4,
+                },
+                to: BatchBufferPointer {
+                    first: 3,
+                    len: 4,
+                },
+            },
+            BatchBufferAllocatorReallocPair {
+                from: BatchBufferPointer {
+                    first: 8,
+                    len: 5,
+                },
+                to: BatchBufferPointer {
+                    first: 7,
+                    len: 5,
+                },
+            },
+        ],
     },
     Write(
         BatchBufferPointer {
@@ -20,48 +54,18 @@ expression: convert_events(&mut allocator)
             len: 1,
         },
     ),
-    Reallocate {
-        from: BatchBufferPointer {
-            first: 1,
-            len: 2,
-        },
-        to: BatchBufferPointer {
-            first: 1,
-            len: 2,
-        },
-    },
     Write(
         BatchBufferPointer {
             first: 1,
             len: 2,
         },
     ),
-    Reallocate {
-        from: BatchBufferPointer {
-            first: 4,
-            len: 4,
-        },
-        to: BatchBufferPointer {
+    Write(
+        BatchBufferPointer {
             first: 3,
             len: 4,
         },
-    },
-    Write(
-        BatchBufferPointer {
-            first: 3,
-            len: 4,
-        },
     ),
-    Reallocate {
-        from: BatchBufferPointer {
-            first: 8,
-            len: 5,
-        },
-        to: BatchBufferPointer {
-            first: 7,
-            len: 5,
-        },
-    },
     Write(
         BatchBufferPointer {
             first: 7,

@@ -9,10 +9,15 @@ use tearchan_util::btree::DuplicatableBTreeMap;
 pub enum BatchBufferAllocatorEvent {
     Write(BatchBufferPointer),
     Clear(BatchBufferPointer),
-    Reallocate {
-        from: BatchBufferPointer,
-        to: BatchBufferPointer,
+    ReallocateAll {
+        pairs: Vec<BatchBufferAllocatorReallocPair>,
     },
+}
+
+#[derive(Debug)]
+pub struct BatchBufferAllocatorReallocPair {
+    pub from: BatchBufferPointer,
+    pub to: BatchBufferPointer,
 }
 
 #[derive(Debug)]
@@ -23,9 +28,8 @@ enum Event {
     Write {
         first: usize,
     },
-    Replace {
-        from: BatchBufferPointer,
-        to_first: usize,
+    Reallocate {
+        pairs: Vec<BatchBufferAllocatorReallocPair>,
     },
 }
 
@@ -102,21 +106,26 @@ impl BatchBufferAllocator {
 
         let prev_pointers = std::mem::take(&mut self.pointers);
         let mut seek = 0;
+        let mut pairs = Vec::new();
+        let mut write_events = VecDeque::new();
         for (_, pointer) in prev_pointers.into_iter() {
             let len = pointer.len;
             let new_pointer = BatchBufferPointer::new(seek, len);
             self.pointers.insert(seek, new_pointer);
 
-            self.events.push_back(Event::Replace {
-                from: pointer,
-                to_first: new_pointer.first,
-            });
-            self.events.push_back(Event::Write {
+            write_events.push_back(Event::Write {
                 first: new_pointer.first,
+            });
+            pairs.push(BatchBufferAllocatorReallocPair {
+                from: pointer,
+                to: new_pointer,
             });
 
             seek += len;
         }
+
+        self.events.push_back(Event::Reallocate { pairs });
+        self.events.append(&mut write_events);
 
         self.len = seek;
     }
@@ -128,10 +137,7 @@ impl BatchBufferAllocator {
                 Some(BatchBufferAllocatorEvent::Write(*pointer))
             }
             Event::Clear { pointer } => Some(BatchBufferAllocatorEvent::Clear(pointer)),
-            Event::Replace { from, to_first } => {
-                let to = *self.pointers.get(&to_first)?;
-                Some(BatchBufferAllocatorEvent::Reallocate { from, to })
-            }
+            Event::Reallocate { pairs } => Some(BatchBufferAllocatorEvent::ReallocateAll { pairs }),
         }
     }
 
@@ -155,19 +161,27 @@ impl BatchBufferAllocator {
         self.pending_pointers.clear();
         self.pending_pointers_grouped_by_last.clear();
 
+        let mut pairs = Vec::new();
+        let mut write_events = VecDeque::new();
         let mut seek = 0;
         for pointer in pointers {
             let new_pointer = BatchBufferPointer::new(seek, pointer.len);
             self.pointers.insert(new_pointer.first, new_pointer);
-            self.events.push_back(Event::Replace {
-                from: pointer,
-                to_first: new_pointer.first,
-            });
-            self.events.push_back(Event::Write {
+
+            write_events.push_back(Event::Write {
                 first: new_pointer.first,
             });
+            pairs.push(BatchBufferAllocatorReallocPair {
+                from: pointer,
+                to: new_pointer,
+            });
+
             seek += new_pointer.len;
         }
+
+        self.events.push_back(Event::Reallocate { pairs });
+        self.events.append(&mut write_events);
+
         assert!(seek <= self.len, "{} <= {}", seek, self.len);
         self.len = seek;
     }
@@ -408,9 +422,19 @@ mod test {
                         &v(pointer.len, *sprite),
                     );
                 }
-                BatchBufferAllocatorEvent::Reallocate { from, to } => {
-                    let sprite = sprites.remove(&from).unwrap();
-                    sprites.insert(to, sprite);
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    for pair in pairs.iter() {
+                        sprites.remove(&pair.from);
+                    }
+                    for (sprite, pointer) in pairs
+                        .iter()
+                        .filter_map(|pair| {
+                            sprites.remove(&pair.from).map(|sprite| (sprite, pair.to))
+                        })
+                        .collect::<Vec<_>>()
+                    {
+                        sprites.insert(pointer, sprite);
+                    }
                 }
             }
         }
@@ -440,9 +464,19 @@ mod test {
                         &v(pointer.len, *sprite),
                     );
                 }
-                BatchBufferAllocatorEvent::Reallocate { from, to } => {
-                    let sprite = sprites.remove(&from).unwrap();
-                    sprites.insert(to, sprite);
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    for pair in pairs.iter() {
+                        sprites.remove(&pair.from);
+                    }
+                    for (sprite, pointer) in pairs
+                        .iter()
+                        .filter_map(|pair| {
+                            sprites.remove(&pair.from).map(|sprite| (sprite, pair.to))
+                        })
+                        .collect::<Vec<_>>()
+                    {
+                        sprites.insert(pointer, sprite);
+                    }
                 }
             }
         }
@@ -605,6 +639,9 @@ mod test {
         assert_eq!(allocator.len, 6);
 
         insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        assert_eq!(allocator.pointers.get(&0).unwrap().len, 3);
+        assert_eq!(allocator.pointers.get(&3).unwrap().len, 3);
     }
 
     #[test]

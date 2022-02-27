@@ -110,18 +110,20 @@ impl BatchObjectManager {
                     self.events
                         .push_back(BatchObjectEvent::ClearToIndexBuffer { pointer });
                 }
-                BatchBufferAllocatorEvent::Reallocate { from, to } => {
-                    let object_id = *self.object_ids_grouped_by_index_pointer.get(&from).unwrap();
-                    let object = self.objects.get_mut(&object_id).unwrap();
-                    self.object_ids_grouped_by_index_pointer
-                        .remove(&object.index_pointer());
-
-                    object.set_index_pointer(to);
-                    self.object_ids_grouped_by_index_pointer
-                        .insert(to, object_id);
-
-                    self.objects_will_be_rewritten
-                        .insert(BatchObjectKey::Index(object_id));
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    let mut object_ids_grouped_by_index_pointer = HashMap::new();
+                    for pair in pairs {
+                        let object_id = *self
+                            .object_ids_grouped_by_index_pointer
+                            .get(&pair.from)
+                            .unwrap();
+                        let object = self.objects.get_mut(&object_id).unwrap();
+                        object.set_index_pointer(pair.to);
+                        object_ids_grouped_by_index_pointer.insert(pair.to, object_id);
+                        self.objects_will_be_rewritten
+                            .insert(BatchObjectKey::Index(object_id));
+                    }
+                    self.object_ids_grouped_by_index_pointer = object_ids_grouped_by_index_pointer;
                 }
             }
         }
@@ -146,23 +148,25 @@ impl BatchObjectManager {
                     self.events
                         .push_back(BatchObjectEvent::ClearToVertexBuffer { pointer });
                 }
-                BatchBufferAllocatorEvent::Reallocate { from, to } => {
-                    let object_id = *self
-                        .object_ids_grouped_by_vertex_pointer
-                        .get(&from)
-                        .unwrap();
-                    let object = self.objects.get_mut(&object_id).unwrap();
-                    self.object_ids_grouped_by_vertex_pointer
-                        .remove(&object.vertex_pointer());
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    let mut object_ids_grouped_by_vertex_pointer = HashMap::new();
+                    for pair in pairs {
+                        let object_id = *self
+                            .object_ids_grouped_by_vertex_pointer
+                            .get(&pair.from)
+                            .unwrap();
+                        let object = self.objects.get_mut(&object_id).unwrap();
 
-                    object.set_vertex_pointer(to);
-                    self.object_ids_grouped_by_vertex_pointer
-                        .insert(to, object_id);
+                        object.set_vertex_pointer(pair.to);
+                        object_ids_grouped_by_vertex_pointer.insert(pair.to, object_id);
 
-                    for i in 0u32..object.vertices().len() as u32 {
-                        self.objects_will_be_rewritten
-                            .insert(BatchObjectKey::Vertex((object_id, i)));
+                        for i in 0u32..object.vertices().len() as u32 {
+                            self.objects_will_be_rewritten
+                                .insert(BatchObjectKey::Vertex((object_id, i)));
+                        }
                     }
+                    self.object_ids_grouped_by_vertex_pointer =
+                        object_ids_grouped_by_vertex_pointer;
                 }
             }
         }
@@ -563,6 +567,81 @@ mod test {
             ],
             None,
         );
+        insta::assert_debug_snapshot!(convert_events(&mut manager));
+    }
+
+    #[test]
+    fn test_sort_by_order() {
+        let mut manager = BatchObjectManager::new(1, 2);
+        let _id0 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![0] },
+            vec![
+                BatchTypeArray::V1U32 { data: vec![1, 1] },
+                BatchTypeArray::V2F32 {
+                    data: vec![vec2(1.0f32, 1.0f32), vec2(1.0f32, 1.0f32)],
+                },
+                BatchTypeArray::V3F32 {
+                    data: vec![vec3(1.0f32, 1.0f32, 1.0f32), vec3(1.0f32, 1.0f32, 1.0f32)],
+                },
+            ],
+            Some(6),
+        );
+        let _id1 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![1] },
+            vec![
+                BatchTypeArray::V1U32 { data: vec![1, 1] },
+                BatchTypeArray::V2F32 {
+                    data: vec![vec2(1.0f32, 1.0f32), vec2(1.0f32, 1.0f32)],
+                },
+                BatchTypeArray::V3F32 {
+                    data: vec![vec3(1.0f32, 1.0f32, 1.0f32), vec3(1.0f32, 1.0f32, 1.0f32)],
+                },
+            ],
+            Some(2),
+        );
+        let _id2 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![2] },
+            vec![
+                BatchTypeArray::V1U32 { data: vec![1, 1] },
+                BatchTypeArray::V2F32 {
+                    data: vec![vec2(1.0f32, 1.0f32), vec2(1.0f32, 1.0f32)],
+                },
+                BatchTypeArray::V3F32 {
+                    data: vec![vec3(1.0f32, 1.0f32, 1.0f32), vec3(1.0f32, 1.0f32, 1.0f32)],
+                },
+            ],
+            Some(4),
+        );
+
+        insta::assert_debug_snapshot!(convert_events(&mut manager));
+
+        let _id3 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![3] },
+            vec![
+                BatchTypeArray::V1U32 { data: vec![1, 1] },
+                BatchTypeArray::V2F32 {
+                    data: vec![vec2(1.0f32, 1.0f32), vec2(1.0f32, 1.0f32)],
+                },
+                BatchTypeArray::V3F32 {
+                    data: vec![vec3(1.0f32, 1.0f32, 1.0f32), vec3(1.0f32, 1.0f32, 1.0f32)],
+                },
+            ],
+            Some(5),
+        );
+        let _id4 = manager.add(
+            BatchTypeArray::V1U32 { data: vec![4] },
+            vec![
+                BatchTypeArray::V1U32 { data: vec![1, 1] },
+                BatchTypeArray::V2F32 {
+                    data: vec![vec2(1.0f32, 1.0f32), vec2(1.0f32, 1.0f32)],
+                },
+                BatchTypeArray::V3F32 {
+                    data: vec![vec3(1.0f32, 1.0f32, 1.0f32), vec3(1.0f32, 1.0f32, 1.0f32)],
+                },
+            ],
+            Some(3),
+        );
+
         insta::assert_debug_snapshot!(convert_events(&mut manager));
     }
 }
