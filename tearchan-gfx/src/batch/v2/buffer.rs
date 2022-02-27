@@ -96,6 +96,10 @@ impl BatchBufferAllocator {
     }
 
     pub fn defragmentation(&mut self) {
+        self.pending_pointers.clear();
+        self.pending_pointers_grouped_by_last.clear();
+        self.events.clear();
+
         let prev_pointers = std::mem::take(&mut self.pointers);
         let mut seek = 0;
         for (_, pointer) in prev_pointers.into_iter() {
@@ -113,6 +117,7 @@ impl BatchBufferAllocator {
 
             seek += len;
         }
+
         self.len = seek;
     }
 
@@ -542,6 +547,28 @@ mod test {
     }
 
     #[test]
+    fn test_allocate() {
+        let mut allocator = BatchBufferAllocator::default();
+
+        let p0 = allocator.allocate(3);
+        assert_eq!(p0.first, 0);
+        assert_eq!(p0.len, 3);
+
+        let p1 = allocator.allocate(4);
+        assert_eq!(p1.first, 3);
+        assert_eq!(p1.len, 4);
+
+        let p2 = allocator.allocate(5);
+        assert_eq!(p2.first, 7);
+        assert_eq!(p2.len, 5);
+
+        assert_eq!(allocator.pointers.len(), 3);
+        assert_eq!(allocator.len(), 12);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+    }
+
+    #[test]
     fn test_reallocate() {
         let mut allocator = BatchBufferAllocator::default();
         let p0 = allocator.allocate(10);
@@ -554,6 +581,30 @@ mod test {
         let p0 = allocator.reallocate(p0, 5);
         assert_eq!(p0.first, 10);
         assert_eq!(p0.len, 5);
+    }
+
+    #[test]
+    fn test_defragmentation() {
+        let mut allocator = BatchBufferAllocator::default();
+        let p0 = allocator.allocate(3);
+        let p1 = allocator.allocate(3);
+        let _p2 = allocator.allocate(3);
+        let p3 = allocator.allocate(3);
+        let _p4 = allocator.allocate(3);
+
+        allocator.free(p0);
+        allocator.free(p1);
+        allocator.free(p3);
+
+        convert_events(&mut allocator);
+
+        allocator.defragmentation();
+        assert_eq!(allocator.pointers.len(), 2);
+        assert_eq!(allocator.pending_pointers.len(), 0);
+        assert_eq!(allocator.pending_pointers_grouped_by_last.len(), 0);
+        assert_eq!(allocator.len, 6);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
     }
 
     #[test]

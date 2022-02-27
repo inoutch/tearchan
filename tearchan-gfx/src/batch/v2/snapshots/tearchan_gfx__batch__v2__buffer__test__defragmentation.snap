@@ -1,0 +1,39 @@
+---
+source: tearchan-gfx/src/batch/v2/buffer.rs
+expression: convert_events(&mut allocator)
+
+---
+[
+    Reallocate {
+        from: BatchBufferPointer {
+            first: 6,
+            len: 3,
+        },
+        to: BatchBufferPointer {
+            first: 0,
+            len: 3,
+        },
+    },
+    Write(
+        BatchBufferPointer {
+            first: 0,
+            len: 3,
+        },
+    ),
+    Reallocate {
+        from: BatchBufferPointer {
+            first: 12,
+            len: 3,
+        },
+        to: BatchBufferPointer {
+            first: 3,
+            len: 3,
+        },
+    },
+    Write(
+        BatchBufferPointer {
+            first: 3,
+            len: 3,
+        },
+    ),
+]
