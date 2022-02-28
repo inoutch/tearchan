@@ -86,7 +86,7 @@ impl<T> Buffer<T> {
 
 pub struct BufferResizer<'a> {
     pub device: &'a wgpu::Device,
-    pub encoder: &'a mut wgpu::CommandEncoder,
+    pub queue: &'a wgpu::Queue,
 }
 
 pub struct BufferWriter<'a> {
@@ -94,7 +94,8 @@ pub struct BufferWriter<'a> {
 }
 
 pub struct BufferCopier<'a> {
-    pub encoder: &'a mut wgpu::CommandEncoder,
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
 }
 
 pub trait Primitive: Pod {}
@@ -122,9 +123,11 @@ impl<'a, T: Primitive> BufferTrait<'a, T> for Buffer<T> {
             });
 
         let copy_u8_len = min(len, self.len) * size_of::<T>();
-        resizer
-            .encoder
-            .copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        let mut encoder = resizer
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encoder.copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        resizer.queue.submit(Some(encoder.finish()));
         self.buffer = buffer;
         self.len = len;
     }
@@ -140,13 +143,17 @@ impl<'a, T: Primitive> BufferTrait<'a, T> for Buffer<T> {
         let from_u8_offset = from * size_of::<T>();
         let to_u8_offset = to * size_of::<T>();
         let u8_len = len * size_of::<T>();
-        copy.encoder.copy_buffer_to_buffer(
+        let mut encoder = copy
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encoder.copy_buffer_to_buffer(
             &self.buffer,
             from_u8_offset as u64,
             &self.buffer,
             to_u8_offset as u64,
             u8_len as u64,
         );
+        copy.queue.submit(Some(encoder.finish()));
     }
 
     fn len(&self) -> usize {
@@ -185,9 +192,11 @@ impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<TV
             });
 
         let copy_u8_len = min(len, self.len) * size_of::<TVec<T, D>>();
-        resizer
-            .encoder
-            .copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        let mut encoder = resizer
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encoder.copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        resizer.queue.submit(Some(encoder.finish()));
         self.buffer = buffer;
         self.len = len;
     }
@@ -203,13 +212,17 @@ impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<TV
         let from_u8_offset = from * size_of::<TVec<T, D>>();
         let to_u8_offset = to * size_of::<TVec<T, D>>();
         let u8_len = len * size_of::<TVec<T, D>>();
-        copy.encoder.copy_buffer_to_buffer(
+        let mut encoder = copy
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encoder.copy_buffer_to_buffer(
             &self.buffer,
             from_u8_offset as u64,
             &self.buffer,
             to_u8_offset as u64,
             u8_len as u64,
         );
+        copy.queue.submit(Some(encoder.finish()));
     }
 
     fn len(&self) -> usize {
