@@ -35,6 +35,7 @@ struct Batch3DScene {
     camera_rotation: f32,
     light_rotation: f32,
     light_object: BatchObjectId,
+    meshes: Vec<Mesh>,
 }
 
 impl Batch3DScene {
@@ -329,6 +330,9 @@ impl Batch3DScene {
                 None,
             );
 
+            let models = vec!["cube.obj", "icosphere.obj", "suzanne.obj"];
+            let meshes = models.into_iter().map(load_obj_mesh).collect();
+
             Box::new(Batch3DScene {
                 batch,
                 objects,
@@ -341,6 +345,7 @@ impl Batch3DScene {
                 camera_rotation: 0.0f32,
                 light_rotation: 0.0f32,
                 light_object,
+                meshes,
             })
         }
     }
@@ -349,12 +354,22 @@ impl Batch3DScene {
 impl Scene for Batch3DScene {
     fn update(&mut self, context: &mut SceneContext, event: WindowEvent) -> SceneControlFlow {
         match event {
+            WindowEvent::Resized(size) => {
+                let width = size.width.max(1);
+                let height = size.height.max(1);
+                let aspect = width as f32 / height as f32;
+                self.camera = Camera3D::default_with_aspect(aspect);
+                self.camera.target_position = vec3(0.0f32, 0.0f32, 0.0f32);
+                self.camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
+                self.depth_texture =
+                    Texture::new_depth_texture(context.gfx().device, width, height, "DepthTexture");
+            }
             WindowEvent::KeyboardInput { input, .. } => {
                 if let Some(key) = input.virtual_keycode {
                     if input.state == ElementState::Pressed {
                         match key {
                             VirtualKeyCode::Right => {
-                                create_object(&mut self.batch, &mut self.objects);
+                                create_object(&mut self.batch, &self.meshes, &mut self.objects);
                             }
                             VirtualKeyCode::Left => {
                                 destroy_object(&mut self.batch, &mut self.objects);
@@ -368,7 +383,7 @@ impl Scene for Batch3DScene {
                 if touch.phase == TouchPhase::Started {
                     let width = context.gfx().surface_config.width as f64;
                     if width / 2.0f64 > touch.location.x {
-                        create_object(&mut self.batch, &mut self.objects);
+                        create_object(&mut self.batch, &self.meshes, &mut self.objects);
                     } else {
                         destroy_object(&mut self.batch, &mut self.objects);
                     }
@@ -388,14 +403,18 @@ impl Scene for Batch3DScene {
         );
         self.camera.update();
         self.light_rotation += context.delta;
-        let light_position = vec3(0.0f32, self.light_rotation.cos() * 2.0f32, 0.0f32);
+        let light_position = vec3(
+            0.0f32,
+            self.light_rotation.cos() * 2.0f32,
+            self.light_rotation.sin() * 2.0f32,
+        );
         self.batch.transform(
             self.light_object,
             BATCH3D_ATTRIBUTE_POSITION,
             BatchTypeTransform::Mat4F32 {
                 m: nalgebra_glm::scale(
                     &nalgebra_glm::translation(&light_position),
-                    &vec3(0.2f32, 0.2f32, 0.2f32),
+                    &vec3(0.1f32, 0.1f32, 0.1f32),
                 ),
             },
         );
@@ -414,14 +433,11 @@ impl Scene for Batch3DScene {
             bytemuck::cast_slice(light_position.as_slice()),
         );
 
+        self.batch.flush(BatchContext { device, queue });
+
         let mut encoder = device
             .create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
         {
-            self.batch.flush(BatchContext {
-                device,
-                queue,
-                encoder: &mut encoder,
-            });
             let index_count = self.batch.index_count() as u32;
             let mut rpass = encoder.begin_render_pass(&tearchan::gfx::wgpu::RenderPassDescriptor {
                 label: None,
@@ -477,10 +493,9 @@ fn load_obj_mesh<P: AsRef<Path>>(filepath: P) -> Mesh {
         .unwrap()
 }
 
-fn create_object(batch: &mut Batch3D, objects: &mut VecDeque<BatchObjectId>) {
+fn create_object(batch: &mut Batch3D, meshes: &[Mesh], objects: &mut VecDeque<BatchObjectId>) {
     let mut rng = rand::thread_rng();
-    let models = vec!["cube.obj", "icosphere.obj", "suzanne.obj"];
-    let mesh = load_obj_mesh(models.get(rng.gen_range(0..models.len())).unwrap());
+    let mesh = meshes.get(rng.gen_range(0..meshes.len())).unwrap().clone();
     let id = batch.add(
         BatchTypeArray::V1U32 { data: mesh.indices },
         vec![
