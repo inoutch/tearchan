@@ -157,8 +157,8 @@ where
                     }
                     Some(BatchProviderCommand::Add {
                         id: *id,
-                        data: &data,
-                        order: &order,
+                        data,
+                        order,
                     })
                 }
                 BatchObjectCommand::Remove { id } => Some(BatchProviderCommand::Remove { id: *id }),
@@ -169,7 +169,7 @@ where
                 } => Some(BatchProviderCommand::Replace {
                     id: *id,
                     attribute: *attribute,
-                    data: &data,
+                    data,
                 }),
                 _ => None,
             } {
@@ -209,7 +209,7 @@ impl BatchObjectManager {
         F: FnMut(&mut BatchObject, u32),
     {
         for (id, attributes) in &mut self.changed_object_attributes {
-            let object = match self.objects.get_mut(&id) {
+            let object = match self.objects.get_mut(id) {
                 Some(object) => object,
                 None => continue,
             };
