@@ -273,14 +273,11 @@ impl Scene for BatchV2Scene {
         let queue = context.gfx().queue;
         let device = context.gfx().device;
 
+        self.batch.flush(BatchContext { device, queue });
+
         let mut encoder = device
             .create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
         {
-            self.batch.flush(BatchContext {
-                device,
-                queue,
-                encoder: &mut encoder,
-            });
             let index_count = self.batch.index_count() as u32;
             let mut rpass = encoder.begin_render_pass(&tearchan::gfx::wgpu::RenderPassDescriptor {
                 label: None,
@@ -363,7 +360,7 @@ fn destroy_sprite(batch: &mut Batch2D, sprites: &mut VecDeque<BatchObjectId>) {
 fn main() {
     env_logger::init();
 
-    let window_builder = WindowBuilder::new().with_title("empty");
+    let window_builder = WindowBuilder::new().with_title("Batch2D example");
     let startup_config = EngineStartupConfigBuilder::new()
         .window_builder(window_builder)
         .scene_factory(BatchV2Scene::factory())

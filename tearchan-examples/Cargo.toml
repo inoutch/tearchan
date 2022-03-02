@@ -21,8 +21,8 @@ name = "batch_billboard"
 path = "batch_billboard/main.rs"
 
 [[bin]]
-name = "batch_v2"
-path = "batch_v2/main.rs"
+name = "batch2d"
+path = "batch2d/main.rs"
 
 [[bin]]
 name = "file"
