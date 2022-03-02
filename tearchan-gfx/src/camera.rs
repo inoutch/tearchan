@@ -106,7 +106,7 @@ impl Camera3D {
             base,
             position: vec3(0.0f32, 0.0f32, 0.0f32),
             target_position: vec3(0.0f32, 0.0f32, 0.0f32),
-            up: vec3(0.0f32, 0.0f32, 0.0f32),
+            up: vec3(0.0f32, 1.0f32, 0.0f32),
         }
     }
 
