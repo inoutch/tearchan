@@ -17,6 +17,10 @@ name = "batch3d"
 path = "batch3d/main.rs"
 
 [[bin]]
+name = "batch_billboard"
+path = "batch_billboard/main.rs"
+
+[[bin]]
 name = "batch_v2"
 path = "batch_v2/main.rs"
 
