@@ -4,10 +4,10 @@ use wgpu::{
     BindGroupLayoutEntry, BindingResource, BindingType, BlendComponent, BlendFactor,
     BlendOperation, BlendState, Buffer, BufferBindingType, BufferSize, ColorTargetState,
     ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,
-    MultisampleState, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, Sampler, ShaderModule, ShaderStages, StencilState,
-    TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexAttribute,
-    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    MultisampleState, PipelineLayout, PrimitiveState, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, Sampler, ShaderModule, ShaderStages, StencilState, TextureFormat,
+    TextureSampleType, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
+    VertexFormat, VertexState, VertexStepMode,
 };
 
 pub struct MaterialBillboardParams<'a> {
@@ -25,9 +25,10 @@ pub struct MaterialBillboard {
 }
 
 impl MaterialBillboard {
-    pub fn new(device: &Device, params: MaterialBillboardParams) -> Self {
-        let shader_module =
-            device.create_shader_module(&wgpu::include_wgsl!("../../shaders/billboard.wgsl"));
+    pub fn new(device: &Device, mut params: MaterialBillboardParams) -> Self {
+        let shader_module = std::mem::take(&mut params.shader_module).unwrap_or_else(|| {
+            device.create_shader_module(&wgpu::include_wgsl!("../../shaders/billboard.wgsl"))
+        });
 
         MaterialBillboard {
             material: Material::new(device, &params, MaterialBillboardProvider { shader_module }),
@@ -90,19 +91,6 @@ impl<'a> MaterialProvider<'a> for MaterialBillboardProvider {
                     count: None,
                 },
             ],
-        })
-    }
-
-    fn create_pipeline_layout(
-        &self,
-        device: &Device,
-        _params: &Self::Params,
-        bind_group_layout: &BindGroupLayout,
-    ) -> PipelineLayout {
-        device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[bind_group_layout],
-            push_constant_ranges: &[],
         })
     }
 
