@@ -13,6 +13,10 @@ name = "batch"
 path = "batch/main.rs"
 
 [[bin]]
+name = "batch2d"
+path = "batch2d/main.rs"
+
+[[bin]]
 name = "batch3d"
 path = "batch3d/main.rs"
 
@@ -21,8 +25,8 @@ name = "batch_billboard"
 path = "batch_billboard/main.rs"
 
 [[bin]]
-name = "batch2d"
-path = "batch2d/main.rs"
+name = "batch_line"
+path = "batch_line/main.rs"
 
 [[bin]]
 name = "file"

@@ -12,9 +12,10 @@ use tearchan::gfx::batch::v2::batch3d::{Batch3D, BATCH3D_ATTRIBUTE_NORMAL};
 use tearchan::gfx::batch::v2::context::BatchContext;
 use tearchan::gfx::batch::v2::object_manager::BatchObjectId;
 use tearchan::gfx::camera::Camera3D;
+use tearchan::gfx::material::material3d::{Material3D, Material3DParams};
 use tearchan::gfx::texture::Texture;
 use tearchan::gfx::wgpu::util::DeviceExt;
-use tearchan::gfx::wgpu::TextureAspect;
+use tearchan::gfx::wgpu::{Buffer, TextureAspect};
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
@@ -26,10 +27,9 @@ use winit::window::WindowBuilder;
 struct Batch3DScene {
     batch: Batch3D,
     objects: VecDeque<BatchObjectId>,
-    bind_group: tearchan::gfx::wgpu::BindGroup,
-    transform_buffer: tearchan::gfx::wgpu::Buffer,
+    material: Material3D,
+    transform_buffer: Buffer,
     light_position_buffer: tearchan::gfx::wgpu::Buffer,
-    pipeline: tearchan::gfx::wgpu::RenderPipeline,
     depth_texture: Texture,
     camera: Camera3D,
     camera_rotation: f32,
@@ -51,79 +51,6 @@ impl Batch3DScene {
             let objects = VecDeque::new();
             let mut batch = Batch3D::new(device);
 
-            let bind_group_layout =
-                device.create_bind_group_layout(&tearchan::gfx::wgpu::BindGroupLayoutDescriptor {
-                    label: None,
-                    entries: &[
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::VERTEX,
-                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
-                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: tearchan::gfx::wgpu::BufferSize::new(64),
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Texture {
-                                multisampled: false,
-                                sample_type: tearchan::gfx::wgpu::TextureSampleType::Float {
-                                    filterable: true,
-                                },
-                                view_dimension: tearchan::gfx::wgpu::TextureViewDimension::D2,
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 2,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Sampler {
-                                comparison: false,
-                                filtering: true,
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 3,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
-                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 4,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
-                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 5,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
-                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-            let pipeline_layout =
-                device.create_pipeline_layout(&tearchan::gfx::wgpu::PipelineLayoutDescriptor {
-                    label: None,
-                    bind_group_layouts: &[&bind_group_layout],
-                    push_constant_ranges: &[],
-                });
             let size = 1u32;
             let texel = vec![255, 255, 255, 255];
             let texture_extent = tearchan::gfx::wgpu::Extent3d {
@@ -211,108 +138,20 @@ impl Batch3DScene {
                 "DepthTexture",
             );
 
-            // Create bind group
-            let bind_group = device.create_bind_group(&tearchan::gfx::wgpu::BindGroupDescriptor {
-                layout: &bind_group_layout,
-                entries: &[
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: transform_buffer.as_entire_binding(),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: tearchan::gfx::wgpu::BindingResource::TextureView(&texture_view),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: tearchan::gfx::wgpu::BindingResource::Sampler(&sampler),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: light_ambient_strength_buffer.as_entire_binding(),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: light_color_buffer.as_entire_binding(),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 5,
-                        resource: light_position_buffer.as_entire_binding(),
-                    },
-                ],
-                label: None,
-            });
-
-            // Create the render pipeline
-            let vertex_state = [
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 3 * std::mem::size_of::<f32>() as u64, // positions
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x3,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
+            let material = Material3D::new(
+                device,
+                Material3DParams {
+                    transform_buffer: &transform_buffer,
+                    light_position_buffer: &light_position_buffer,
+                    light_ambient_strength_buffer: &light_ambient_strength_buffer,
+                    light_color_buffer: &light_color_buffer,
+                    texture_view: &texture_view,
+                    sampler: &sampler,
+                    color_format: gfx.surface_config.format,
+                    depth_format: depth_texture.format(),
+                    shader_module: None,
                 },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 2 * std::mem::size_of::<f32>() as u64, // texcoords
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x2,
-                        offset: 0,
-                        shader_location: 1,
-                    }],
-                },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 4 * std::mem::size_of::<f32>() as u64, // colors
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x4,
-                        offset: 0,
-                        shader_location: 2,
-                    }],
-                },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 3 * std::mem::size_of::<f32>() as u64, // normals
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x3,
-                        offset: 0,
-                        shader_location: 3,
-                    }],
-                },
-            ];
-
-            let shader =
-                device.create_shader_module(&tearchan::gfx::wgpu::include_wgsl!("./batch3d.wgsl"));
-
-            let pipeline =
-                device.create_render_pipeline(&tearchan::gfx::wgpu::RenderPipelineDescriptor {
-                    label: None,
-                    layout: Some(&pipeline_layout),
-                    vertex: tearchan::gfx::wgpu::VertexState {
-                        module: &shader,
-                        entry_point: "vs_main",
-                        buffers: &vertex_state,
-                    },
-                    fragment: Some(tearchan::gfx::wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: "fs_main",
-                        targets: &[gfx.surface_config.format.into()],
-                    }),
-                    primitive: tearchan::gfx::wgpu::PrimitiveState {
-                        cull_mode: Some(tearchan::gfx::wgpu::Face::Back),
-                        ..Default::default()
-                    },
-                    depth_stencil: Some(tearchan::gfx::wgpu::DepthStencilState {
-                        format: depth_texture.format(),
-                        depth_write_enabled: true,
-                        depth_compare: tearchan::gfx::wgpu::CompareFunction::Less,
-                        stencil: tearchan::gfx::wgpu::StencilState::default(),
-                        bias: tearchan::gfx::wgpu::DepthBiasState::default(),
-                    }),
-                    multisample: tearchan::gfx::wgpu::MultisampleState::default(),
-                });
+            );
 
             let mesh = load_obj_mesh("cube.obj");
             let light_object = batch.add(
@@ -335,11 +174,10 @@ impl Batch3DScene {
 
             Box::new(Batch3DScene {
                 batch,
+                material,
                 objects,
-                bind_group,
                 transform_buffer,
                 light_position_buffer,
-                pipeline,
                 depth_texture,
                 camera,
                 camera_rotation: 0.0f32,
@@ -465,12 +303,8 @@ impl Scene for Batch3DScene {
                     },
                 ),
             });
-            rpass.push_debug_group("Prepare data for draw.");
-            rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.bind_group, &[]);
+            self.material.bind(&mut rpass);
             self.batch.bind(&mut rpass);
-            rpass.pop_debug_group();
-            rpass.insert_debug_marker("Draw!");
             rpass.draw_indexed(0..index_count, 0, 0..1);
         }
 
