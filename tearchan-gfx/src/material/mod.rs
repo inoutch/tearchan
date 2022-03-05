@@ -1,4 +1,9 @@
+use wgpu::PipelineLayoutDescriptor;
+
+pub mod material2d;
+pub mod material3d;
 pub mod material_billboard;
+pub mod material_line;
 
 pub struct Material<T> {
     provider: T,
@@ -44,9 +49,15 @@ pub trait MaterialProvider<'a> {
     fn create_pipeline_layout(
         &self,
         device: &wgpu::Device,
-        params: &Self::Params,
+        _params: &Self::Params,
         bind_group_layout: &wgpu::BindGroupLayout,
-    ) -> wgpu::PipelineLayout;
+    ) -> wgpu::PipelineLayout {
+        device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[bind_group_layout],
+            push_constant_ranges: &[],
+        })
+    }
 
     fn create_pipeline(
         &self,
