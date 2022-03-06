@@ -117,7 +117,11 @@ where
     {
         let values = self.btree.get_mut(key)?;
         let index = values.iter().position(|v| v == value)?;
-        values.remove(index)
+        let ret = values.remove(index);
+        if values.is_empty() {
+            self.btree.remove(key);
+        }
+        ret
     }
 
     pub fn first_key_value(&self) -> Option<(&K, &V)> {

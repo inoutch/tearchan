@@ -1,0 +1,97 @@
+---
+source: tearchan-gfx/src/batch/v2/object_manager.rs
+expression: convert_events(&mut manager)
+
+---
+[
+    Add {
+        id: BatchObjectId(
+            0,
+        ),
+    },
+    ResizeIndexBuffer {
+        len: 4,
+    },
+    ResizeVertexBuffer {
+        len: 8,
+    },
+    Add {
+        id: BatchObjectId(
+            1,
+        ),
+    },
+    Add {
+        id: BatchObjectId(
+            2,
+        ),
+    },
+    WriteToIndexBuffer {
+        id: BatchObjectId(
+            1,
+        ),
+    },
+    WriteToIndexBuffer {
+        id: BatchObjectId(
+            2,
+        ),
+    },
+    WriteToIndexBuffer {
+        id: BatchObjectId(
+            0,
+        ),
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            0,
+        ),
+        attribute: 0,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            0,
+        ),
+        attribute: 1,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            0,
+        ),
+        attribute: 2,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 0,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 1,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            1,
+        ),
+        attribute: 2,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            2,
+        ),
+        attribute: 0,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            2,
+        ),
+        attribute: 1,
+    },
+    WriteToVertexBuffer {
+        id: BatchObjectId(
+            2,
+        ),
+        attribute: 2,
+    },
+]

@@ -35,5 +35,5 @@ members = [
     "tearchan-horde",
     "tearchan-tools",
     "tearchan-util",
-    "examples",
+    "tearchan-examples",
 ]

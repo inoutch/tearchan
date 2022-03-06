@@ -6,29 +6,34 @@ use std::ops::RangeBounds;
 use wgpu::util::DeviceExt;
 use wgpu::{BufferAddress, BufferSlice, BufferUsages};
 
-pub trait BufferInterface {
-    type DataType: Pod;
-    type Device;
-    type Queue;
-    type Encoder;
+pub trait BufferTrait<'a, TDataType> {
+    type Resizer: 'a;
+    type Writer: 'a;
+    type Copier: 'a;
 
-    fn write(&self, queue: &Self::Queue, data: &[Self::DataType], offset: usize);
+    fn resize(&mut self, resizer: Self::Resizer, len: usize);
+
+    fn write(&mut self, writer: Self::Writer, data: &[TDataType], offset: usize);
+
+    fn copy(&mut self, copy: Self::Copier, from: usize, to: usize, len: usize);
 
     fn len(&self) -> usize;
 
     fn is_empty(&self) -> bool;
 
-    fn clear(&self, queue: &Self::Queue, offset: usize, len: usize);
+    fn clear(&mut self, writer: Self::Writer, offset: usize, len: usize);
 }
 
 pub struct Buffer<T> {
+    label: String,
+    usage: wgpu::BufferUsages,
     buffer: wgpu::Buffer,
     len: usize,
-    _type: PhantomData<T>,
+    _t: PhantomData<T>,
 }
 
 impl<T> Buffer<T> {
-    pub fn new(device: &wgpu::Device, len: usize, label: &str, usage: BufferUsages) -> Buffer<T> {
+    pub fn new(device: &wgpu::Device, len: usize, label: String, usage: BufferUsages) -> Buffer<T> {
         let u8_len = len * size_of::<T>();
         let bytes: Vec<u8> = vec![0u8; u8_len];
         Buffer::new_with_bytes(device, label, usage, &bytes)
@@ -36,21 +41,23 @@ impl<T> Buffer<T> {
 
     pub fn new_with_bytes(
         device: &wgpu::Device,
-        label: &str,
+        label: String,
         usage: BufferUsages,
         bytes: &[u8],
     ) -> Buffer<T> {
         assert_eq!(bytes.len() % size_of::<T>(), 0);
         let len = bytes.len() / size_of::<T>();
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(label),
+            label: Some(&label),
             contents: bytes,
             usage,
         });
         Buffer {
+            label,
+            usage,
             buffer,
             len,
-            _type: PhantomData,
+            _t: PhantomData,
         }
     }
 
@@ -58,7 +65,7 @@ impl<T> Buffer<T> {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         len: usize,
-        label: &str,
+        label: String,
         usage: BufferUsages,
         buffer: &Buffer<T>,
         buffer_len: usize,
@@ -69,23 +76,77 @@ impl<T> Buffer<T> {
         new_buffer
     }
 
+    #[inline]
     pub fn slice<S: RangeBounds<BufferAddress>>(&self, bounds: S) -> BufferSlice {
         self.buffer.slice(bounds)
     }
 }
 
-impl<T> BufferInterface for Buffer<T>
+pub struct BufferResizer<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+}
+
+pub struct BufferWriter<'a> {
+    pub queue: &'a wgpu::Queue,
+}
+
+pub struct BufferCopier<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+}
+
+impl<'a, T> BufferTrait<'a, T> for Buffer<T>
 where
     T: Pod,
 {
-    type DataType = T;
-    type Device = wgpu::Device;
-    type Queue = wgpu::Queue;
-    type Encoder = wgpu::CommandEncoder;
+    type Resizer = BufferResizer<'a>;
+    type Writer = BufferWriter<'a>;
+    type Copier = BufferCopier<'a>;
 
-    fn write(&self, queue: &Self::Queue, data: &[T], offset: usize) {
+    fn resize(&mut self, resizer: BufferResizer<'a>, len: usize) {
+        let u8_len = len * size_of::<T>();
+        let bytes: Vec<u8> = vec![0u8; u8_len];
+        let buffer = resizer
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(&self.label),
+                contents: &bytes,
+                usage: self.usage,
+            });
+
+        let copy_u8_len = min(len, self.len) * size_of::<T>();
+        let mut encoder = resizer
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encoder.copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
+        resizer.queue.submit(Some(encoder.finish()));
+        self.buffer = buffer;
+        self.len = len;
+    }
+
+    fn write(&mut self, writer: BufferWriter<'a>, data: &[T], offset: usize) {
         let u8_offset = offset * size_of::<T>();
-        queue.write_buffer(&self.buffer, u8_offset as u64, bytemuck::cast_slice(data));
+        writer
+            .queue
+            .write_buffer(&self.buffer, u8_offset as u64, bytemuck::cast_slice(data));
+    }
+
+    fn copy(&mut self, copy: BufferCopier, from: usize, to: usize, len: usize) {
+        let from_u8_offset = from * size_of::<T>();
+        let to_u8_offset = to * size_of::<T>();
+        let u8_len = len * size_of::<T>();
+        let mut encoder = copy
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        encoder.copy_buffer_to_buffer(
+            &self.buffer,
+            from_u8_offset as u64,
+            &self.buffer,
+            to_u8_offset as u64,
+            u8_len as u64,
+        );
+        copy.queue.submit(Some(encoder.finish()));
     }
 
     fn len(&self) -> usize {
@@ -96,11 +157,78 @@ where
         self.len == 0
     }
 
-    fn clear(&self, queue: &Self::Queue, offset: usize, len: usize) {
+    fn clear(&mut self, writer: BufferWriter<'a>, offset: usize, len: usize) {
         let u8_offset = offset * size_of::<T>() as usize;
         let u8_size = len * size_of::<T>() as usize;
 
         let bytes: Vec<u8> = vec![0u8; u8_size];
-        queue.write_buffer(&self.buffer, u8_offset as u64, &bytes);
+        writer
+            .queue
+            .write_buffer(&self.buffer, u8_offset as u64, &bytes);
+    }
+}
+
+#[cfg(test)]
+pub mod test {
+    use crate::buffer::BufferTrait;
+    use std::cell::RefCell;
+
+    pub struct TestWriter;
+    pub struct TestResizer;
+    pub struct TestCopier;
+
+    pub struct TestBuffer<T> {
+        pub data: RefCell<Vec<T>>,
+    }
+
+    impl<T> TestBuffer<T> {
+        pub fn new(data: Vec<T>) -> TestBuffer<T> {
+            Self {
+                data: RefCell::new(data),
+            }
+        }
+    }
+
+    impl<'a, T> BufferTrait<'a, T> for TestBuffer<T>
+    where
+        T: Default + Copy,
+    {
+        type Resizer = &'a TestResizer;
+        type Writer = &'a TestWriter;
+        type Copier = &'a TestCopier;
+
+        fn resize(&mut self, _resizer: Self::Resizer, len: usize) {
+            self.data.borrow_mut().resize(len, T::default());
+        }
+
+        fn write(&mut self, _writer: Self::Writer, data: &[T], offset: usize) {
+            self.data
+                .borrow_mut()
+                .splice(offset..(offset + data.len()), data.iter().copied());
+        }
+
+        fn copy(&mut self, _copy: Self::Copier, from: usize, to: usize, len: usize) {
+            let from = {
+                self.data.borrow_mut().as_slice()[from..(from + len)]
+                    .iter()
+                    .copied()
+                    .collect::<Vec<_>>()
+            };
+            self.data.borrow_mut().splice(to..(to + len), from);
+        }
+
+        fn len(&self) -> usize {
+            self.data.borrow().len()
+        }
+
+        fn is_empty(&self) -> bool {
+            self.data.borrow().is_empty()
+        }
+
+        fn clear(&mut self, _writer: Self::Writer, offset: usize, len: usize) {
+            self.data
+                .borrow_mut()
+                .splice(offset..(offset + len), vec![T::default(); len]);
+        }
     }
 }

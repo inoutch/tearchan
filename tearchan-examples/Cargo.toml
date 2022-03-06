@@ -9,8 +9,20 @@ name = "empty"
 path = "empty/main.rs"
 
 [[bin]]
-name = "batch"
-path = "batch/main.rs"
+name = "batch2d"
+path = "batch2d/main.rs"
+
+[[bin]]
+name = "batch3d"
+path = "batch3d/main.rs"
+
+[[bin]]
+name = "batch_billboard"
+path = "batch_billboard/main.rs"
+
+[[bin]]
+name = "batch_line"
+path = "batch_line/main.rs"
 
 [[bin]]
 name = "file"
@@ -29,6 +41,7 @@ rand = "0.8.3"
 color-rs = "0.6.1"
 env_logger = "0.8.4"
 tearchan = { path = ".." }
+wavefront_obj = "9.0.0"
 
 [build-dependencies]
 shaderc = "0.6.2"

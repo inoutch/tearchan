@@ -20,9 +20,13 @@ mod test {
         path.push("@assets://");
         path.push("fruits");
         path.push("apple.jpg");
+
+        let mut expect = PathBuf::new();
+        expect.push("fruits");
+        expect.push("apple.jpg");
         assert_eq!(
             get_path_without_prefix(&path, "@assets://"),
-            Some("fruits/apple.jpg".to_string())
+            expect.to_str().map(|str| str.to_string())
         );
     }
 

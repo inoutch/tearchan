@@ -1,0 +1,24 @@
+---
+source: tearchan-gfx/src/batch/v2/object_manager.rs
+expression: convert_events(&mut manager)
+
+---
+[
+    Remove {
+        id: BatchObjectId(
+            0,
+        ),
+    },
+    ClearToIndexBuffer {
+        pointer: BatchBufferPointer {
+            first: 0,
+            len: 1,
+        },
+    },
+    ClearToVertexBuffer {
+        pointer: BatchBufferPointer {
+            first: 0,
+            len: 1,
+        },
+    },
+]

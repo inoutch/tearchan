@@ -9,6 +9,7 @@ webgl = ["wgpu/webgl"]
 [dependencies]
 # utils
 log = "0.4.11"
+nalgebra = { version = "0.27.1", features = ["bytemuck"] }
 nalgebra-glm = { version = "0.13.0", features = ["serde-serialize"] }
 image = "0.23.4"
 bytemuck = "1.5.0"
@@ -26,3 +27,6 @@ wasm-bindgen-futures = "0.4.19"
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 version = "0.3.45"
 features = [ "console", "Document", "Element", "HtmlElement", "Node", "Window" ]
+
+[dev-dependencies]
+insta = "1.8.0"

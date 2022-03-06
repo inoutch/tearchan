@@ -1,3 +1,4 @@
+use bytemuck::{Pod, Zeroable};
 use nalgebra_glm::{vec3, Mat4, Vec2, Vec3};
 use std::f32::consts::PI;
 use tearchan_util::math::mat::create_orthographic;
@@ -28,6 +29,23 @@ impl Camera {
 
     pub fn combine(&self) -> &Mat4 {
         &self.combine
+    }
+
+    pub fn billboard(&self) -> Billboard {
+        Billboard {
+            camera_right: vec3(
+                self.view_matrix.data.0[0][0],
+                self.view_matrix.data.0[1][0],
+                self.view_matrix.data.0[2][0],
+            ),
+            camera_up: vec3(
+                self.view_matrix.data.0[0][1],
+                self.view_matrix.data.0[1][1],
+                self.view_matrix.data.0[2][1],
+            ),
+            _pad1: 0.0f32,
+            _pad2: 0.0f32,
+        }
     }
 }
 
@@ -88,7 +106,7 @@ impl Camera3D {
             base,
             position: vec3(0.0f32, 0.0f32, 0.0f32),
             target_position: vec3(0.0f32, 0.0f32, 0.0f32),
-            up: vec3(0.0f32, 0.0f32, 0.0f32),
+            up: vec3(0.0f32, 1.0f32, 0.0f32),
         }
     }
 
@@ -106,3 +124,16 @@ impl Camera3D {
         self.base.combine()
     }
 }
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct Billboard {
+    pub camera_right: Vec3,
+    _pad1: f32, // alignment
+    pub camera_up: Vec3,
+    _pad2: f32,
+}
+
+unsafe impl Zeroable for Billboard {}
+
+unsafe impl Pod for Billboard {}
