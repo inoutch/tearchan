@@ -1,10 +1,8 @@
-use crate::primitive::Primitive;
-use nalgebra_glm::{RealField, TVec};
+use bytemuck::Pod;
 use std::cmp::min;
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::ops::RangeBounds;
-use tearchan_util::bytes::vec_to_bytes;
 use wgpu::util::DeviceExt;
 use wgpu::{BufferAddress, BufferSlice, BufferUsages};
 
@@ -98,7 +96,10 @@ pub struct BufferCopier<'a> {
     pub queue: &'a wgpu::Queue,
 }
 
-impl<'a, T: Primitive> BufferTrait<'a, T> for Buffer<T> {
+impl<'a, T> BufferTrait<'a, T> for Buffer<T>
+where
+    T: Pod,
+{
     type Resizer = BufferResizer<'a>;
     type Writer = BufferWriter<'a>;
     type Copier = BufferCopier<'a>;
@@ -159,75 +160,6 @@ impl<'a, T: Primitive> BufferTrait<'a, T> for Buffer<T> {
     fn clear(&mut self, writer: BufferWriter<'a>, offset: usize, len: usize) {
         let u8_offset = offset * size_of::<T>() as usize;
         let u8_size = len * size_of::<T>() as usize;
-
-        let bytes: Vec<u8> = vec![0u8; u8_size];
-        writer
-            .queue
-            .write_buffer(&self.buffer, u8_offset as u64, &bytes);
-    }
-}
-
-impl<'a, T: RealField, const D: usize> BufferTrait<'a, TVec<T, D>> for Buffer<TVec<T, D>> {
-    type Resizer = BufferResizer<'a>;
-    type Writer = BufferWriter<'a>;
-    type Copier = BufferCopier<'a>;
-
-    fn resize(&mut self, resizer: BufferResizer<'a>, len: usize) {
-        let u8_len = len * size_of::<TVec<T, D>>();
-        let bytes: Vec<u8> = vec![0u8; u8_len];
-        let buffer = resizer
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&self.label),
-                contents: &bytes,
-                usage: self.usage,
-            });
-
-        let copy_u8_len = min(len, self.len) * size_of::<TVec<T, D>>();
-        let mut encoder = resizer
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        encoder.copy_buffer_to_buffer(&self.buffer, 0, &buffer, 0, copy_u8_len as u64);
-        resizer.queue.submit(Some(encoder.finish()));
-        self.buffer = buffer;
-        self.len = len;
-    }
-
-    fn write(&mut self, writer: BufferWriter, data: &[TVec<T, D>], offset: usize) {
-        let u8_offset = offset * size_of::<TVec<T, D>>();
-        writer
-            .queue
-            .write_buffer(&self.buffer, u8_offset as u64, vec_to_bytes(data));
-    }
-
-    fn copy(&mut self, copy: BufferCopier, from: usize, to: usize, len: usize) {
-        let from_u8_offset = from * size_of::<TVec<T, D>>();
-        let to_u8_offset = to * size_of::<TVec<T, D>>();
-        let u8_len = len * size_of::<TVec<T, D>>();
-        let mut encoder = copy
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        encoder.copy_buffer_to_buffer(
-            &self.buffer,
-            from_u8_offset as u64,
-            &self.buffer,
-            to_u8_offset as u64,
-            u8_len as u64,
-        );
-        copy.queue.submit(Some(encoder.finish()));
-    }
-
-    fn len(&self) -> usize {
-        self.len
-    }
-
-    fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
-    fn clear(&mut self, writer: BufferWriter, offset: usize, len: usize) {
-        let u8_offset = offset * size_of::<TVec<T, D>>() as usize;
-        let u8_size = len * size_of::<TVec<T, D>>() as usize;
 
         let bytes: Vec<u8> = vec![0u8; u8_size];
         writer
