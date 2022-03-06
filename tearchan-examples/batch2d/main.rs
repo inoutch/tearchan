@@ -11,8 +11,9 @@ use tearchan::gfx::batch::v2::batch2d::BATCH2D_ATTRIBUTE_POSITION;
 use tearchan::gfx::batch::v2::context::BatchContext;
 use tearchan::gfx::batch::v2::object_manager::BatchObjectId;
 use tearchan::gfx::camera::Camera3D;
-use tearchan::gfx::wgpu::util::DeviceExt;
-use tearchan::gfx::wgpu::TextureAspect;
+use tearchan::gfx::material::material2d::{Material2D, Material2DParams};
+use tearchan::gfx::uniform_buffer::UniformBuffer;
+use tearchan::gfx::wgpu::{Device, Queue, TextureAspect, TextureView};
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
@@ -24,16 +25,15 @@ use winit::event::{ElementState, TouchPhase, VirtualKeyCode, WindowEvent};
 use winit::window::WindowBuilder;
 
 #[allow(dead_code)]
-struct BatchV2Scene {
+struct Batch2DScene {
     batch: Batch2D,
+    material: Material2D,
     sprites: VecDeque<BatchObjectId>,
-    bind_group: tearchan::gfx::wgpu::BindGroup,
-    uniform_buffer: tearchan::gfx::wgpu::Buffer,
-    pipeline: tearchan::gfx::wgpu::RenderPipeline,
+    transform_buffer: UniformBuffer<Mat4>,
     camera: Camera3D,
 }
 
-impl BatchV2Scene {
+impl Batch2DScene {
     pub fn factory() -> SceneFactory {
         |context, _| {
             let gfx = context.gfx();
@@ -47,84 +47,7 @@ impl BatchV2Scene {
             let mut batch = Batch2D::new(device);
             create_sprite(&mut batch, &mut sprites);
 
-            let bind_group_layout =
-                device.create_bind_group_layout(&tearchan::gfx::wgpu::BindGroupLayoutDescriptor {
-                    label: None,
-                    entries: &[
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::VERTEX,
-                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
-                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: tearchan::gfx::wgpu::BufferSize::new(64),
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Texture {
-                                multisampled: false,
-                                sample_type: tearchan::gfx::wgpu::TextureSampleType::Float {
-                                    filterable: true,
-                                },
-                                view_dimension: tearchan::gfx::wgpu::TextureViewDimension::D2,
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 2,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Sampler {
-                                comparison: false,
-                                filtering: true,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-            let pipeline_layout =
-                device.create_pipeline_layout(&tearchan::gfx::wgpu::PipelineLayoutDescriptor {
-                    label: None,
-                    bind_group_layouts: &[&bind_group_layout],
-                    push_constant_ranges: &[],
-                });
-            let size = 1u32;
-            let texel = vec![255, 255, 255, 255];
-            let texture_extent = tearchan::gfx::wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 1,
-            };
-            let texture = device.create_texture(&tearchan::gfx::wgpu::TextureDescriptor {
-                label: None,
-                size: texture_extent,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: tearchan::gfx::wgpu::TextureDimension::D2,
-                format: tearchan::gfx::wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: tearchan::gfx::wgpu::TextureUsages::TEXTURE_BINDING
-                    | tearchan::gfx::wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | tearchan::gfx::wgpu::TextureUsages::COPY_DST,
-            });
-            let texture_view =
-                texture.create_view(&tearchan::gfx::wgpu::TextureViewDescriptor::default());
-            queue.write_texture(
-                tearchan::gfx::wgpu::ImageCopyTexture {
-                    texture: &texture,
-                    mip_level: 0,
-                    origin: tearchan::gfx::wgpu::Origin3d::ZERO,
-                    aspect: TextureAspect::All,
-                },
-                &texel,
-                tearchan::gfx::wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(std::num::NonZeroU32::new(4 * size).unwrap()),
-                    rows_per_image: None,
-                },
-                texture_extent,
-            );
+            let texture_view = create_texture_view(device, queue);
             let sampler = device.create_sampler(&tearchan::gfx::wgpu::SamplerDescriptor {
                 address_mode_u: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
                 address_mode_v: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
@@ -140,103 +63,33 @@ impl BatchV2Scene {
             camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
             camera.update();
 
-            let uniform_buffer =
-                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                    label: Some("Uniform Buffer"),
-                    contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
-                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-                });
+            let transform_buffer = UniformBuffer::new(device, camera.combine());
 
-            // Create bind group
-            let bind_group = device.create_bind_group(&tearchan::gfx::wgpu::BindGroupDescriptor {
-                layout: &bind_group_layout,
-                entries: &[
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniform_buffer.as_entire_binding(),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: tearchan::gfx::wgpu::BindingResource::TextureView(&texture_view),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: tearchan::gfx::wgpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
-                label: None,
-            });
-
-            // Create the render pipeline
-            let vertex_state = [
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 3 * std::mem::size_of::<f32>() as u64, // positions
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x3,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
-                },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 2 * std::mem::size_of::<f32>() as u64, // texcoords
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x2,
-                        offset: 0,
-                        shader_location: 1,
-                    }],
-                },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 4 * std::mem::size_of::<f32>() as u64, // colors
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x4,
-                        offset: 0,
-                        shader_location: 2,
-                    }],
-                },
-            ];
-
-            let shader =
+            let shader_module =
                 device.create_shader_module(&tearchan::gfx::wgpu::include_wgsl!("./batch.wgsl"));
+            let material = Material2D::new(
+                device,
+                Material2DParams {
+                    transform_buffer: transform_buffer.buffer(),
+                    texture_view: &texture_view,
+                    sampler: &sampler,
+                    color_format: context.gfx().surface_config.format,
+                    shader_module: Some(shader_module),
+                },
+            );
 
-            let pipeline =
-                device.create_render_pipeline(&tearchan::gfx::wgpu::RenderPipelineDescriptor {
-                    label: None,
-                    layout: Some(&pipeline_layout),
-                    vertex: tearchan::gfx::wgpu::VertexState {
-                        module: &shader,
-                        entry_point: "vs_main",
-                        buffers: &vertex_state,
-                    },
-                    fragment: Some(tearchan::gfx::wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: "fs_main",
-                        targets: &[gfx.surface_config.format.into()],
-                    }),
-                    primitive: tearchan::gfx::wgpu::PrimitiveState {
-                        cull_mode: Some(tearchan::gfx::wgpu::Face::Back),
-                        ..Default::default()
-                    },
-                    depth_stencil: None,
-                    multisample: tearchan::gfx::wgpu::MultisampleState::default(),
-                });
-
-            Box::new(BatchV2Scene {
+            Box::new(Batch2DScene {
                 batch,
+                material,
                 sprites,
-                bind_group,
-                uniform_buffer,
-                pipeline,
+                transform_buffer,
                 camera,
             })
         }
     }
 }
 
-impl Scene for BatchV2Scene {
+impl Scene for Batch2DScene {
     fn update(&mut self, context: &mut SceneContext, event: WindowEvent) -> SceneControlFlow {
         match event {
             WindowEvent::KeyboardInput { input, .. } => {
@@ -297,8 +150,7 @@ impl Scene for BatchV2Scene {
                 depth_stencil_attachment: None,
             });
             rpass.push_debug_group("Prepare data for draw.");
-            rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.bind_group, &[]);
+            self.material.bind(&mut rpass);
             self.batch.bind(&mut rpass);
             rpass.pop_debug_group();
             rpass.insert_debug_marker("Draw!");
@@ -357,13 +209,51 @@ fn destroy_sprite(batch: &mut Batch2D, sprites: &mut VecDeque<BatchObjectId>) {
     batch.remove(id);
 }
 
+fn create_texture_view(device: &Device, queue: &Queue) -> TextureView {
+    let size = 1u32;
+    let texel = vec![255, 255, 255, 255];
+    let texture_extent = tearchan::gfx::wgpu::Extent3d {
+        width: size,
+        height: size,
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&tearchan::gfx::wgpu::TextureDescriptor {
+        label: None,
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: tearchan::gfx::wgpu::TextureDimension::D2,
+        format: tearchan::gfx::wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: tearchan::gfx::wgpu::TextureUsages::TEXTURE_BINDING
+            | tearchan::gfx::wgpu::TextureUsages::RENDER_ATTACHMENT
+            | tearchan::gfx::wgpu::TextureUsages::COPY_DST,
+    });
+    let texture_view = texture.create_view(&tearchan::gfx::wgpu::TextureViewDescriptor::default());
+    queue.write_texture(
+        tearchan::gfx::wgpu::ImageCopyTexture {
+            texture: &texture,
+            mip_level: 0,
+            origin: tearchan::gfx::wgpu::Origin3d::ZERO,
+            aspect: TextureAspect::All,
+        },
+        &texel,
+        tearchan::gfx::wgpu::ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(std::num::NonZeroU32::new(4 * size).unwrap()),
+            rows_per_image: None,
+        },
+        texture_extent,
+    );
+    texture_view
+}
+
 fn main() {
     env_logger::init();
 
     let window_builder = WindowBuilder::new().with_title("Batch2D example");
     let startup_config = EngineStartupConfigBuilder::new()
         .window_builder(window_builder)
-        .scene_factory(BatchV2Scene::factory())
+        .scene_factory(Batch2DScene::factory())
         .build();
     let engine = Engine::new(startup_config);
     engine.run();

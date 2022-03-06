@@ -1,4 +1,4 @@
-use nalgebra_glm::{vec3, vec4, Mat4};
+use nalgebra_glm::{vec3, vec3_to_vec4, vec4, Mat4, Vec4};
 use rand::Rng;
 use std::collections::VecDeque;
 use std::f32::consts::PI;
@@ -14,8 +14,13 @@ use tearchan::gfx::batch::v2::object_manager::BatchObjectId;
 use tearchan::gfx::camera::Camera3D;
 use tearchan::gfx::material::material3d::{Material3D, Material3DParams};
 use tearchan::gfx::texture::Texture;
-use tearchan::gfx::wgpu::util::DeviceExt;
-use tearchan::gfx::wgpu::{Buffer, TextureAspect};
+use tearchan::gfx::uniform_buffer::UniformBuffer;
+use tearchan::gfx::wgpu::{
+    Color, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp,
+    Operations, Origin3d, Queue, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, SamplerDescriptor, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
+};
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
@@ -28,8 +33,8 @@ struct Batch3DScene {
     batch: Batch3D,
     objects: VecDeque<BatchObjectId>,
     material: Material3D,
-    transform_buffer: Buffer,
-    light_position_buffer: tearchan::gfx::wgpu::Buffer,
+    transform_buffer: UniformBuffer<Mat4>,
+    light_position_buffer: UniformBuffer<Vec4>,
     depth_texture: Texture,
     camera: Camera3D,
     camera_rotation: f32,
@@ -51,86 +56,20 @@ impl Batch3DScene {
             let objects = VecDeque::new();
             let mut batch = Batch3D::new(device);
 
-            let size = 1u32;
-            let texel = vec![255, 255, 255, 255];
-            let texture_extent = tearchan::gfx::wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 1,
-            };
-            let texture = device.create_texture(&tearchan::gfx::wgpu::TextureDescriptor {
-                label: None,
-                size: texture_extent,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: tearchan::gfx::wgpu::TextureDimension::D2,
-                format: tearchan::gfx::wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: tearchan::gfx::wgpu::TextureUsages::TEXTURE_BINDING
-                    | tearchan::gfx::wgpu::TextureUsages::RENDER_ATTACHMENT
-                    | tearchan::gfx::wgpu::TextureUsages::COPY_DST,
-            });
-            let texture_view =
-                texture.create_view(&tearchan::gfx::wgpu::TextureViewDescriptor::default());
-            queue.write_texture(
-                tearchan::gfx::wgpu::ImageCopyTexture {
-                    texture: &texture,
-                    mip_level: 0,
-                    origin: tearchan::gfx::wgpu::Origin3d::ZERO,
-                    aspect: TextureAspect::All,
-                },
-                &texel,
-                tearchan::gfx::wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(std::num::NonZeroU32::new(4 * size).unwrap()),
-                    rows_per_image: None,
-                },
-                texture_extent,
-            );
-            let sampler = device.create_sampler(&tearchan::gfx::wgpu::SamplerDescriptor {
-                address_mode_u: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
-                address_mode_v: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
-                address_mode_w: tearchan::gfx::wgpu::AddressMode::ClampToEdge,
-                mag_filter: tearchan::gfx::wgpu::FilterMode::Nearest,
-                min_filter: tearchan::gfx::wgpu::FilterMode::Linear,
-                mipmap_filter: tearchan::gfx::wgpu::FilterMode::Nearest,
-                ..Default::default()
-            });
+            let texture_view = create_texture_view(device, queue);
+            let sampler = device.create_sampler(&SamplerDescriptor::default());
             let mut camera = Camera3D::default_with_aspect(aspect);
             camera.position = vec3(0.0f32, 1.0f32, 4.0f32);
             camera.target_position = vec3(0.0f32, 0.0f32, 0.0f32);
             camera.up = vec3(0.0f32, 1.0f32, 0.0f32);
             camera.update();
 
-            let transform_buffer =
-                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                    label: Some("Uniform Buffer"),
-                    contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
-                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-                });
-            let light_ambient_strength_buffer =
-                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                    label: Some("LightAmbientBuffer"),
-                    contents: bytemuck::bytes_of(&0.13f32),
-                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
-                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-                });
+            let transform_buffer = UniformBuffer::new(device, camera.combine());
+            let light_ambient_strength_buffer = UniformBuffer::new(device, &0.13f32);
             let light_color_buffer =
-                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                    label: Some("LightColorBuffer"),
-                    contents: bytemuck::cast_slice(vec4(1.0f32, 1.0f32, 1.0f32, 0.0f32).as_slice()),
-                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
-                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-                });
+                UniformBuffer::new(device, &vec4(1.0f32, 1.0f32, 1.0f32, 0.0f32));
             let light_position_buffer =
-                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                    label: Some("LightPositionBuffer"),
-                    contents: bytemuck::cast_slice(
-                        vec4(0.0f32, 10.0f32, 0.0f32, 0.0f32).as_slice(),
-                    ),
-                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
-                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-                });
+                UniformBuffer::new(device, &vec4(0.0f32, 10.0f32, 0.0f32, 0.0f32));
             let depth_texture = Texture::new_depth_texture(
                 device,
                 gfx.surface_config.width,
@@ -141,10 +80,10 @@ impl Batch3DScene {
             let material = Material3D::new(
                 device,
                 Material3DParams {
-                    transform_buffer: &transform_buffer,
-                    light_position_buffer: &light_position_buffer,
-                    light_ambient_strength_buffer: &light_ambient_strength_buffer,
-                    light_color_buffer: &light_color_buffer,
+                    transform_buffer: transform_buffer.buffer(),
+                    light_position_buffer: light_position_buffer.buffer(),
+                    light_ambient_strength_buffer: light_ambient_strength_buffer.buffer(),
+                    light_color_buffer: light_color_buffer.buffer(),
                     texture_view: &texture_view,
                     sampler: &sampler,
                     color_format: gfx.surface_config.format,
@@ -260,30 +199,22 @@ impl Scene for Batch3DScene {
         let queue = context.gfx().queue;
         let device = context.gfx().device;
 
-        queue.write_buffer(
-            &self.transform_buffer,
-            0,
-            bytemuck::cast_slice(self.camera.combine().as_slice()),
-        );
-        queue.write_buffer(
-            &self.light_position_buffer,
-            0,
-            bytemuck::cast_slice(light_position.as_slice()),
-        );
+        self.transform_buffer.write(queue, self.camera.combine());
+        self.light_position_buffer
+            .write(queue, &vec3_to_vec4(&light_position));
 
         self.batch.flush(BatchContext { device, queue });
 
-        let mut encoder = device
-            .create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
         {
             let index_count = self.batch.index_count() as u32;
-            let mut rpass = encoder.begin_render_pass(&tearchan::gfx::wgpu::RenderPassDescriptor {
+            let mut rpass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: None,
-                color_attachments: &[tearchan::gfx::wgpu::RenderPassColorAttachment {
+                color_attachments: &[RenderPassColorAttachment {
                     view: &context.gfx_rendering().view,
                     resolve_target: None,
-                    ops: tearchan::gfx::wgpu::Operations {
-                        load: tearchan::gfx::wgpu::LoadOp::Clear(tearchan::gfx::wgpu::Color {
+                    ops: Operations {
+                        load: LoadOp::Clear(Color {
                             r: 0.1,
                             g: 0.2,
                             b: 0.3,
@@ -292,16 +223,14 @@ impl Scene for Batch3DScene {
                         store: true,
                     },
                 }],
-                depth_stencil_attachment: Some(
-                    tearchan::gfx::wgpu::RenderPassDepthStencilAttachment {
-                        view: self.depth_texture.view(),
-                        depth_ops: Some(tearchan::gfx::wgpu::Operations {
-                            load: tearchan::gfx::wgpu::LoadOp::Clear(1.0),
-                            store: true,
-                        }),
-                        stencil_ops: None,
-                    },
-                ),
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: self.depth_texture.view(),
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             });
             self.material.bind(&mut rpass);
             self.batch.bind(&mut rpass);
@@ -386,6 +315,44 @@ fn destroy_object(batch: &mut Batch3D, sprites: &mut VecDeque<BatchObjectId>) {
         Some(id) => id,
     };
     batch.remove(id);
+}
+
+fn create_texture_view(device: &Device, queue: &Queue) -> TextureView {
+    let size = 1u32;
+    let texel = vec![255, 255, 255, 255];
+    let texture_extent = Extent3d {
+        width: size,
+        height: size,
+        depth_or_array_layers: 1,
+    };
+    let texture = device.create_texture(&TextureDescriptor {
+        label: None,
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: TextureDimension::D2,
+        format: TextureFormat::Rgba8UnormSrgb,
+        usage: TextureUsages::TEXTURE_BINDING
+            | TextureUsages::RENDER_ATTACHMENT
+            | TextureUsages::COPY_DST,
+    });
+    let texture_view = texture.create_view(&TextureViewDescriptor::default());
+    queue.write_texture(
+        ImageCopyTexture {
+            texture: &texture,
+            mip_level: 0,
+            origin: Origin3d::ZERO,
+            aspect: TextureAspect::All,
+        },
+        &texel,
+        ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(std::num::NonZeroU32::new(4 * size).unwrap()),
+            rows_per_image: None,
+        },
+        texture_extent,
+    );
+    texture_view
 }
 
 fn main() {

@@ -9,9 +9,9 @@ use tearchan::gfx::batch::v2::context::BatchContext;
 use tearchan::gfx::batch::v2::object_manager::BatchObjectId;
 use tearchan::gfx::camera::Camera3D;
 use tearchan::gfx::material::material_line::{MaterialLine, MaterialLineParams};
-use tearchan::gfx::wgpu::util::{BufferInitDescriptor, DeviceExt};
+use tearchan::gfx::uniform_buffer::UniformBuffer;
 use tearchan::gfx::wgpu::{
-    BufferUsages, Color, CommandEncoderDescriptor, LoadOp, Operations, RenderPassColorAttachment,
+    Color, CommandEncoderDescriptor, LoadOp, Operations, RenderPassColorAttachment,
     RenderPassDescriptor,
 };
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
@@ -40,16 +40,12 @@ impl BatchLineScene {
 
             let batch = BatchLine::new(device);
 
-            let transform_buffer = device.create_buffer_init(&BufferInitDescriptor {
-                label: Some("TransformBuffer"),
-                contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            });
+            let transform_buffer = UniformBuffer::new(device, camera.combine());
 
             let material = MaterialLine::new(
                 device,
                 MaterialLineParams {
-                    transform_buffer: &transform_buffer,
+                    transform_buffer: transform_buffer.buffer(),
                     color_format: context.gfx().surface_config.format,
                     shader_module: None,
                 },

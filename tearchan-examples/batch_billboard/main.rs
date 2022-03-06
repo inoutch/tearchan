@@ -1,4 +1,4 @@
-use nalgebra_glm::vec3;
+use nalgebra_glm::{vec3, Mat4};
 use rand::Rng;
 use std::collections::VecDeque;
 use tearchan::engine::Engine;
@@ -7,16 +7,15 @@ use tearchan::gfx::batch::types::BatchTypeArray;
 use tearchan::gfx::batch::v2::batch_billboard::BatchBillboard;
 use tearchan::gfx::batch::v2::context::BatchContext;
 use tearchan::gfx::batch::v2::object_manager::BatchObjectId;
-use tearchan::gfx::camera::Camera3D;
+use tearchan::gfx::camera::{Billboard, Camera3D};
 use tearchan::gfx::material::material_billboard::{MaterialBillboard, MaterialBillboardParams};
 use tearchan::gfx::texture::Texture;
-use tearchan::gfx::wgpu::util::{BufferInitDescriptor, DeviceExt};
+use tearchan::gfx::uniform_buffer::UniformBuffer;
 use tearchan::gfx::wgpu::{
-    Buffer, BufferUsages, Color, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture,
-    ImageDataLayout, LoadOp, Operations, Origin3d, Queue, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, SamplerDescriptor, TextureAspect,
-    TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
-    TextureViewDescriptor,
+    Color, CommandEncoderDescriptor, Device, Extent3d, ImageCopyTexture, ImageDataLayout, LoadOp,
+    Operations, Origin3d, Queue, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, SamplerDescriptor, TextureAspect, TextureDescriptor, TextureDimension,
+    TextureFormat, TextureUsages, TextureView, TextureViewDescriptor,
 };
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
@@ -32,8 +31,8 @@ struct BatchBillboardScene {
     batch: BatchBillboard,
     material: MaterialBillboard,
     depth_texture: Texture,
-    transform_buffer: Buffer,
-    billboard_buffer: Buffer,
+    transform_buffer: UniformBuffer<Mat4>,
+    billboard_buffer: UniformBuffer<Billboard>,
     squares: VecDeque<BatchObjectId>,
 }
 
@@ -56,16 +55,8 @@ impl BatchBillboardScene {
                 "DepthTexture",
             );
 
-            let transform_buffer = device.create_buffer_init(&BufferInitDescriptor {
-                label: Some("TransformBuffer"),
-                contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            });
-            let billboard_buffer = device.create_buffer_init(&BufferInitDescriptor {
-                label: Some("BillboardBuffer"),
-                contents: bytemuck::bytes_of(&camera.base().billboard()),
-                usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-            });
+            let transform_buffer = UniformBuffer::new(device, camera.combine());
+            let billboard_buffer = UniformBuffer::new(device, &camera.base().billboard());
 
             let texture_view = create_texture_view(device, queue);
             let sampler = device.create_sampler(&SamplerDescriptor::default());
@@ -73,8 +64,8 @@ impl BatchBillboardScene {
             let material = MaterialBillboard::new(
                 context.gfx().device,
                 MaterialBillboardParams {
-                    transform_buffer: &transform_buffer,
-                    camera_buffer: &billboard_buffer,
+                    transform_buffer: transform_buffer.buffer(),
+                    camera_buffer: billboard_buffer.buffer(),
                     texture_view: &texture_view,
                     sampler: &sampler,
                     color_format: context.gfx().surface_config.format,
@@ -176,16 +167,9 @@ impl Scene for BatchBillboardScene {
         );
         self.camera.update();
 
-        queue.write_buffer(
-            &self.transform_buffer,
-            0,
-            bytemuck::cast_slice(self.camera.combine().as_slice()),
-        );
-        queue.write_buffer(
-            &self.billboard_buffer,
-            0,
-            bytemuck::bytes_of(&self.camera.base().billboard()),
-        );
+        self.transform_buffer.write(queue, self.camera.combine());
+        self.billboard_buffer
+            .write(queue, &self.camera.base().billboard());
 
         self.batch.flush(BatchContext { device, queue });
 
