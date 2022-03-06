@@ -1,0 +1,55 @@
+---
+source: tearchan-horde/src/action/manager.rs
+expression: convert_events(&mut action_manager)
+
+---
+[
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 0,
+            inner: "Sleep",
+        },
+    },
+    Enqueue {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 3000,
+            inner: "Walk",
+        },
+    },
+    Start {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 3000,
+            inner: "Walk",
+        },
+    },
+    Cancel {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 3000,
+            inner: "Walk",
+        },
+    },
+    Start {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 0,
+            inner: "Sleep",
+        },
+    },
+    Cancel {
+        action: Action {
+            entity_id: 1,
+            start_time: 0,
+            end_time: 0,
+            inner: "Sleep",
+        },
+    },
+]

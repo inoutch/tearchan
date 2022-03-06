@@ -435,11 +435,7 @@ impl<T> ActionServerManager<T> {
         self.commands
             .iter()
             .find_map(|(key, values)| {
-                if values
-                    .iter()
-                    .find(|command| command.state().is_active())
-                    .is_some()
-                {
+                if values.iter().any(|command| command.state().is_active()) {
                     Some(*key)
                 } else {
                     None
@@ -962,12 +958,12 @@ mod test {
         let actual = actual.unwrap_or_else(|| panic!("actual is None"));
         let expect = expect.unwrap();
 
-        match expect {
+        match &expect {
             ActionResult::Start { action, .. } => {
                 let actual = actual
                     .get_start()
                     .unwrap_or_else(|| panic!("{:?} is not start", actual));
-                asset_action(actual, &action);
+                asset_action(actual, action);
             }
             ActionResult::Update {
                 action,
@@ -979,35 +975,45 @@ mod test {
                 } = &actual
                 {
                     assert_eq!(
-                        *actual_current_time, current_time,
+                        actual_current_time, current_time,
                         "current_time is not correct\n   actual: {:?}\n   expect: {:?}",
                         *actual_current_time, current_time
-                    )
+                    );
                 }
                 let (actual, _) = actual
                     .get_update()
                     .unwrap_or_else(|| panic!("{:?} is not update", actual));
-                asset_action(actual, &action);
+                asset_action(actual, action);
             }
             ActionResult::End { action, .. } => {
                 let actual = actual
                     .get_end()
                     .unwrap_or_else(|| panic!("{:?} is not end", actual));
-                asset_action(actual, &action);
+                asset_action(actual, action);
             }
             ActionResult::Cancel { action, .. } => {
                 let actual = actual
                     .get_cancel()
                     .unwrap_or_else(|| panic!("{:?} is not cancel", actual));
-                asset_action(actual, &action);
+                asset_action(actual, action);
             }
             ActionResult::Enqueue { action, .. } => {
                 let actual = actual
                     .get_enqueue()
                     .unwrap_or_else(|| panic!("{:?} is not enqueue", actual));
-                asset_action(actual, &action);
+                asset_action(actual, action);
             }
         }
+    }
+
+    fn convert_events(
+        manager: &mut ActionServerManager<TestActionState>,
+    ) -> Vec<ActionResult<TestActionState>> {
+        let mut events = Vec::new();
+        while let Some(event) = manager.pull() {
+            events.push(event);
+        }
+        events
     }
 
     #[test]
@@ -1611,36 +1617,7 @@ mod test {
         action_manager.cancel(1, false);
         action_manager.cancel(1, true);
 
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Enqueue {
-                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Enqueue {
-                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Start {
-                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::End {
-                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Start {
-                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
-            }),
-        );
+        insta::assert_debug_snapshot!(convert_events(&mut action_manager));
     }
 
     #[test]
@@ -1655,36 +1632,7 @@ mod test {
         action_manager.cancel(1, true);
         action_manager.cancel(1, false);
 
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Enqueue {
-                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Enqueue {
-                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Start {
-                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::End {
-                action: Arc::new(Action::new(1, 0, 0, "Sleep")),
-            }),
-        );
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::Start {
-                action: Arc::new(Action::new(1, 0, 3000, "Walk")),
-            }),
-        );
+        insta::assert_debug_snapshot!(convert_events(&mut action_manager));
     }
 
     #[test]
@@ -1718,12 +1666,7 @@ mod test {
         );
         action_manager.cancel(1039, true);
 
-        asset_action_result(
-            action_manager.pull(),
-            Some(ActionResult::End {
-                action: Arc::new(Action::new(1039, 0, 500, "WalkTo1")),
-            }),
-        );
+        insta::assert_debug_snapshot!(convert_events(&mut action_manager));
     }
 
     #[test]

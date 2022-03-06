@@ -1,0 +1,39 @@
+---
+source: tearchan-horde/src/action/manager.rs
+expression: convert_events(&mut action_manager)
+
+---
+[
+    Cancel {
+        action: Action {
+            entity_id: 1039,
+            start_time: 0,
+            end_time: 500,
+            inner: "WalkTo1",
+        },
+    },
+    Cancel {
+        action: Action {
+            entity_id: 1039,
+            start_time: 500,
+            end_time: 3500,
+            inner: "Wait",
+        },
+    },
+    End {
+        action: Action {
+            entity_id: 1040,
+            start_time: 500,
+            end_time: 1000,
+            inner: "WalkTo2",
+        },
+    },
+    Start {
+        action: Action {
+            entity_id: 1040,
+            start_time: 1000,
+            end_time: 1500,
+            inner: "WalkTo3",
+        },
+    },
+]
