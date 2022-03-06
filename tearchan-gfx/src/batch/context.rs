@@ -1,4 +1,4 @@
-use crate::v2::buffer::{BufferCopier, BufferResizer, BufferWriter};
+use crate::buffer::{BufferCopier, BufferResizer, BufferWriter};
 
 pub struct BatchContext<'a> {
     pub device: &'a wgpu::Device,

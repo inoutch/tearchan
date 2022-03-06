@@ -1,4 +1,4 @@
-use crate::batch::v2::BatchEvent;
+use crate::batch::BatchEvent;
 
 pub trait BatchProvider<'a> {
     type Context: 'a;

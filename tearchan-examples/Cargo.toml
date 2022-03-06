@@ -9,10 +9,6 @@ name = "empty"
 path = "empty/main.rs"
 
 [[bin]]
-name = "batch"
-path = "batch/main.rs"
-
-[[bin]]
 name = "batch2d"
 path = "batch2d/main.rs"
 

@@ -1,8 +1,6 @@
+use crate::batch::buffer::{BatchBufferAllocator, BatchBufferAllocatorEvent, BatchBufferPointer};
+use crate::batch::object::BatchObject;
 use crate::batch::types::{BatchAttributeIndex, BatchTypeArray, BatchTypeTransform};
-use crate::batch::v2::buffer::{
-    BatchBufferAllocator, BatchBufferAllocatorEvent, BatchBufferPointer,
-};
-use crate::batch::v2::object::BatchObject;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tearchan_util::id_manager::IdManager;
 
@@ -395,8 +393,8 @@ impl BatchObjectManager {
 
 #[cfg(test)]
 mod test {
+    use crate::batch::object_manager::{BatchObjectEvent, BatchObjectManager};
     use crate::batch::types::{BatchTypeArray, BatchTypeTransform};
-    use crate::batch::v2::object_manager::{BatchObjectEvent, BatchObjectManager};
     use nalgebra_glm::{vec2, vec3, Mat2, Mat3};
 
     fn convert_events(manager: &mut BatchObjectManager) -> Vec<BatchObjectEvent> {

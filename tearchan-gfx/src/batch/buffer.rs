@@ -1,383 +1,688 @@
-use crate::batch::BatchObjectId;
-use crate::buffer::BufferInterface;
-use std::collections::HashMap;
+use crate::buffer::BufferTrait;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, VecDeque};
+use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use tearchan_util::btree::DuplicatableBTreeMap;
 
-const DEFAULT_BUFFER_SIZE: usize = 1024usize;
-pub type BufferFactory<TBuffer> = fn(
-    &<TBuffer as BufferInterface>::Device,
-    &<TBuffer as BufferInterface>::Queue,
-    &mut Option<&mut <TBuffer as BufferInterface>::Encoder>,
-    Option<(&TBuffer, usize)>, // (previous buffer, previous buffer used size)
-    usize,
-) -> TBuffer;
-
-#[derive(Debug, Clone)]
-pub struct BatchPointer {
-    pub first: usize,
-    pub size: usize,
+#[derive(Debug)]
+pub enum BatchBufferAllocatorEvent {
+    Write(BatchBufferPointer),
+    Clear(BatchBufferPointer),
+    ReallocateAll {
+        pairs: Vec<BatchBufferAllocatorReallocPair>,
+    },
 }
 
-impl BatchPointer {
-    pub fn new(first: usize, size: usize) -> Self {
-        BatchPointer { first, size }
+#[derive(Debug)]
+pub struct BatchBufferAllocatorReallocPair {
+    pub from: BatchBufferPointer,
+    pub to: BatchBufferPointer,
+}
+
+#[derive(Debug)]
+enum Event {
+    Clear {
+        pointer: BatchBufferPointer,
+    },
+    Write {
+        first: usize,
+    },
+    Reallocate {
+        pairs: Vec<BatchBufferAllocatorReallocPair>,
+    },
+}
+
+#[derive(Default)]
+pub struct BatchBufferAllocator {
+    pointers: BTreeMap<usize, BatchBufferPointer>, // grouped by first
+    pending_pointers: DuplicatableBTreeMap<usize, usize>, // grouped by size, value is last of pending pointer
+    pending_pointers_grouped_by_last: BTreeMap<usize, BatchBufferPointer>,
+    events: VecDeque<Event>,
+    len: usize,
+}
+
+impl BatchBufferAllocator {
+    pub fn allocate(&mut self, len: usize) -> BatchBufferPointer {
+        if let Some(pointer) = self.allocate_from_pending_pointers(len) {
+            self.events.push_back(Event::Write {
+                first: pointer.first,
+            });
+            return pointer;
+        }
+        let first = self
+            .pointers
+            .last_key_value()
+            .map(|(key, pointer)| *key + pointer.len)
+            .unwrap_or(0);
+        let pointer = BatchBufferPointer::new(first, len);
+        self.pointers.insert(first, pointer);
+        self.len += len;
+        self.events.push_back(Event::Write { first });
+        pointer
     }
 
-    pub fn last(&self) -> usize {
-        self.first + self.size
+    pub fn reallocate(&mut self, pointer: BatchBufferPointer, size: usize) -> BatchBufferPointer {
+        self.free(pointer);
+        self.allocate(size)
+    }
+
+    pub fn free(&mut self, pointer: BatchBufferPointer) {
+        let first = pointer.first;
+        let last = pointer.first + pointer.len;
+        self.pointers.remove(&pointer.first);
+
+        let is_last = first == self.len - pointer.len;
+        let mut seek = first;
+
+        let mut merge_pointers = vec![pointer];
+        for (last, pointer) in self.pending_pointers_grouped_by_last.range(0..=first).rev() {
+            if &seek != last {
+                break;
+            }
+            merge_pointers.push(*pointer);
+            seek -= pointer.len;
+        }
+
+        for merge_pointer in merge_pointers {
+            let last = merge_pointer.first + merge_pointer.len;
+            self.pending_pointers.remove(&merge_pointer.len, &last);
+            self.pending_pointers_grouped_by_last.remove(&last);
+        }
+
+        if is_last {
+            self.len = seek;
+            return;
+        }
+
+        self.push_pending_pointer(BatchBufferPointer::new(seek, last - seek));
+        self.events.push_back(Event::Clear { pointer });
+    }
+
+    pub fn defragmentation(&mut self) {
+        self.pending_pointers.clear();
+        self.pending_pointers_grouped_by_last.clear();
+        self.events.clear();
+
+        let prev_pointers = std::mem::take(&mut self.pointers);
+        let mut seek = 0;
+        let mut pairs = Vec::new();
+        let mut write_events = VecDeque::new();
+        for (_, pointer) in prev_pointers.into_iter() {
+            let len = pointer.len;
+            let new_pointer = BatchBufferPointer::new(seek, len);
+            self.pointers.insert(seek, new_pointer);
+
+            write_events.push_back(Event::Write {
+                first: new_pointer.first,
+            });
+            pairs.push(BatchBufferAllocatorReallocPair {
+                from: pointer,
+                to: new_pointer,
+            });
+
+            seek += len;
+        }
+
+        self.events.push_back(Event::Reallocate { pairs });
+        self.events.append(&mut write_events);
+
+        self.len = seek;
+    }
+
+    pub fn pop_event(&mut self) -> Option<BatchBufferAllocatorEvent> {
+        match self.events.pop_front()? {
+            Event::Write { first } => {
+                let pointer = self.pointers.get(&first)?;
+                Some(BatchBufferAllocatorEvent::Write(*pointer))
+            }
+            Event::Clear { pointer } => Some(BatchBufferAllocatorEvent::Clear(pointer)),
+            Event::Reallocate { pairs } => Some(BatchBufferAllocatorEvent::ReallocateAll { pairs }),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(&BatchBufferPointer, &BatchBufferPointer) -> Ordering,
+    {
+        let mut pointers = self.pointers.iter().map(|(_, p)| *p).collect::<Vec<_>>();
+        pointers.sort_by(compare);
+
+        self.events.clear();
+        self.pointers.clear();
+        self.pending_pointers.clear();
+        self.pending_pointers_grouped_by_last.clear();
+
+        let mut pairs = Vec::new();
+        let mut write_events = VecDeque::new();
+        let mut seek = 0;
+        for pointer in pointers {
+            let new_pointer = BatchBufferPointer::new(seek, pointer.len);
+            self.pointers.insert(new_pointer.first, new_pointer);
+
+            write_events.push_back(Event::Write {
+                first: new_pointer.first,
+            });
+            pairs.push(BatchBufferAllocatorReallocPair {
+                from: pointer,
+                to: new_pointer,
+            });
+
+            seek += new_pointer.len;
+        }
+
+        self.events.push_back(Event::Reallocate { pairs });
+        self.events.append(&mut write_events);
+
+        assert!(seek <= self.len, "{} <= {}", seek, self.len);
+        self.len = seek;
+    }
+
+    fn allocate_from_pending_pointers(&mut self, len: usize) -> Option<BatchBufferPointer> {
+        let last = self
+            .pending_pointers
+            .range_mut(len..)
+            .next()?
+            .1
+            .pop_front()?;
+        let pointer = self.pending_pointers_grouped_by_last.remove(&last).unwrap();
+        {
+            let (pointer, pending_pointer) = if len == pointer.len {
+                (pointer, None)
+            } else {
+                (
+                    BatchBufferPointer::new(pointer.first, len),
+                    Some(BatchBufferPointer::new(
+                        pointer.first + len,
+                        pointer.len - len,
+                    )),
+                )
+            };
+            self.pointers.insert(pointer.first, pointer);
+            if let Some(pending_pointer) = pending_pointer {
+                self.push_pending_pointer(pending_pointer);
+            }
+            Some(pointer)
+        }
+    }
+
+    fn push_pending_pointer(&mut self, pointer: BatchBufferPointer) {
+        let last = pointer.first + pointer.len;
+        self.pending_pointers_grouped_by_last.insert(last, pointer);
+        self.pending_pointers.push_front(pointer.len, last);
     }
 }
 
-pub struct BatchBuffer<TBuffer>
-where
-    TBuffer: BufferInterface,
-{
+#[derive(Copy, Clone, Debug)]
+pub struct BatchBufferPointer {
+    first: usize,
+    len: usize,
+}
+
+impl Eq for BatchBufferPointer {}
+
+impl PartialEq for BatchBufferPointer {
+    fn eq(&self, other: &Self) -> bool {
+        self.first == other.first
+    }
+}
+
+impl Ord for BatchBufferPointer {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.first.cmp(&other.first)
+    }
+}
+
+impl PartialOrd for BatchBufferPointer {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.first.partial_cmp(&other.first)
+    }
+}
+
+impl Hash for BatchBufferPointer {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_usize(self.first)
+    }
+}
+
+impl BatchBufferPointer {
+    fn new(first: usize, len: usize) -> Self {
+        BatchBufferPointer { first, len }
+    }
+
+    pub fn first(&self) -> usize {
+        self.first
+    }
+}
+
+pub struct BatchBuffer<TBuffer, TDataType> {
     buffer: TBuffer,
-    buffer_factory: BufferFactory<TBuffer>,
-    pointers: HashMap<BatchObjectId, BatchPointer>,
-    last: usize,
-    flushed_last: usize,
-    pending_pointers: DuplicatableBTreeMap<usize, BatchPointer>,
-    fragmentation_size: usize,
+    _phantom: PhantomData<TDataType>,
 }
 
-impl<TBuffer> BatchBuffer<TBuffer>
+impl<'a, TBuffer, TDataType> BatchBuffer<TBuffer, TDataType>
 where
-    TBuffer: BufferInterface,
+    TBuffer: BufferTrait<'a, TDataType>,
 {
-    pub fn new(
-        device: &TBuffer::Device,
-        queue: &TBuffer::Queue,
-        encoder: &mut Option<&mut TBuffer::Encoder>,
-        buffer_factory: BufferFactory<TBuffer>,
-    ) -> Self {
-        let factory = &buffer_factory;
-        BatchBuffer {
-            buffer: factory(device, queue, encoder, None, DEFAULT_BUFFER_SIZE),
-            buffer_factory,
-            pointers: HashMap::new(),
-            last: 0,
-            flushed_last: 0,
-            pending_pointers: DuplicatableBTreeMap::default(),
-            fragmentation_size: 0,
+    pub fn new(buffer: TBuffer) -> Self {
+        Self {
+            buffer,
+            _phantom: PhantomData,
         }
-    }
-
-    pub fn allocate(
-        &mut self,
-        device: &TBuffer::Device,
-        queue: &TBuffer::Queue,
-        encoder: &mut Option<&mut TBuffer::Encoder>,
-        id: BatchObjectId,
-        size: usize,
-    ) -> &mut BatchPointer {
-        debug_assert!(!self.pointers.contains_key(&id));
-
-        // Search from pending_pointers
-        if let Some(mut ptr) = match self.pending_pointers.range_mut(size..).next() {
-            Some((_, pointers)) => pointers.pop_back(),
-            None => None,
-        } {
-            // Reuse the memory if there is more free space than the desired size
-            self.fragmentation_size -= ptr.size; // Note that reduce will increase the fragment size
-            if ptr.size != size {
-                // Reducing unnecessary memory size
-                self.reduce_pointer(queue, &mut ptr, size);
-            }
-
-            self.pointers.insert(id, ptr);
-        } else {
-            // Allocate new memory space
-            let ptr = self.allocate_new_pointer(device, queue, encoder, size);
-            self.pointers.insert(id, ptr);
-        }
-        self.pointers.get_mut(&id).unwrap()
-    }
-
-    pub fn reallocate(
-        &mut self,
-        device: &TBuffer::Device,
-        queue: &TBuffer::Queue,
-        encoder: &mut Option<&mut TBuffer::Encoder>,
-        id: BatchObjectId,
-        size: usize,
-    ) {
-        let mut pointer = self.pointers.remove(&id).unwrap();
-        match pointer.size {
-            d if d > size => {
-                self.reduce_pointer(queue, &mut pointer, size);
-                self.pointers.insert(id, pointer);
-            }
-            d if d < size => {
-                self.buffer.clear(queue, pointer.first, pointer.size);
-                self.fragmentation_size += pointer.size;
-
-                self.allocate(device, queue, encoder, id, size);
-                self.pending_pointers.push_back(pointer.size, pointer);
-            }
-            _ => {
-                self.pointers.insert(id, pointer);
-            }
-        }
-    }
-
-    pub fn free(&mut self, queue: &TBuffer::Queue, id: BatchObjectId) {
-        let pointer = self.pointers.remove(&id).unwrap();
-        self.fragmentation_size += pointer.size;
-        self.buffer.clear(queue, pointer.first, pointer.size);
-        self.pending_pointers.push_back(pointer.size, pointer);
     }
 
     pub fn write(
-        &self,
-        queue: &TBuffer::Queue,
-        pointer: &BatchPointer,
-        data: &[TBuffer::DataType],
+        &mut self,
+        writer: TBuffer::Writer,
+        pointer: BatchBufferPointer,
+        data: &[TDataType],
     ) {
-        assert!(data.len() <= pointer.size);
-        self.buffer
-            .write(queue, bytemuck::cast_slice(data), pointer.first);
+        assert!(pointer.len <= data.len());
+        self.buffer.write(writer, data, pointer.first);
+    }
+
+    pub fn clear(&mut self, writer: TBuffer::Writer, pointer: BatchBufferPointer) {
+        self.buffer.clear(writer, pointer.first, pointer.len);
+    }
+
+    pub fn resize(&mut self, resizer: TBuffer::Resizer, len: usize) {
+        self.buffer.resize(resizer, len);
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
     }
 
     pub fn buffer(&self) -> &TBuffer {
         &self.buffer
     }
-
-    pub fn len(&self) -> usize {
-        self.buffer.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.buffer.is_empty()
-    }
-
-    pub fn last(&self) -> usize {
-        self.last
-    }
-
-    pub fn fragmentation_size(&self) -> usize {
-        self.fragmentation_size
-    }
-
-    // NOTICE: Destroy structures
-    pub fn defragmentation(&mut self) {
-        let mut first: usize = 0;
-        for pointer in &mut self.pointers {
-            pointer.1.first = first;
-            first += pointer.1.size;
-        }
-
-        self.last = first;
-        self.pending_pointers.clear();
-        self.fragmentation_size = 0;
-    }
-
-    pub fn get_pointer(&self, id: &BatchObjectId) -> Option<&BatchPointer> {
-        self.pointers.get(id)
-    }
-
-    pub fn sort(&mut self, ids: &[BatchObjectId]) {
-        debug_assert_eq!(ids.len(), self.pointers.len());
-        let mut pointers = HashMap::new();
-        let mut size = 0;
-        for id in ids {
-            let pointer = &self.pointers[id];
-            pointers.insert(*id, BatchPointer::new(size, pointer.size));
-            size += pointer.size;
-        }
-
-        self.pointers = pointers;
-        self.last = size;
-    }
-
-    fn reallocate_buffer(
-        &mut self,
-        device: &TBuffer::Device,
-        queue: &TBuffer::Queue,
-        encoder: &mut Option<&mut TBuffer::Encoder>,
-        size: usize,
-    ) {
-        let new_size = size * 2;
-        let factory = &self.buffer_factory;
-        self.buffer = factory(
-            device,
-            queue,
-            encoder,
-            Some((&self.buffer, self.flushed_last)),
-            new_size,
-        );
-    }
-
-    fn allocate_new_pointer(
-        &mut self,
-        device: &TBuffer::Device,
-        queue: &TBuffer::Queue,
-        encoder: &mut Option<&mut TBuffer::Encoder>,
-        size: usize,
-    ) -> BatchPointer {
-        let first = self.last;
-        if first + size > self.buffer.len() {
-            self.reallocate_buffer(device, queue, encoder, first + size);
-        }
-
-        self.last += size;
-        BatchPointer::new(first, size)
-    }
-
-    fn reduce_pointer(&mut self, queue: &TBuffer::Queue, pointer: &mut BatchPointer, size: usize) {
-        if pointer.last() != self.last {
-            let r_first = pointer.first + size;
-            let r_size = pointer.size - size;
-            let r_ptr = BatchPointer::new(r_first, r_size);
-            self.pending_pointers.push_back(r_size, r_ptr);
-
-            self.buffer.clear(queue, r_first, r_size);
-            self.fragmentation_size += r_size;
-        } else {
-            self.last = pointer.first + size;
-        }
-
-        pointer.size = size;
-    }
-
-    pub fn flush(&mut self) {
-        // Update the size copied to the buffer.
-        // This will determine how much of the existing buffer should be restored when the buffer is recreated.
-        self.flushed_last = self.last;
-    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::batch::buffer::BatchBuffer;
-    use crate::buffer::BufferInterface;
-    use std::cell::RefCell;
+    use crate::batch::buffer::{
+        BatchBuffer, BatchBufferAllocator, BatchBufferAllocatorEvent, BatchBufferPointer,
+    };
+    use crate::buffer::BufferTrait;
+    use std::collections::HashMap;
 
-    struct MockBuffer(RefCell<Vec<u32>>);
+    struct ResultContext;
 
-    impl BufferInterface for MockBuffer {
-        type DataType = u32;
-        type Device = ();
-        type Queue = ();
-        type Encoder = ();
+    #[derive(Default)]
+    struct VecBuffer {
+        data: Vec<u32>,
+    }
 
-        fn write(&self, _queue: &Self::Queue, data: &[Self::DataType], offset: usize) {
-            self.0.borrow_mut()[offset..(offset + data.len())].clone_from_slice(data);
-        }
-
-        fn len(&self) -> usize {
-            self.0.borrow().len()
-        }
-
-        fn is_empty(&self) -> bool {
-            self.0.borrow().is_empty()
-        }
-
-        fn clear(&self, _queue: &Self::Queue, offset: usize, len: usize) {
-            self.0.borrow_mut()[offset..(offset + len)].fill(0);
+    impl VecBuffer {
+        pub fn new(len: usize) -> VecBuffer {
+            VecBuffer { data: vec![0; len] }
         }
     }
 
+    impl<'a> BufferTrait<'a, u32> for VecBuffer {
+        type Resizer = &'a mut ResultContext;
+        type Writer = &'a mut ResultContext;
+        type Copier = &'a mut ResultContext;
+
+        fn resize(&mut self, _resizer: Self::Resizer, len: usize) {
+            self.data.resize(len, 0);
+        }
+
+        fn write(&mut self, _writer: &mut ResultContext, data: &[u32], offset: usize) {
+            self.data
+                .splice(offset..(offset + data.len()), data.iter().copied());
+        }
+
+        fn copy(&mut self, _copy: &mut ResultContext, from: usize, to: usize, len: usize) {
+            let from = {
+                self.data.as_slice()[from..(from + len)]
+                    .iter()
+                    .copied()
+                    .collect::<Vec<_>>()
+            };
+            self.data.splice(to..(to + len), from);
+        }
+
+        fn len(&self) -> usize {
+            self.data.len()
+        }
+
+        fn is_empty(&self) -> bool {
+            self.data.is_empty()
+        }
+
+        fn clear(&mut self, _writer: &mut ResultContext, offset: usize, len: usize) {
+            self.data.splice(offset..(offset + len), vec![0; len]);
+        }
+    }
+
+    fn v<T>(size: usize, value: T) -> Vec<T>
+    where
+        T: Clone,
+    {
+        let mut v = Vec::with_capacity(size);
+        v.resize(size, value);
+        v
+    }
+
+    fn convert_events(allocator: &mut BatchBufferAllocator) -> Vec<BatchBufferAllocatorEvent> {
+        let mut events = Vec::new();
+        while let Some(event) = allocator.pop_event() {
+            events.push(event);
+        }
+        events
+    }
+
     #[test]
-    fn test_allocate() {
-        let mut buffer: BatchBuffer<MockBuffer> =
-            BatchBuffer::new(&(), &(), &mut None, |_, _, _, prev, len| {
-                MockBuffer(RefCell::new(if let Some((prev_buffer, prev_len)) = prev {
-                    let mut v = prev_buffer.0.borrow().clone();
-                    for _ in prev_len..len {
-                        v.push(0);
+    fn test_basic_write() {
+        let mut allocator = BatchBufferAllocator::default();
+        let mut index_buffer = BatchBuffer::new(VecBuffer::new(10));
+        let mut sprites = HashMap::new();
+        let mut context = ResultContext;
+
+        let p0 = allocator.allocate(5);
+        sprites.insert(p0, 1);
+
+        let allocator_len = allocator.len();
+        while let Some(event) = allocator.pop_event() {
+            match event {
+                BatchBufferAllocatorEvent::Clear(pointer) => {
+                    index_buffer.clear(&mut context, pointer);
+                }
+                BatchBufferAllocatorEvent::Write(pointer) => {
+                    if index_buffer.len() < allocator_len {
+                        index_buffer.resize(&mut context, allocator_len * 2);
                     }
-                    v
-                } else {
-                    vec![0; len]
-                }))
-            });
-        let p0 = buffer.allocate(&(), &(), &mut None, 1, 10).clone();
-        buffer.write(&(), &p0, &[1; 10]);
-        assert_eq!(p0.first, 0);
-        assert_eq!(p0.size, 10);
-
-        let p1 = buffer.allocate(&(), &(), &mut None, 2, 15).clone();
-        buffer.write(&(), &p1, &[2; 15]);
-        assert_eq!(p1.first, 10);
-        assert_eq!(p1.size, 15);
-
-        let p2 = buffer.allocate(&(), &(), &mut None, 3, 5).clone();
-        buffer.write(&(), &p2, &[3; 5]);
-        assert_eq!(p2.first, 25);
-        assert_eq!(p2.size, 5);
-
-        let p3 = buffer.allocate(&(), &(), &mut None, 4, 12).clone();
-        buffer.write(&(), &p3, &[4; 12]);
-        assert_eq!(p3.first, 30);
-        assert_eq!(p3.size, 12);
-
-        buffer.flush();
+                    let sprite = sprites.get(&pointer).unwrap();
+                    index_buffer.write(&mut context, pointer, &v(pointer.len, *sprite));
+                }
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    for pair in pairs.iter() {
+                        sprites.remove(&pair.from);
+                    }
+                    for (sprite, pointer) in pairs
+                        .iter()
+                        .filter_map(|pair| {
+                            sprites.remove(&pair.from).map(|sprite| (sprite, pair.to))
+                        })
+                        .collect::<Vec<_>>()
+                    {
+                        sprites.insert(pointer, sprite);
+                    }
+                }
+            }
+        }
 
         assert_eq!(
-            &buffer.buffer.0.borrow()[0..buffer.last()],
-            &vec![
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3,
-                3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4
-            ]
+            index_buffer.buffer.data[0..allocator.len()],
+            [1, 1, 1, 1, 1]
+        );
+
+        let p1 = allocator.allocate(3);
+        sprites.insert(p1, 2);
+
+        let p2 = allocator.allocate(4);
+        sprites.insert(p2, 3);
+
+        let allocator_len = allocator.len();
+        while let Some(event) = allocator.pop_event() {
+            match event {
+                BatchBufferAllocatorEvent::Clear(pointer) => {
+                    index_buffer.clear(&mut context, pointer);
+                }
+                BatchBufferAllocatorEvent::Write(pointer) => {
+                    if index_buffer.len() < allocator_len {
+                        index_buffer.resize(&mut context, allocator_len * 2);
+                    }
+                    let sprite = sprites.get(&pointer).unwrap();
+                    index_buffer.write(&mut context, pointer, &v(pointer.len, *sprite));
+                }
+                BatchBufferAllocatorEvent::ReallocateAll { pairs } => {
+                    for pair in pairs.iter() {
+                        sprites.remove(&pair.from);
+                    }
+                    for (sprite, pointer) in pairs
+                        .iter()
+                        .filter_map(|pair| {
+                            sprites.remove(&pair.from).map(|sprite| (sprite, pair.to))
+                        })
+                        .collect::<Vec<_>>()
+                    {
+                        sprites.insert(pointer, sprite);
+                    }
+                }
+            }
+        }
+
+        assert_eq!(
+            index_buffer.buffer.data[0..allocator.len()],
+            [1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3]
         );
     }
 
     #[test]
     fn test_free() {
-        let mut buffer: BatchBuffer<MockBuffer> =
-            BatchBuffer::new(&(), &(), &mut None, |_, _, _, prev, len| {
-                MockBuffer(RefCell::new(if let Some((prev_buffer, prev_len)) = prev {
-                    let mut v = prev_buffer.0.borrow().clone();
-                    for _ in prev_len..len {
-                        v.push(0);
-                    }
-                    v
-                } else {
-                    vec![0; len]
-                }))
-            });
-        let p0 = buffer.allocate(&(), &(), &mut None, 1, 10).clone();
-        buffer.write(&(), &p0, &[1; 10]);
+        let mut allocator = BatchBufferAllocator::default();
 
-        let p1 = buffer.allocate(&(), &(), &mut None, 2, 15).clone();
-        buffer.write(&(), &p1, &[2; 15]);
+        let p0 = allocator.allocate(1); // 5
+        let p1 = allocator.allocate(2); // 1
+        let p2 = allocator.allocate(4); // 2
+        let p3 = allocator.allocate(3); // 4
+        let p4 = allocator.allocate(5); // 3
 
-        let p2 = buffer.allocate(&(), &(), &mut None, 3, 5).clone();
-        buffer.write(&(), &p2, &[3; 5]);
+        assert_eq!(allocator.len(), 15);
 
-        let p3 = buffer.allocate(&(), &(), &mut None, 4, 12).clone();
-        buffer.write(&(), &p3, &[4; 12]);
-        buffer.flush();
+        allocator.free(p1);
 
-        buffer.free(&(), 1);
-        buffer.free(&(), 2);
-        buffer.free(&(), 3);
-        buffer.free(&(), 4);
-        assert_eq!(&buffer.buffer.0.borrow()[0..buffer.last()], &vec![0; 42]);
-
-        let p4 = buffer.allocate(&(), &(), &mut None, 5, 16).clone();
-        buffer.write(&(), &p4, &[5; 16]);
-        assert_eq!(p4.first, 42);
-        assert_eq!(p4.size, 16);
-
-        let p5 = buffer.allocate(&(), &(), &mut None, 6, 12).clone();
-        buffer.write(&(), &p5, &[6; 12]);
-        assert_eq!(p5.first, 30);
-        assert_eq!(p5.size, 12);
-
-        let p6 = buffer.allocate(&(), &(), &mut None, 7, 5).clone();
-        buffer.write(&(), &p6, &[7; 5]);
-        assert_eq!(p6.first, 25);
-        assert_eq!(p6.size, 5);
-
+        assert_eq!(allocator.len(), 15);
         assert_eq!(
-            &buffer.buffer.0.borrow()[0..buffer.last()],
-            &vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7,
-                7, 7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-                5, 5
-            ]
+            allocator.pending_pointers.len(),
+            1,
+            "{:?}",
+            allocator.pending_pointers
         );
+        assert_eq!(
+            allocator.pending_pointers_grouped_by_last.len(),
+            1,
+            "{:?}",
+            allocator.pending_pointers_grouped_by_last
+        );
+
+        allocator.free(p2);
+
+        assert_eq!(allocator.len(), 15);
+        assert_eq!(
+            allocator.pending_pointers.len(),
+            1,
+            "{:?}",
+            allocator.pending_pointers
+        );
+        assert_eq!(
+            allocator.pending_pointers_grouped_by_last.len(),
+            1,
+            "{:?}",
+            allocator.pending_pointers_grouped_by_last
+        );
+
+        allocator.free(p4);
+
+        assert_eq!(allocator.len(), 10);
+        assert_eq!(
+            allocator.pending_pointers.len(),
+            1,
+            "{:?}",
+            allocator.pending_pointers
+        );
+        assert_eq!(
+            allocator.pending_pointers_grouped_by_last.len(),
+            1,
+            "{:?}",
+            allocator.pending_pointers_grouped_by_last
+        );
+
+        allocator.free(p3);
+
+        assert_eq!(allocator.len(), 1);
+        assert_eq!(
+            allocator.pending_pointers.len(),
+            0,
+            "{:?}",
+            allocator.pending_pointers
+        );
+        assert_eq!(
+            allocator.pending_pointers_grouped_by_last.len(),
+            0,
+            "{:?}",
+            allocator.pending_pointers_grouped_by_last
+        );
+
+        allocator.free(p0);
+
+        assert_eq!(allocator.len(), 0);
+        assert_eq!(
+            allocator.pending_pointers.len(),
+            0,
+            "{:?}",
+            allocator.pending_pointers
+        );
+        assert_eq!(
+            allocator.pending_pointers_grouped_by_last.len(),
+            0,
+            "{:?}",
+            allocator.pending_pointers_grouped_by_last
+        );
+    }
+
+    #[test]
+    fn test_allocate() {
+        let mut allocator = BatchBufferAllocator::default();
+
+        let p0 = allocator.allocate(3);
+        assert_eq!(p0.first, 0);
+        assert_eq!(p0.len, 3);
+
+        let p1 = allocator.allocate(4);
+        assert_eq!(p1.first, 3);
+        assert_eq!(p1.len, 4);
+
+        let p2 = allocator.allocate(5);
+        assert_eq!(p2.first, 7);
+        assert_eq!(p2.len, 5);
+
+        assert_eq!(allocator.pointers.len(), 3);
+        assert_eq!(allocator.len(), 12);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+    }
+
+    #[test]
+    fn test_reallocate() {
+        let mut allocator = BatchBufferAllocator::default();
+        let p0 = allocator.allocate(10);
+        let p1 = allocator.allocate(5);
+        let _p2 = allocator.allocate(15);
+        let p1 = allocator.reallocate(p1, 10);
+        assert_eq!(p1.first, 30);
+        assert_eq!(p1.len, 10);
+
+        let p0 = allocator.reallocate(p0, 5);
+        assert_eq!(p0.first, 10);
+        assert_eq!(p0.len, 5);
+    }
+
+    #[test]
+    fn test_defragmentation() {
+        let mut allocator = BatchBufferAllocator::default();
+        let p0 = allocator.allocate(3);
+        let p1 = allocator.allocate(3);
+        let _p2 = allocator.allocate(3);
+        let p3 = allocator.allocate(3);
+        let _p4 = allocator.allocate(3);
+
+        allocator.free(p0);
+        allocator.free(p1);
+        allocator.free(p3);
+
+        convert_events(&mut allocator);
+
+        allocator.defragmentation();
+        assert_eq!(allocator.pointers.len(), 2);
+        assert_eq!(allocator.pending_pointers.len(), 0);
+        assert_eq!(allocator.pending_pointers_grouped_by_last.len(), 0);
+        assert_eq!(allocator.len, 6);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        assert_eq!(allocator.pointers.get(&0).unwrap().len, 3);
+        assert_eq!(allocator.pointers.get(&3).unwrap().len, 3);
+    }
+
+    #[test]
+    fn test_events() {
+        let mut allocator = BatchBufferAllocator::default();
+
+        let p0 = allocator.allocate(1); // 4
+        let p1 = allocator.allocate(2); // 1
+        let p2 = allocator.allocate(4); // 3
+        let _p3 = allocator.allocate(3);
+        let p4 = allocator.allocate(5); // 2
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        allocator.free(p1);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        allocator.free(p4);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        allocator.free(p2);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        let _p0 = allocator.reallocate(p0, 5);
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+    }
+
+    #[test]
+    fn test_sort() {
+        let mut allocator = BatchBufferAllocator::default();
+
+        // 5, 3, 4, 1
+        let _p0 = allocator.allocate(5);
+        let _p1 = allocator.allocate(3);
+        let _p2 = allocator.allocate(4);
+        let _p3 = allocator.allocate(1);
+
+        allocator.sort_by(|p0, p1| p0.len.cmp(&p1.len)); // 1, 3, 4, 5
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        let p1 = BatchBufferPointer::new(1, 3);
+        allocator.free(p1); // 1, _, 4, 5
+
+        allocator.allocate(2); // 1, 2, 4, 5
+
+        allocator.sort_by(|p0, p1| p0.len.cmp(&p1.len));
+
+        insta::assert_debug_snapshot!(convert_events(&mut allocator));
+
+        assert_eq!(allocator.len, 12);
     }
 }

@@ -1,12 +1,13 @@
-use nalgebra_glm::{vec2, vec4};
+use nalgebra_glm::{vec2, vec4, Mat4};
 use tearchan::engine::Engine;
 use tearchan::engine_config::EngineStartupConfigBuilder;
 use tearchan::gfx::batch::batch2d::Batch2D;
+use tearchan::gfx::batch::context::BatchContext;
 use tearchan::gfx::batch::types::BatchTypeArray;
 use tearchan::gfx::camera::Camera2D;
 use tearchan::gfx::font_texture::FontTexture;
-use tearchan::gfx::shader::get_standard_2d_shader_source;
-use tearchan::gfx::wgpu::util::DeviceExt;
+use tearchan::gfx::material::material2d::{Material2D, Material2DParams};
+use tearchan::gfx::uniform_buffer::UniformBuffer;
 use tearchan::scene::context::{SceneContext, SceneRenderContext};
 use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
@@ -21,10 +22,8 @@ use tearchan::winit::window::WindowBuilder;
 struct FontScene {
     font_texture: FontTexture,
     batch: Batch2D,
-    bind_group: tearchan::gfx::wgpu::BindGroup,
-    bind_group_layout: tearchan::gfx::wgpu::BindGroupLayout,
-    uniform_buffer: tearchan::gfx::wgpu::Buffer,
-    pipeline: tearchan::gfx::wgpu::RenderPipeline,
+    material: Material2D,
+    transform_buffer: UniformBuffer<Mat4>,
     camera: Camera2D,
 }
 
@@ -55,16 +54,15 @@ impl FontScene {
             )
             .unwrap();
 
-            let mut batch = Batch2D::new(device, queue);
-            let mut batch_command_buffer = batch.create_command_buffer();
+            let mut batch = Batch2D::new(device);
 
             let square_idx = create_square_indices();
             let square_pos = create_square_positions(&rect2(80.0f32, 80.0f32, 256.0f32, 256.0f32));
             let square_tex = create_square_texcoords(&rect2(0.0f32, 0.0f32, 1.0f32, 1.0f32));
             let square_col = create_square_colors(vec4(1.0f32, 1.0f32, 1.0f32, 1.0f32));
-            batch_command_buffer.add(
+            batch.add(
+                BatchTypeArray::V1U32 { data: square_idx },
                 vec![
-                    BatchTypeArray::V1U32 { data: square_idx },
                     BatchTypeArray::V3F32 { data: square_pos },
                     BatchTypeArray::V2F32 { data: square_tex },
                     BatchTypeArray::V4F32 { data: square_col },
@@ -77,11 +75,11 @@ impl FontScene {
             system,
             "#;
             let (text_mesh, _text_size) = font_texture.create_mesh(device, queue, text).unwrap();
-            batch_command_buffer.add(
+            batch.add(
+                BatchTypeArray::V1U32 {
+                    data: text_mesh.indices,
+                },
                 vec![
-                    BatchTypeArray::V1U32 {
-                        data: text_mesh.indices,
-                    },
                     BatchTypeArray::V3F32 {
                         data: text_mesh.positions,
                     },
@@ -95,165 +93,26 @@ impl FontScene {
                 None,
             );
 
-            let bind_group_layout =
-                device.create_bind_group_layout(&tearchan::gfx::wgpu::BindGroupLayoutDescriptor {
-                    label: None,
-                    entries: &[
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::VERTEX,
-                            ty: tearchan::gfx::wgpu::BindingType::Buffer {
-                                ty: tearchan::gfx::wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: tearchan::gfx::wgpu::BufferSize::new(64),
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Texture {
-                                multisampled: false,
-                                sample_type: tearchan::gfx::wgpu::TextureSampleType::Float {
-                                    filterable: true,
-                                },
-                                view_dimension: tearchan::gfx::wgpu::TextureViewDimension::D2,
-                            },
-                            count: None,
-                        },
-                        tearchan::gfx::wgpu::BindGroupLayoutEntry {
-                            binding: 2,
-                            visibility: tearchan::gfx::wgpu::ShaderStages::FRAGMENT,
-                            ty: tearchan::gfx::wgpu::BindingType::Sampler {
-                                comparison: false,
-                                filtering: true,
-                            },
-                            count: None,
-                        },
-                    ],
-                });
-            let pipeline_layout =
-                device.create_pipeline_layout(&tearchan::gfx::wgpu::PipelineLayoutDescriptor {
-                    label: None,
-                    bind_group_layouts: &[&bind_group_layout],
-                    push_constant_ranges: &[],
-                });
             let mut camera = Camera2D::new(&vec2(width, height));
             camera.update();
 
-            let uniform_buffer =
-                device.create_buffer_init(&tearchan::gfx::wgpu::util::BufferInitDescriptor {
-                    label: Some("Uniform Buffer"),
-                    contents: bytemuck::cast_slice(camera.combine().as_slice()),
-                    usage: tearchan::gfx::wgpu::BufferUsages::UNIFORM
-                        | tearchan::gfx::wgpu::BufferUsages::COPY_DST,
-                });
+            let transform_buffer = UniformBuffer::new(device, camera.combine());
 
-            // Create bind group
-            let bind_group = device.create_bind_group(&tearchan::gfx::wgpu::BindGroupDescriptor {
-                layout: &bind_group_layout,
-                entries: &[
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: uniform_buffer.as_entire_binding(),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: tearchan::gfx::wgpu::BindingResource::TextureView(
-                            font_texture.view(),
-                        ),
-                    },
-                    tearchan::gfx::wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: tearchan::gfx::wgpu::BindingResource::Sampler(
-                            font_texture.sampler(),
-                        ),
-                    },
-                ],
-                label: None,
-            });
-
-            // Create the render pipeline
-            let vertex_buffers = [
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 3 * std::mem::size_of::<f32>() as u64, // positions
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x3,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
+            let material = Material2D::new(
+                device,
+                Material2DParams {
+                    transform_buffer: transform_buffer.buffer(),
+                    texture_view: &font_texture.view,
+                    sampler: &font_texture.sampler,
+                    color_format: context.gfx().surface_config.format,
+                    shader_module: None,
                 },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 2 * std::mem::size_of::<f32>() as u64, // texcoords
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x2,
-                        offset: 0,
-                        shader_location: 1,
-                    }],
-                },
-                tearchan::gfx::wgpu::VertexBufferLayout {
-                    array_stride: 4 * std::mem::size_of::<f32>() as u64, // colors
-                    step_mode: tearchan::gfx::wgpu::VertexStepMode::Vertex,
-                    attributes: &[tearchan::gfx::wgpu::VertexAttribute {
-                        format: tearchan::gfx::wgpu::VertexFormat::Float32x4,
-                        offset: 0,
-                        shader_location: 2,
-                    }],
-                },
-            ];
-
-            let shader =
-                device.create_shader_module(&tearchan::gfx::wgpu::ShaderModuleDescriptor {
-                    label: None,
-                    source: get_standard_2d_shader_source(),
-                });
-
-            let pipeline =
-                device.create_render_pipeline(&tearchan::gfx::wgpu::RenderPipelineDescriptor {
-                    label: None,
-                    layout: Some(&pipeline_layout),
-                    vertex: tearchan::gfx::wgpu::VertexState {
-                        module: &shader,
-                        entry_point: "vs_main",
-                        buffers: &vertex_buffers,
-                    },
-                    fragment: Some(tearchan::gfx::wgpu::FragmentState {
-                        module: &shader,
-                        entry_point: "fs_main",
-                        targets: &[tearchan::gfx::wgpu::ColorTargetState {
-                            format: context.gfx().surface_config.format,
-                            blend: Some(tearchan::gfx::wgpu::BlendState {
-                                color: tearchan::gfx::wgpu::BlendComponent {
-                                    src_factor: tearchan::gfx::wgpu::BlendFactor::SrcAlpha,
-                                    dst_factor: tearchan::gfx::wgpu::BlendFactor::OneMinusSrcAlpha,
-                                    operation: tearchan::gfx::wgpu::BlendOperation::Add,
-                                },
-                                alpha: tearchan::gfx::wgpu::BlendComponent {
-                                    src_factor: tearchan::gfx::wgpu::BlendFactor::One,
-                                    dst_factor: tearchan::gfx::wgpu::BlendFactor::One,
-                                    operation: tearchan::gfx::wgpu::BlendOperation::Max,
-                                },
-                            }),
-                            write_mask: tearchan::gfx::wgpu::ColorWrites::ALL,
-                        }],
-                    }),
-                    primitive: tearchan::gfx::wgpu::PrimitiveState {
-                        cull_mode: Some(tearchan::gfx::wgpu::Face::Back),
-                        ..Default::default()
-                    },
-                    depth_stencil: None,
-                    multisample: tearchan::gfx::wgpu::MultisampleState::default(),
-                });
-
+            );
             Box::new(FontScene {
                 font_texture,
                 batch,
-                bind_group,
-                bind_group_layout,
-                uniform_buffer,
-                pipeline,
+                material,
+                transform_buffer,
                 camera,
             })
         }
@@ -269,12 +128,11 @@ impl Scene for FontScene {
         let queue = context.gfx().queue;
         let device = context.gfx().device;
 
+        self.batch.flush(BatchContext { device, queue });
+
         let mut encoder = device
             .create_command_encoder(&tearchan::gfx::wgpu::CommandEncoderDescriptor { label: None });
         {
-            self.batch.flush(device, queue, &mut Some(&mut encoder));
-            let provider = self.batch.provider();
-
             let mut rpass = encoder.begin_render_pass(&tearchan::gfx::wgpu::RenderPassDescriptor {
                 label: None,
                 color_attachments: &[tearchan::gfx::wgpu::RenderPassColorAttachment {
@@ -292,19 +150,9 @@ impl Scene for FontScene {
                 }],
                 depth_stencil_attachment: None,
             });
-            rpass.push_debug_group("Prepare data for draw.");
-            rpass.set_pipeline(&self.pipeline);
-            rpass.set_bind_group(0, &self.bind_group, &[]);
-            rpass.set_index_buffer(
-                provider.index_buffer().slice(..),
-                tearchan::gfx::wgpu::IndexFormat::Uint32,
-            );
-            rpass.set_vertex_buffer(0, provider.position_buffer().slice(..));
-            rpass.set_vertex_buffer(1, provider.texcoord_buffer().slice(..));
-            rpass.set_vertex_buffer(2, provider.color_buffer().slice(..));
-            rpass.pop_debug_group();
-            rpass.insert_debug_marker("Draw");
-            rpass.draw_indexed(0..provider.index_count() as u32, 0, 0..1);
+            self.material.bind(&mut rpass);
+            self.batch.bind(&mut rpass);
+            rpass.draw_indexed(0..self.batch.index_count() as u32, 0, 0..1);
         }
 
         queue.submit(Some(encoder.finish()));

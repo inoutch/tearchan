@@ -11,6 +11,5 @@ pub mod renderer;
 pub mod shader;
 pub mod texture;
 pub mod uniform_buffer;
-pub mod v2;
 
 pub use wgpu;
