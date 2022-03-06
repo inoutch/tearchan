@@ -1,4 +1,4 @@
-use wgpu::PipelineLayoutDescriptor;
+use wgpu::{Device, PipelineLayoutDescriptor};
 
 pub mod material2d;
 pub mod material3d;
@@ -7,6 +7,7 @@ pub mod material_line;
 
 pub struct Material<T> {
     provider: T,
+    bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
 }
@@ -22,6 +23,7 @@ where
         let bind_group = provider.create_bind_group(device, params, &bind_group_layout);
         Material {
             provider,
+            bind_group_layout,
             bind_group,
             pipeline,
         }
@@ -30,6 +32,12 @@ where
     pub fn bind<'b>(&'b self, rpass: &mut wgpu::RenderPass<'b>) {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.bind_group, &[]);
+    }
+
+    pub fn update_bind_group(&mut self, device: &Device, params: T::Params) {
+        self.bind_group = self
+            .provider
+            .create_bind_group(device, &params, &self.bind_group_layout);
     }
 
     pub fn provider(&self) -> &T {
