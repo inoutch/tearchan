@@ -1,4 +1,4 @@
-use bytemuck::Pod;
+use crate::primitive::Primitive;
 use nalgebra_glm::{RealField, TVec};
 use std::cmp::min;
 use std::marker::PhantomData;
@@ -97,14 +97,6 @@ pub struct BufferCopier<'a> {
     pub device: &'a wgpu::Device,
     pub queue: &'a wgpu::Queue,
 }
-
-pub trait Primitive: Pod {}
-
-impl Primitive for i32 {}
-impl Primitive for f32 {}
-impl Primitive for u32 {}
-impl Primitive for f64 {}
-impl Primitive for u64 {}
 
 impl<'a, T: Primitive> BufferTrait<'a, T> for Buffer<T> {
     type Resizer = BufferResizer<'a>;
