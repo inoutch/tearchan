@@ -252,8 +252,8 @@ impl BatchObjectManager {
     }
 
     pub fn remove(&mut self, id: BatchObjectId) -> Option<BatchObject> {
-        self.events.push_back(BatchObjectEvent::Remove { id });
         let object = self.objects.remove(&id)?;
+        self.events.push_back(BatchObjectEvent::Remove { id });
         self.index_allocator.free(object.index_pointer());
         self.vertex_allocator.free(object.vertex_pointer());
         self.object_ids_grouped_by_index_pointer
@@ -348,16 +348,16 @@ impl BatchObjectManager {
     }
 
     pub fn replace_vertices(&mut self, id: BatchObjectId, vertices: Vec<BatchTypeArray>) {
+        let object = match self.objects.get_mut(&id) {
+            Some(object) => object,
+            None => return,
+        };
+
         let mut iter = vertices.iter();
         let vertex_len = iter.next().map(|array| array.len()).unwrap_or(0);
         for array in iter {
             assert_eq!(array.len(), vertex_len);
         }
-
-        let object = match self.objects.get_mut(&id) {
-            Some(object) => object,
-            None => return,
-        };
         if object
             .vertices()
             .first()
