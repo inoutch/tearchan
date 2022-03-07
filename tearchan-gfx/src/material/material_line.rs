@@ -3,15 +3,17 @@ use std::ops::{Deref, DerefMut};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState,
-    Buffer, BufferBindingType, BufferSize, ColorTargetState, ColorWrites, Device, FragmentState,
-    MultisampleState, PipelineLayout, PrimitiveState, PrimitiveTopology, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModule, ShaderStages, TextureFormat, VertexAttribute,
-    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    Buffer, BufferBindingType, BufferSize, ColorTargetState, ColorWrites, CompareFunction,
+    DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineLayout,
+    PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
+    ShaderStages, StencilState, TextureFormat, VertexAttribute, VertexBufferLayout, VertexFormat,
+    VertexState, VertexStepMode,
 };
 
 pub struct MaterialLineParams<'a> {
     pub transform_buffer: &'a Buffer,
     pub color_format: TextureFormat,
+    pub depth_format: Option<TextureFormat>,
     pub shader_module: Option<ShaderModule>,
 }
 
@@ -105,7 +107,13 @@ impl<'a> MaterialProvider<'a> for MaterialLineProvider {
                     write_mask: ColorWrites::ALL,
                 }],
             }),
-            depth_stencil: None,
+            depth_stencil: params.depth_format.map(|format| DepthStencilState {
+                format,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Less,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             multisample: MultisampleState::default(),
         })
     }

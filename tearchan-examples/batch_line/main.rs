@@ -47,6 +47,7 @@ impl BatchLineScene {
                 MaterialLineParams {
                     transform_buffer: transform_buffer.buffer(),
                     color_format: context.gfx().surface_config.format,
+                    depth_format: None,
                     shader_module: None,
                 },
             );

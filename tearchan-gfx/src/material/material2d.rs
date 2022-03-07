@@ -3,10 +3,11 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, BlendComponent, BlendFactor,
     BlendOperation, BlendState, Buffer, BufferBindingType, BufferSize, ColorTargetState,
-    ColorWrites, Device, Face, FragmentState, MultisampleState, PipelineLayout, PrimitiveState,
-    RenderPass, RenderPipeline, RenderPipelineDescriptor, Sampler, ShaderModule, ShaderStages,
-    TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexAttribute,
-    VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,
+    MultisampleState, PipelineLayout, PrimitiveState, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, Sampler, ShaderModule, ShaderStages, StencilState, TextureFormat,
+    TextureSampleType, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
+    VertexFormat, VertexState, VertexStepMode,
 };
 
 pub struct Material2DParams<'a> {
@@ -14,6 +15,7 @@ pub struct Material2DParams<'a> {
     pub texture_view: &'a TextureView,
     pub sampler: &'a Sampler,
     pub color_format: TextureFormat,
+    pub depth_format: Option<TextureFormat>,
     pub shader_module: Option<ShaderModule>,
 }
 
@@ -118,7 +120,13 @@ impl<'a> MaterialProvider<'a> for Material2DProvider {
                     write_mask: ColorWrites::ALL,
                 }],
             }),
-            depth_stencil: None,
+            depth_stencil: params.depth_format.map(|format| DepthStencilState {
+                format,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Less,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             multisample: MultisampleState::default(),
         })
     }

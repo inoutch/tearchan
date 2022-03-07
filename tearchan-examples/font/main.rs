@@ -105,6 +105,7 @@ impl FontScene {
                     texture_view: &font_texture.view,
                     sampler: &font_texture.sampler,
                     color_format: context.gfx().surface_config.format,
+                    depth_format: None,
                     shader_module: None,
                 },
             );

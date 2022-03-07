@@ -74,6 +74,7 @@ impl Batch2DScene {
                     texture_view: &texture_view,
                     sampler: &sampler,
                     color_format: context.gfx().surface_config.format,
+                    depth_format: None,
                     shader_module: Some(shader_module),
                 },
             );
