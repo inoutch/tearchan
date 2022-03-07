@@ -85,8 +85,18 @@ impl<T> Batch<T> {
     pub fn replace_indices(&mut self, id: BatchObjectId, indices: BatchTypeArray) {
         self.manager.replace_indices(id, indices);
     }
+
     pub fn replace_vertices(&mut self, id: BatchObjectId, vertices: Vec<BatchTypeArray>) {
         self.manager.replace_vertices(id, vertices);
+    }
+
+    pub fn rewrite_vertices(
+        &mut self,
+        id: BatchObjectId,
+        attribute: BatchAttributeIndex,
+        vertices: BatchTypeArray,
+    ) {
+        self.manager.rewrite_vertices(id, attribute, vertices);
     }
 
     pub fn index_count(&self) -> usize {
@@ -119,27 +129,29 @@ impl<TProvider> Batch<TProvider> {
                     provider.run(&mut context, BatchEvent::Remove { id });
                 }
                 BatchObjectEvent::WriteToIndexBuffer { id } => {
-                    let object = manager.get(id).unwrap();
-                    provider.run(
-                        &mut context,
-                        BatchEvent::WriteToIndexBuffer {
-                            id,
-                            pointer: object.index_pointer(),
-                            object,
-                        },
-                    );
+                    if let Some(object) = manager.get(id) {
+                        provider.run(
+                            &mut context,
+                            BatchEvent::WriteToIndexBuffer {
+                                id,
+                                pointer: object.index_pointer(),
+                                object,
+                            },
+                        );
+                    }
                 }
                 BatchObjectEvent::WriteToVertexBuffer { id, attribute } => {
-                    let object = manager.get(id).unwrap();
-                    provider.run(
-                        &mut context,
-                        BatchEvent::WriteToVertexBuffer {
-                            id,
-                            pointer: object.vertex_pointer(),
-                            attribute,
-                            object,
-                        },
-                    );
+                    if let Some(object) = manager.get(id) {
+                        provider.run(
+                            &mut context,
+                            BatchEvent::WriteToVertexBuffer {
+                                id,
+                                pointer: object.vertex_pointer(),
+                                attribute,
+                                object,
+                            },
+                        );
+                    }
                 }
                 BatchObjectEvent::ClearToIndexBuffer { pointer } => {
                     provider.run(&mut context, BatchEvent::ClearToIndexBuffer { pointer });
