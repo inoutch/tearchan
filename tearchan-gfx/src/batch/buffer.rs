@@ -36,8 +36,7 @@ enum Event {
 #[derive(Default)]
 pub struct BatchBufferAllocator {
     pointers: BTreeMap<usize, BatchBufferPointer>, // grouped by first
-    pending_pointers: DuplicatableBTreeMap<usize, usize>, // grouped by size, value is last of pending pointer
-    pending_pointers_grouped_by_last: BTreeMap<usize, BatchBufferPointer>,
+    pending_pointers: PendingPointers,
     events: VecDeque<Event>,
     len: usize,
 }
@@ -76,7 +75,12 @@ impl BatchBufferAllocator {
         let mut seek = first;
 
         let mut merge_pointers = vec![pointer];
-        for (last, pointer) in self.pending_pointers_grouped_by_last.range(0..=first).rev() {
+        for (last, pointer) in self
+            .pending_pointers
+            .pending_pointers_grouped_by_last()
+            .range(0..=first)
+            .rev()
+        {
             if &seek != last {
                 break;
             }
@@ -85,9 +89,7 @@ impl BatchBufferAllocator {
         }
 
         for merge_pointer in merge_pointers {
-            let last = merge_pointer.first + merge_pointer.len;
-            self.pending_pointers.remove(&merge_pointer.len, &last);
-            self.pending_pointers_grouped_by_last.remove(&last);
+            self.pending_pointers.remove(merge_pointer);
         }
 
         if is_last {
@@ -95,13 +97,13 @@ impl BatchBufferAllocator {
             return;
         }
 
-        self.push_pending_pointer(BatchBufferPointer::new(seek, last - seek));
+        self.pending_pointers
+            .add(BatchBufferPointer::new(seek, last - seek));
         self.events.push_back(Event::Clear { pointer });
     }
 
     pub fn defragmentation(&mut self) {
         self.pending_pointers.clear();
-        self.pending_pointers_grouped_by_last.clear();
         self.events.clear();
 
         let prev_pointers = std::mem::take(&mut self.pointers);
@@ -159,7 +161,6 @@ impl BatchBufferAllocator {
         self.events.clear();
         self.pointers.clear();
         self.pending_pointers.clear();
-        self.pending_pointers_grouped_by_last.clear();
 
         let mut pairs = Vec::new();
         let mut write_events = VecDeque::new();
@@ -187,37 +188,23 @@ impl BatchBufferAllocator {
     }
 
     fn allocate_from_pending_pointers(&mut self, len: usize) -> Option<BatchBufferPointer> {
-        let last = self
-            .pending_pointers
-            .range_mut(len..)
-            .next()?
-            .1
-            .pop_front()?;
-        let pointer = self.pending_pointers_grouped_by_last.remove(&last).unwrap();
-        {
-            let (pointer, pending_pointer) = if len == pointer.len {
-                (pointer, None)
-            } else {
-                (
-                    BatchBufferPointer::new(pointer.first, len),
-                    Some(BatchBufferPointer::new(
-                        pointer.first + len,
-                        pointer.len - len,
-                    )),
-                )
-            };
-            self.pointers.insert(pointer.first, pointer);
-            if let Some(pending_pointer) = pending_pointer {
-                self.push_pending_pointer(pending_pointer);
-            }
-            Some(pointer)
+        let pointer = self.pending_pointers.pop(len)?;
+        let (pointer, pending_pointer) = if len == pointer.len {
+            (pointer, None)
+        } else {
+            (
+                BatchBufferPointer::new(pointer.first, len),
+                Some(BatchBufferPointer::new(
+                    pointer.first + len,
+                    pointer.len - len,
+                )),
+            )
+        };
+        self.pointers.insert(pointer.first, pointer);
+        if let Some(pending_pointer) = pending_pointer {
+            self.pending_pointers.add(pending_pointer);
         }
-    }
-
-    fn push_pending_pointer(&mut self, pointer: BatchBufferPointer) {
-        let last = pointer.first + pointer.len;
-        self.pending_pointers_grouped_by_last.insert(last, pointer);
-        self.pending_pointers.push_front(pointer.len, last);
+        Some(pointer)
     }
 }
 
@@ -312,10 +299,50 @@ where
     }
 }
 
+#[derive(Default)]
+struct PendingPointers {
+    pending_pointers: DuplicatableBTreeMap<usize, usize>, // grouped by size, value is last of pending pointer
+    pending_pointers_grouped_by_last: BTreeMap<usize, BatchBufferPointer>,
+}
+
+impl PendingPointers {
+    pub fn add(&mut self, pointer: BatchBufferPointer) {
+        let last = pointer.first + pointer.len;
+        self.pending_pointers_grouped_by_last.insert(last, pointer);
+        self.pending_pointers.push_back(pointer.len, last);
+    }
+
+    pub fn remove(&mut self, pointer: BatchBufferPointer) {
+        let last = pointer.first + pointer.len;
+        self.pending_pointers_grouped_by_last.remove(&last);
+        self.pending_pointers.remove(&pointer.len, &last);
+    }
+
+    pub fn pending_pointers_grouped_by_last(&self) -> &BTreeMap<usize, BatchBufferPointer> {
+        &self.pending_pointers_grouped_by_last
+    }
+
+    pub fn clear(&mut self) {
+        self.pending_pointers.clear();
+        self.pending_pointers_grouped_by_last.clear();
+    }
+
+    pub fn pop(&mut self, len: usize) -> Option<BatchBufferPointer> {
+        let last = self
+            .pending_pointers
+            .range_mut(len..)
+            .next()?
+            .1
+            .pop_front()?;
+        self.pending_pointers_grouped_by_last.remove(&last)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::batch::buffer::{
         BatchBuffer, BatchBufferAllocator, BatchBufferAllocatorEvent, BatchBufferPointer,
+        PendingPointers,
     };
     use crate::buffer::BufferTrait;
     use std::collections::HashMap;
@@ -490,80 +517,95 @@ mod test {
 
         assert_eq!(allocator.len(), 15);
         assert_eq!(
-            allocator.pending_pointers.len(),
+            allocator.pending_pointers.pending_pointers.len(),
             1,
             "{:?}",
-            allocator.pending_pointers
+            allocator.pending_pointers.pending_pointers
         );
         assert_eq!(
-            allocator.pending_pointers_grouped_by_last.len(),
+            allocator
+                .pending_pointers
+                .pending_pointers_grouped_by_last
+                .len(),
             1,
             "{:?}",
-            allocator.pending_pointers_grouped_by_last
+            allocator.pending_pointers.pending_pointers_grouped_by_last
         );
 
         allocator.free(p2);
 
         assert_eq!(allocator.len(), 15);
         assert_eq!(
-            allocator.pending_pointers.len(),
+            allocator.pending_pointers.pending_pointers.len(),
             1,
             "{:?}",
-            allocator.pending_pointers
+            allocator.pending_pointers.pending_pointers
         );
         assert_eq!(
-            allocator.pending_pointers_grouped_by_last.len(),
+            allocator
+                .pending_pointers
+                .pending_pointers_grouped_by_last
+                .len(),
             1,
             "{:?}",
-            allocator.pending_pointers_grouped_by_last
+            allocator.pending_pointers.pending_pointers_grouped_by_last
         );
 
         allocator.free(p4);
 
         assert_eq!(allocator.len(), 10);
         assert_eq!(
-            allocator.pending_pointers.len(),
+            allocator.pending_pointers.pending_pointers.len(),
             1,
             "{:?}",
-            allocator.pending_pointers
+            allocator.pending_pointers.pending_pointers
         );
         assert_eq!(
-            allocator.pending_pointers_grouped_by_last.len(),
+            allocator
+                .pending_pointers
+                .pending_pointers_grouped_by_last
+                .len(),
             1,
             "{:?}",
-            allocator.pending_pointers_grouped_by_last
+            allocator.pending_pointers.pending_pointers_grouped_by_last
         );
 
         allocator.free(p3);
 
         assert_eq!(allocator.len(), 1);
         assert_eq!(
-            allocator.pending_pointers.len(),
+            allocator.pending_pointers.pending_pointers.len(),
             0,
             "{:?}",
-            allocator.pending_pointers
+            allocator.pending_pointers.pending_pointers
         );
         assert_eq!(
-            allocator.pending_pointers_grouped_by_last.len(),
+            allocator
+                .pending_pointers
+                .pending_pointers_grouped_by_last
+                .len(),
             0,
             "{:?}",
-            allocator.pending_pointers_grouped_by_last
+            allocator.pending_pointers.pending_pointers_grouped_by_last
         );
 
         allocator.free(p0);
 
         assert_eq!(allocator.len(), 0);
         assert_eq!(
-            allocator.pending_pointers.len(),
+            allocator.pending_pointers.pending_pointers.len(),
             0,
             "{:?}",
-            allocator.pending_pointers
+            allocator.pending_pointers.pending_pointers
         );
         assert_eq!(
-            allocator.pending_pointers_grouped_by_last.len(),
+            allocator
+                .pending_pointers
+                .pending_pointers_grouped_by_last
+                .len(),
             0,
             "{:?}",
-            allocator.pending_pointers_grouped_by_last
+            allocator.pending_pointers.pending_pointers_grouped_by_last
         );
     }
 
@@ -621,8 +663,14 @@ mod test {
 
         allocator.defragmentation();
         assert_eq!(allocator.pointers.len(), 2);
-        assert_eq!(allocator.pending_pointers.len(), 0);
-        assert_eq!(allocator.pending_pointers_grouped_by_last.len(), 0);
+        assert_eq!(allocator.pending_pointers.pending_pointers.len(), 0);
+        assert_eq!(
+            allocator
+                .pending_pointers
+                .pending_pointers_grouped_by_last
+                .len(),
+            0
+        );
         assert_eq!(allocator.len, 6);
 
         insta::assert_debug_snapshot!(convert_events(&mut allocator));
@@ -684,5 +732,28 @@ mod test {
         insta::assert_debug_snapshot!(convert_events(&mut allocator));
 
         assert_eq!(allocator.len, 12);
+    }
+
+    #[test]
+    fn test_pending_pointers() {
+        let mut pending_pointers = PendingPointers::default();
+        pending_pointers.add(BatchBufferPointer { first: 0, len: 1 });
+        pending_pointers.add(BatchBufferPointer { first: 1, len: 2 });
+        pending_pointers.add(BatchBufferPointer { first: 3, len: 3 });
+
+        assert_eq!(pending_pointers.pending_pointers.len(), 3);
+        assert_eq!(pending_pointers.pending_pointers_grouped_by_last.len(), 3);
+
+        pending_pointers.remove(BatchBufferPointer { first: 0, len: 1 });
+        assert_eq!(pending_pointers.pending_pointers.len(), 2);
+        assert_eq!(pending_pointers.pending_pointers_grouped_by_last.len(), 2);
+
+        pending_pointers.remove(BatchBufferPointer { first: 1, len: 2 });
+        assert_eq!(pending_pointers.pending_pointers.len(), 1);
+        assert_eq!(pending_pointers.pending_pointers_grouped_by_last.len(), 1);
+
+        pending_pointers.remove(BatchBufferPointer { first: 3, len: 3 });
+        assert_eq!(pending_pointers.pending_pointers.len(), 0);
+        assert_eq!(pending_pointers.pending_pointers_grouped_by_last.len(), 0);
     }
 }
