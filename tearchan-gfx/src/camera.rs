@@ -87,6 +87,8 @@ pub struct Camera3D {
     pub position: Vec3,
     pub target_position: Vec3,
     pub up: Vec3,
+    near: f32,
+    far: f32,
 }
 
 impl Camera3D {
@@ -107,6 +109,8 @@ impl Camera3D {
             position: vec3(0.0f32, 0.0f32, 0.0f32),
             target_position: vec3(0.0f32, 0.0f32, 0.0f32),
             up: vec3(0.0f32, 1.0f32, 0.0f32),
+            near,
+            far,
         }
     }
 
@@ -122,6 +126,16 @@ impl Camera3D {
 
     pub fn combine(&self) -> &Mat4 {
         self.base.combine()
+    }
+
+    #[inline]
+    pub fn near(&self) -> f32 {
+        self.near
+    }
+
+    #[inline]
+    pub fn far(&self) -> f32 {
+        self.far
     }
 }
 
