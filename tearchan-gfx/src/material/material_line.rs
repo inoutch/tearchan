@@ -115,6 +115,7 @@ impl<'a> MaterialProvider<'a> for MaterialLineProvider {
                 bias: DepthBiasState::default(),
             }),
             multisample: MultisampleState::default(),
+            multiview: None,
         })
     }
 
