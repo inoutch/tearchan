@@ -31,7 +31,7 @@ where
     }
 
     pub fn try_read(&self) -> Option<ComponentGroupSyncReader<T>> {
-        if Arc::strong_count(&self.inner) != 1 {
+        if self.inner.try_read().is_err() {
             return None;
         }
         Some(ComponentGroupSyncReader {
