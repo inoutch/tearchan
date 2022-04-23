@@ -6,7 +6,6 @@ struct VertexOutput {
     [[location(3)]] frag_pos: vec3<f32>;
 };
 
-[[block]]
 struct Locals {
     transform: mat4x4<f32>;
 };
@@ -33,15 +32,12 @@ fn vs_main(
 struct FragmentOutput {
     [[location(0)]] target: vec4<f32>;
 };
-[[block]]
 struct LightAmbient {
     strength: f32;
 };
-[[block]]
 struct LightColor {
     color: vec4<f32>;
 };
-[[block]]
 struct LightPosition {
     position: vec4<f32>;
 };

@@ -248,6 +248,10 @@ impl BatchBufferPointer {
     pub fn first(&self) -> usize {
         self.first
     }
+
+    pub fn last(&self) -> usize {
+        self.first + self.len
+    }
 }
 
 pub struct BatchBuffer<TBuffer, TDataType> {

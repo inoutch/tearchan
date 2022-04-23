@@ -4,11 +4,9 @@ struct VertexOutput {
     [[location(1)]] color: vec4<f32>;
 };
 
-[[block]]
 struct Locals {
     transform: mat4x4<f32>;
 };
-[[block]]
 struct BillboardCamera {
     right: vec3<f32>;
     up: vec3<f32>;

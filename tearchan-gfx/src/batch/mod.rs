@@ -111,6 +111,10 @@ impl<T> Batch<T> {
     ) {
         self.manager.transform(id, attribute, transform);
     }
+
+    pub fn get_batch_object(&self, id: BatchObjectId) -> Option<&BatchObject> {
+        self.manager.get(id)
+    }
 }
 
 impl<TProvider> Batch<TProvider> {

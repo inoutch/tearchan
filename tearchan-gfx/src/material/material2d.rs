@@ -5,9 +5,9 @@ use wgpu::{
     BlendOperation, BlendState, Buffer, BufferBindingType, BufferSize, ColorTargetState,
     ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,
     MultisampleState, PipelineLayout, PrimitiveState, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, Sampler, ShaderModule, ShaderStages, StencilState, TextureFormat,
-    TextureSampleType, TextureView, TextureViewDimension, VertexAttribute, VertexBufferLayout,
-    VertexFormat, VertexState, VertexStepMode,
+    RenderPipelineDescriptor, Sampler, SamplerBindingType, ShaderModule, ShaderStages,
+    StencilState, TextureFormat, TextureSampleType, TextureView, TextureViewDimension,
+    VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 
 pub struct Material2DParams<'a> {
@@ -72,10 +72,7 @@ impl<'a> MaterialProvider<'a> for Material2DProvider {
                 BindGroupLayoutEntry {
                     binding: 2,
                     visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler {
-                        comparison: false,
-                        filtering: true,
-                    },
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
             ],
@@ -128,6 +125,7 @@ impl<'a> MaterialProvider<'a> for Material2DProvider {
                 bias: DepthBiasState::default(),
             }),
             multisample: MultisampleState::default(),
+            multiview: None,
         })
     }
 
