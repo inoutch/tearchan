@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod group;
 pub mod group_sync;
+pub mod resource_sync;
 pub mod zip;
 
 pub type EntityId = u64;

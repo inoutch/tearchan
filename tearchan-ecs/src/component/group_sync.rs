@@ -30,32 +30,16 @@ where
         }
     }
 
-    pub fn try_read(&self) -> Option<ComponentGroupSyncReader<T>> {
-        if self.inner.try_read().is_err() {
-            return None;
-        }
-        Some(ComponentGroupSyncReader {
-            inner: Arc::clone(&self.inner),
-        })
-    }
-
-    pub fn try_write(&mut self) -> Option<ComponentGroupSyncWriter<T>> {
-        if Arc::strong_count(&self.inner) != 1 {
-            return None;
-        }
-        Some(ComponentGroupSyncWriter {
-            inner: Arc::clone(&self.inner),
-        })
-    }
-
     pub fn read(&self) -> ComponentGroupSyncReader<T> {
-        self.try_read()
-            .expect("It can only be read once. If you need more than one, please Clone")
+        ComponentGroupSyncReader {
+            inner: Arc::clone(&self.inner),
+        }
     }
 
     pub fn write(&mut self) -> ComponentGroupSyncWriter<T> {
-        self.try_write()
-            .expect("It can only be write once. If you need more than one, please Clone")
+        ComponentGroupSyncWriter {
+            inner: Arc::clone(&self.inner),
+        }
     }
 }
 
@@ -107,95 +91,13 @@ where
 #[cfg(test)]
 mod test {
     use crate::component::group::ComponentGroup;
-    use crate::component::group_sync::{ComponentGroupSync, ComponentGroupSyncReader};
+    use crate::component::group_sync::ComponentGroupSync;
     use crate::component::zip::ZipEntity1;
     use tearchan_util::thread::ThreadPool;
 
     #[test]
     fn test_default() {
         let _: ComponentGroupSync<i32> = ComponentGroupSync::default();
-    }
-
-    #[test]
-    fn test_read() {
-        let thread_pool = ThreadPool::new(4);
-        let mut group: ComponentGroupSync<i32> = ComponentGroupSync::default();
-        {
-            let mut writer = group.try_write().unwrap();
-            writer.get_mut().push(1, 32);
-            writer.get_mut().push(2, 12);
-            writer.get_mut().push(3, 45);
-            writer.get_mut().push(4, 67);
-        }
-        {
-            let group_reader = group.try_read().unwrap();
-
-            assert!(group.try_read().is_none());
-
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(1).unwrap(), &32);
-            });
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(2).unwrap(), &12);
-            });
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(3).unwrap(), &45);
-            });
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(4).unwrap(), &67);
-            });
-        }
-
-        thread_pool.join();
-        assert!(group.try_read().is_some());
-    }
-
-    #[test]
-    fn test_write() {
-        let thread_pool = ThreadPool::new(4);
-        let mut group: ComponentGroupSync<i32> = ComponentGroupSync::default();
-        {
-            let mut writer = group.try_write().unwrap();
-            assert!(group.try_write().is_none());
-
-            thread_pool.execute(move || {
-                writer.get_mut().push(1, 32);
-                writer.get_mut().push(2, 12);
-                writer.get_mut().push(3, 45);
-                writer.get_mut().push(4, 67);
-            });
-        }
-        thread_pool.join();
-
-        {
-            let group_reader = group.try_read().unwrap();
-
-            assert!(group.try_read().is_none());
-
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(1).unwrap(), &32);
-            });
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(2).unwrap(), &12);
-            });
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(3).unwrap(), &45);
-            });
-            let clone_reader = ComponentGroupSyncReader::clone(&group_reader);
-            thread_pool.execute(move || {
-                assert_eq!(clone_reader.get().get(4).unwrap(), &67);
-            });
-        }
-        thread_pool.join();
-
-        assert!(group.try_read().is_some());
     }
 
     #[test]
@@ -206,8 +108,8 @@ mod test {
         let mut group2: ComponentGroupSync<i32> = ComponentGroupSync::default();
 
         {
-            let mut writer1 = group1.try_write().unwrap();
-            let mut writer2 = group2.try_write().unwrap();
+            let mut writer1 = group1.write();
+            let mut writer2 = group2.write();
 
             thread_pool.execute(move || {
                 writer1.get_mut().push(1, 32);
@@ -227,8 +129,8 @@ mod test {
 
         // Read x Read
         {
-            let read1 = group1.try_read().unwrap();
-            let read2 = group2.try_read().unwrap();
+            let read1 = group1.read();
+            let read2 = group2.read();
             thread_pool.execute(move || {
                 read1
                     .get()
@@ -243,8 +145,8 @@ mod test {
 
         // Write x Read
         {
-            let mut write1 = group1.try_write().unwrap();
-            let read2 = group2.try_read().unwrap();
+            let mut write1 = group1.write();
+            let read2 = group2.read();
             thread_pool.execute(move || {
                 write1
                     .get_mut()
@@ -257,7 +159,7 @@ mod test {
         }
         thread_pool.join();
 
-        let read1 = group1.try_read().unwrap();
+        let read1 = group1.read();
         assert_eq!(read1.get().get(1).unwrap(), &128);
         assert_eq!(read1.get().get(2).unwrap(), &48);
         assert_eq!(read1.get().get(3).unwrap(), &180);
