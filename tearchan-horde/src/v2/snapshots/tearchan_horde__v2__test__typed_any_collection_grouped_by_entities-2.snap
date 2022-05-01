@@ -1,0 +1,16 @@
+---
+source: tearchan-horde/src/v2/mod.rs
+expression: "collection.get::<JumpState>()"
+
+---
+Some(
+    [
+        Action {
+            raw: JumpState,
+            entity_id: 2,
+            ty: Start {
+                time: 0,
+            },
+        },
+    ],
+)

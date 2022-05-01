@@ -1,3 +1,5 @@
+#![feature(map_first_last)]
+
 use crate::action::manager::{ActionController, ActionServerReader};
 use crate::action::Action;
 use crate::job::result::{JobResult, ProgressState};
@@ -6,6 +8,7 @@ use tearchan_ecs::component::EntityId;
 
 pub mod action;
 pub mod job;
+pub mod v2;
 
 pub trait HordeInterface {
     type ActionState;

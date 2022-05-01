@@ -1,0 +1,34 @@
+---
+source: tearchan-horde/src/v2/action/manager.rs
+expression: "SnapshotResult {\n    current_tick: manager.current_tick(),\n    tag: \"updates\",\n    move_actions: actions.get(),\n    jump_actions: actions.get(),\n    talk_actions: actions.get(),\n}"
+
+---
+SnapshotResult {
+    tag: "updates",
+    current_tick: 7,
+    move_actions: Some(
+        [
+            Action {
+                raw: MoveState,
+                entity_id: 1,
+                ty: Update {
+                    start: 0,
+                    end: 990,
+                },
+            },
+        ],
+    ),
+    jump_actions: Some(
+        [
+            Action {
+                raw: JumpState,
+                entity_id: 2,
+                ty: Update {
+                    start: 462,
+                    end: 1914,
+                },
+            },
+        ],
+    ),
+    talk_actions: None,
+}
