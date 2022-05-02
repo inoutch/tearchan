@@ -139,13 +139,13 @@ impl AnyActionVec {
 }
 
 #[derive(Default)]
-pub struct TypedAnyActionVecGroupedByEntityId {
+pub struct TypedAnyActionMapGroupedByEntityId {
     map: HashMap<TypeId, AnyActionVec>,
     indices: HashMap<EntityId, (TypeId, usize)>,
     entities: HashMap<(TypeId, usize), EntityId>,
 }
 
-impl TypedAnyActionVecGroupedByEntityId {
+impl TypedAnyActionMapGroupedByEntityId {
     pub fn get<T>(&self) -> Option<Vec<&ArcAction<T>>>
     where
         T: 'static,
@@ -207,11 +207,15 @@ impl TypedAnyActionVecGroupedByEntityId {
             }
         }
     }
+
+    pub fn iter(&self) -> Iter<'_, TypeId, AnyActionVec> {
+        self.map.iter()
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::v2::action::collection::TypedAnyActionVecGroupedByEntityId;
+    use crate::v2::action::collection::TypedAnyActionMapGroupedByEntityId;
     use crate::v2::action::{Action, ActionType};
     use std::sync::Arc;
 
@@ -223,14 +227,18 @@ mod test {
 
     #[test]
     fn test_typed_any_vec_grouped_by_entities() {
-        let mut collection = TypedAnyActionVecGroupedByEntityId::default();
+        let mut collection = TypedAnyActionMapGroupedByEntityId::default();
 
         collection.insert(
             1,
             Action {
                 raw: Arc::new(MoveState),
                 entity_id: 1,
-                ty: ActionType::Start { tick: 0 },
+                ty: ActionType::Start {
+                    tick: 0,
+                    start: 0,
+                    end: 0,
+                },
             },
         );
 
@@ -239,7 +247,11 @@ mod test {
             Action {
                 raw: Arc::new(JumpState),
                 entity_id: 2,
-                ty: ActionType::Start { tick: 0 },
+                ty: ActionType::Start {
+                    tick: 0,
+                    start: 0,
+                    end: 0,
+                },
             },
         );
         collection.insert(
@@ -247,7 +259,11 @@ mod test {
             Action {
                 raw: Arc::new(JumpState),
                 entity_id: 2,
-                ty: ActionType::Start { tick: 0 },
+                ty: ActionType::Start {
+                    tick: 0,
+                    start: 0,
+                    end: 0,
+                },
             },
         );
 

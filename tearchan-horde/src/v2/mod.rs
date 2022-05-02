@@ -8,12 +8,25 @@ pub type Tick = u64;
 #[macro_export]
 macro_rules! define_actions {
     ($name:tt, $(($member:tt, $struct:tt)),*) => {
-        type Mapper = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::ActionAnyVec, validator: &$crate::v2::action::manager::ActionSessionValidator) -> Vec<$crate::v2::action::Action<$name>>>;
-        static MAPPER: $crate::v2::Lazy<Mapper> = $crate::v2::Lazy::new(|| {
-            let mut map: Mapper = std::collections::HashMap::new();
+        type Mapper0 = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::ActionAnyVec, validator: &$crate::v2::action::manager::ActionSessionValidator) -> Vec<$crate::v2::action::Action<$name>>>;
+        type Mapper1 = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::AnyActionVec) -> Vec<$crate::v2::action::Action<$name>>>;
+        static MAPPER0: $crate::v2::Lazy<Mapper0> = $crate::v2::Lazy::new(|| {
+            let mut map: Mapper0 = std::collections::HashMap::new();
             $(
             map.insert(std::any::TypeId::of::<$struct>(), |vec, validator| {
                 vec.cast::<$struct>(validator)
+                    .iter()
+                    .map(|action| action.replace($name::$member(action.raw().clone())))
+                    .collect::<Vec<_>>()
+            });
+            )*
+            map
+        });
+        static MAPPER1: $crate::v2::Lazy<Mapper1> = $crate::v2::Lazy::new(|| {
+            let mut map: Mapper1 = std::collections::HashMap::new();
+            $(
+            map.insert(std::any::TypeId::of::<$struct>(), |vec| {
+                vec.cast::<$struct>()
                     .iter()
                     .map(|action| action.replace($name::$member(action.raw().clone())))
                     .collect::<Vec<_>>()
@@ -30,38 +43,44 @@ macro_rules! define_actions {
         }
 
         #[allow(dead_code)]
-        fn covert_to_actions(
+        fn convert_actions_from_typed_action_any_map(
             map: &$crate::v2::action::collection::TypedActionAnyMap,
             validator: &$crate::v2::action::manager::ActionSessionValidator
         ) -> Vec<$crate::v2::action::Action<$name>> {
             map.iter()
-                .filter_map(|(key, value)| MAPPER.get(&key).map(|f| f(value, validator)))
+                .filter_map(|(key, value)| MAPPER0.get(&key).map(|f| f(value, validator)))
                 .flatten()
                 .collect()
         }
 
         #[allow(dead_code)]
-        fn convert_from_actions(actions: &Vec<$crate::v2::action::Action<$name>>) -> $crate::v2::action::collection::TypedActionAnyMap {
-            let mut map = $crate::v2::action::collection::TypedActionAnyMap::default();
-            for action in actions {
-                match action.raw() {
-                $(
-                    $name::$member(state) => {
-                        map.push(action.replace(state.clone()), $crate::v2::action::VALID_SESSION_ID);
-                    },
-                )*
-                }
+        fn convert_actions_from_typed_any_action_map(
+            map: &$crate::v2::action::collection::TypedAnyActionMapGroupedByEntityId
+        ) -> Vec<$crate::v2::action::Action<$name>> {
+            map.iter()
+                .filter_map(|(key, value)| MAPPER1.get(&key).map(|f| f(value)))
+                .flatten()
+                .collect()
+        }
+
+        #[allow(dead_code)]
+        fn convert_from_actions(action: $crate::v2::action::Action<$name>, converter: &mut $crate::v2::action::manager::ActionManagerConverter) {
+            match action.raw() {
+            $(
+                $name::$member(state) => {
+                    converter.load(action.replace(Arc::clone(state)));
+                },
+            )*
             }
-            map
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::v2::action::collection::TypedActionAnyMap;
+    use crate::v2::action::collection::{TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId};
     use crate::v2::action::manager::ActionSessionValidator;
-    use crate::v2::action::{Action, ActionType};
+    use crate::v2::action::{Action, ActionSessionId, ActionType};
     use serde::{Deserialize, Serialize};
     use std::sync::Arc;
 
@@ -74,23 +93,51 @@ mod test {
     define_actions!(TestAction, (Move, MoveState), (Jump, JumpState));
 
     #[test]
-    fn test() {
+    fn test_macro_0() {
         let validator = ActionSessionValidator::default();
         let mut collections = TypedActionAnyMap::default();
         collections.push(
-            Action::new(Arc::new(MoveState), 1, ActionType::Start { tick: 0 }),
-            0,
+            Action::new(
+                Arc::new(MoveState),
+                1,
+                ActionType::Start {
+                    tick: 0,
+                    start: 0,
+                    end: 0,
+                },
+            ),
+            ActionSessionId::default(),
         );
 
         let move_states = collections.get::<MoveState>(&validator);
-        let mut actions = covert_to_actions(&collections, &validator);
+        let mut actions = convert_actions_from_typed_action_any_map(&collections, &validator);
         actions.sort_by_key(|x| x.entity_id());
 
         assert_eq!(move_states.unwrap().len(), 1);
         assert_eq!(actions.len(), 1);
+    }
 
-        let collections = convert_from_actions(&actions);
-        let move_states = collections.get::<MoveState>(&validator);
+    #[test]
+    fn test_macro_1() {
+        let mut collections = TypedAnyActionMapGroupedByEntityId::default();
+        collections.insert(
+            0,
+            Action::new(
+                Arc::new(MoveState),
+                1,
+                ActionType::Start {
+                    tick: 0,
+                    start: 0,
+                    end: 0,
+                },
+            ),
+        );
+
+        let move_states = collections.get::<MoveState>();
+        let mut actions = convert_actions_from_typed_any_action_map(&collections);
+        actions.sort_by_key(|x| x.entity_id());
+
         assert_eq!(move_states.unwrap().len(), 1);
+        assert_eq!(actions.len(), 1);
     }
 }

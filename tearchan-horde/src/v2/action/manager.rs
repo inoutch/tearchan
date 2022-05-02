@@ -1,12 +1,14 @@
 use crate::action::manager::TimeMilliseconds;
 use crate::v2::action::collection::{
-    ActionMeta, TypedActionAnyMap, TypedAnyActionVecGroupedByEntityId,
+    ActionMeta, TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId,
 };
-use crate::v2::action::{Action, ActionSessionId, ActionType, VALID_SESSION_ID};
+use crate::v2::action::{Action, ActionSessionId, ActionType, ArcAction, VALID_SESSION_ID};
+use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
+use tearchan_util::id_manager::IdManager;
 
 #[derive(Default)]
 pub struct ActionSessionValidator<'a> {
@@ -52,9 +54,9 @@ struct ActionContext {
 }
 
 #[derive(Default)]
-struct ActionQueueItem {
+struct TickBundle {
     map: TypedActionAnyMap,
-    events: VecDeque<(EntityId, Event)>,
+    events: VecDeque<(EntityId, (ActionSessionId, Event))>,
     cancels: BTreeSet<EntityId>,
 }
 
@@ -63,15 +65,32 @@ pub struct PullActionResult {
     pub cancels: BTreeSet<EntityId>,
 }
 
-#[derive(Default)]
 pub struct ActionManager {
+    tick_duration: TimeMilliseconds,
     next_time: TimeMilliseconds,
     next_tick: Tick,
     current_tick: Tick,
-    actions: BTreeMap<Tick, ActionQueueItem>,
-    update_actions: TypedAnyActionVecGroupedByEntityId,
+    actions: BTreeMap<Tick, TickBundle>,
+    update_actions: TypedAnyActionMapGroupedByEntityId,
     contexts: HashMap<EntityId, ActionContext>,
     vacated_entities: BTreeSet<EntityId>,
+    session_id_manager: IdManager<ActionSessionId>,
+}
+
+impl Default for ActionManager {
+    fn default() -> Self {
+        ActionManager {
+            tick_duration: TICK_DURATION,
+            next_time: 0,
+            next_tick: 0,
+            current_tick: 0,
+            actions: Default::default(),
+            update_actions: Default::default(),
+            contexts: Default::default(),
+            vacated_entities: Default::default(),
+            session_id_manager: IdManager::new(ActionSessionId::default(), |id| id.next()),
+        }
+    }
 }
 
 impl ActionManager {
@@ -83,7 +102,7 @@ impl ActionManager {
             ActionContext {
                 last_tick: self.current_tick,
                 running_end_tick: self.current_tick,
-                session_id: 1,
+                session_id: self.session_id_manager.gen(),
                 session_expired_at: self.current_tick,
             },
         );
@@ -91,13 +110,15 @@ impl ActionManager {
 
     pub fn detach(&mut self, entity_id: EntityId) {
         self.contexts.remove(&entity_id);
+        self.vacated_entities.remove(&entity_id);
+        self.update_actions.remove(entity_id);
     }
 
     pub fn update(&mut self, delta: TimeMilliseconds) {
         debug_assert!(self.vacated_entities.is_empty());
 
         self.next_time += delta;
-        self.next_tick = self.next_time / TICK_DURATION;
+        self.next_tick = self.next_time / self.tick_duration;
     }
 
     pub fn enqueue<T>(&mut self, entity_id: EntityId, raw: Arc<T>, duration: TimeMilliseconds)
@@ -113,7 +134,9 @@ impl ActionManager {
         debug_assert!(context.running_end_tick <= context.last_tick);
 
         let start_tick = context.last_tick;
-        let end_tick = start_tick + duration / TICK_DURATION;
+        let end_tick = start_tick + duration / self.tick_duration;
+        let start = start_tick * self.tick_duration;
+        let end = end_tick * self.tick_duration;
         {
             let item = self
                 .actions
@@ -123,24 +146,28 @@ impl ActionManager {
                 Action {
                     raw: Arc::clone(&raw),
                     entity_id,
-                    ty: ActionType::Start { tick: start_tick },
+                    ty: ActionType::Start {
+                        tick: start_tick,
+                        start,
+                        end,
+                    },
                 },
                 context.session_id,
             );
             item.events.push_back((
                 entity_id,
-                Event::Started {
-                    type_id,
-                    update_action: Box::new(Action {
-                        raw: Arc::clone(&raw),
-                        entity_id,
-                        ty: ActionType::Update {
-                            start: start_tick * TICK_DURATION,
-                            end: end_tick * TICK_DURATION,
-                        },
-                    }),
-                    running_end_tick: end_tick,
-                },
+                (
+                    context.session_id,
+                    Event::Started {
+                        type_id,
+                        update_action: Box::new(Action {
+                            raw: Arc::clone(&raw),
+                            entity_id,
+                            ty: ActionType::Update { start, end },
+                        }),
+                        running_end_tick: end_tick,
+                    },
+                ),
             ));
         }
         {
@@ -152,11 +179,16 @@ impl ActionManager {
                 Action {
                     raw,
                     entity_id,
-                    ty: ActionType::End { tick: end_tick },
+                    ty: ActionType::End {
+                        tick: end_tick,
+                        start,
+                        end,
+                    },
                 },
                 context.session_id,
             );
-            item.events.push_back((entity_id, Event::Ended));
+            item.events
+                .push_back((entity_id, (context.session_id, Event::Ended)));
         }
         context.last_tick = end_tick;
     }
@@ -171,8 +203,14 @@ impl ActionManager {
 
         self.current_tick = tick;
 
-        while let Some((entity_id, event)) = item.events.pop_front() {
-            let context = self.contexts.get_mut(&entity_id).unwrap();
+        while let Some((entity_id, (session_id, event))) = item.events.pop_front() {
+            let context = match self.contexts.get_mut(&entity_id) {
+                Some(context) => context,
+                None => continue,
+            };
+            if context.session_id != session_id {
+                continue;
+            }
             match event {
                 Event::Started {
                     type_id,
@@ -201,7 +239,7 @@ impl ActionManager {
         })
     }
 
-    pub fn pull_updates(&self) -> &TypedAnyActionVecGroupedByEntityId {
+    pub fn pull_updates(&self) -> &TypedAnyActionMapGroupedByEntityId {
         &self.update_actions
     }
 
@@ -213,7 +251,7 @@ impl ActionManager {
         self.update_actions.remove(entity_id);
 
         let context = self.contexts.get_mut(&entity_id).unwrap();
-        context.session_id += 1;
+        context.session_id = self.session_id_manager.gen();
         let tick = if immediate {
             self.current_tick
         } else {
@@ -225,7 +263,8 @@ impl ActionManager {
 
         let item = self.actions.entry(tick).or_insert_with(Default::default);
         item.cancels.insert(entity_id);
-        item.events.push_back((entity_id, Event::Canceled));
+        item.events
+            .push_back((entity_id, (context.session_id, Event::Canceled)));
     }
 
     pub fn validator(&self) -> ActionSessionValidator {
@@ -238,26 +277,197 @@ impl ActionManager {
     pub fn current_tick(&self) -> Tick {
         self.current_tick
     }
+
+    pub fn to_data<T>(
+        &self,
+        converter0: fn(&TypedActionAnyMap, &ActionSessionValidator) -> Vec<Action<T>>,
+        converter1: fn(&TypedAnyActionMapGroupedByEntityId) -> Vec<Action<T>>,
+    ) -> ActionManagerData<T> {
+        debug_assert!(
+            self.vacated_entities.is_empty(),
+            "Must process vacated entities until busy"
+        );
+        if let Some((tick, _)) = self.actions.iter().next() {
+            debug_assert!(self.current_tick < *tick, "Must process current actions");
+        }
+
+        let validator = ActionSessionValidator {
+            contexts: Some(&self.contexts),
+        };
+        let mut actions = converter1(&self.update_actions);
+        actions.append(
+            &mut self
+                .actions
+                .iter()
+                .flat_map(|(_tick, action)| converter0(&action.map, &validator))
+                .collect::<Vec<_>>(),
+        );
+        ActionManagerData {
+            actions,
+            current_tick: self.current_tick,
+            next_time: self.next_time,
+        }
+    }
+
+    pub fn from_data<T>(
+        data: ActionManagerData<T>,
+        converter: fn(action: Action<T>, manager: &mut ActionManagerConverter),
+    ) -> Result<Self, ActionManagerError> {
+        let mut manager = ActionManager {
+            next_time: data.next_time,
+            next_tick: data.current_tick,
+            current_tick: data.current_tick,
+            ..Default::default()
+        };
+        let mut tick_validation: Tick = data.current_tick;
+        for action in data.actions.iter() {
+            if !manager.contexts.contains_key(&action.entity_id) {
+                manager.attach(action.entity_id);
+                manager
+                    .contexts
+                    .get_mut(&action.entity_id)
+                    .unwrap()
+                    .running_end_tick = Tick::MAX;
+            }
+            match action.ty {
+                ActionType::Start { .. } | ActionType::End { .. } => {
+                    let tick = action.tick().unwrap();
+                    if tick < tick_validation {
+                        return Err(ActionManagerError::InvalidDataCauseBySortedActions);
+                    }
+                    tick_validation = tick;
+                }
+                ActionType::Update { .. } => {
+                    if tick_validation != data.current_tick {
+                        return Err(ActionManagerError::InvalidDataCauseBySortedActions);
+                    }
+                }
+            }
+        }
+
+        let mut c = ActionManagerConverter {
+            actions: &mut manager.actions,
+            contexts: &mut manager.contexts,
+            update_actions: &mut manager.update_actions,
+        };
+        for action in data.actions.into_iter() {
+            converter(action, &mut c);
+        }
+
+        for (_entity, context) in manager.contexts.iter() {
+            if context.running_end_tick == Tick::MAX {
+                return Err(ActionManagerError::InvalidDataNoEndAction);
+            }
+        }
+
+        Ok(manager)
+    }
+}
+
+pub struct ActionManagerConverter<'a> {
+    actions: &'a mut BTreeMap<Tick, TickBundle>,
+    contexts: &'a mut HashMap<EntityId, ActionContext>,
+    update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
+}
+
+impl<'a> ActionManagerConverter<'a> {
+    pub fn load<T>(&mut self, action: ArcAction<T>)
+    where
+        T: 'static,
+    {
+        let type_id = TypeId::of::<T>();
+        let entity_id = action.entity_id();
+        let context = self
+            .contexts
+            .get_mut(&entity_id)
+            .unwrap_or_else(|| panic!("entity of {} is not attached", entity_id));
+
+        match action.ty {
+            ActionType::Start { start, end, .. } => {
+                let tick = action.tick().expect("Invalid action type");
+                let item = self.actions.entry(tick).or_insert_with(Default::default);
+                item.events.push_back((
+                    entity_id,
+                    (
+                        context.session_id,
+                        Event::Started {
+                            type_id,
+                            update_action: Box::new(Action {
+                                raw: Arc::clone(&action.raw),
+                                entity_id,
+                                ty: ActionType::Update { start, end },
+                            }),
+                            running_end_tick: 0,
+                        },
+                    ),
+                ));
+                item.map.push(
+                    Action {
+                        raw: Arc::clone(action.raw()),
+                        entity_id,
+                        ty: action.ty,
+                    },
+                    context.session_id,
+                );
+            }
+            ActionType::End { .. } => {
+                let tick = action.tick().expect("Invalid action type");
+                let item = self.actions.entry(tick).or_insert_with(Default::default);
+                item.events
+                    .push_back((entity_id, (context.session_id, Event::Ended)));
+                item.map.push(
+                    Action {
+                        raw: Arc::clone(action.raw()),
+                        entity_id,
+                        ty: action.ty,
+                    },
+                    context.session_id,
+                );
+                context.last_tick = context.last_tick.max(tick);
+                context.running_end_tick = context.running_end_tick.min(tick);
+            }
+            ActionType::Update { .. } => {
+                self.update_actions.insert(entity_id, action);
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ActionManagerError {
+    InvalidDataCauseBySortedActions,
+    InvalidDataNoEndAction,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ActionManagerData<T> {
+    actions: Vec<Action<T>>,
+    current_tick: Tick,
+    next_time: TimeMilliseconds,
 }
 
 #[cfg(test)]
 #[macro_use]
 mod test {
     use crate::define_actions;
+    use crate::v2::action::collection::TypedActionAnyMap;
     use crate::v2::action::manager::{
-        ActionManager, ActionSessionValidator, PullActionResult, Tick,
+        ActionManager, ActionManagerData, ActionSessionValidator, PullActionResult, Tick,
     };
     use crate::v2::action::ArcAction;
     use serde::{Deserialize, Serialize};
+    use std::collections::BTreeSet;
+    use std::fmt::Debug;
     use std::sync::Arc;
+    use tearchan_ecs::component::EntityId;
 
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
     struct MoveState;
 
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
     struct JumpState;
 
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
     struct TalkState;
 
     #[derive(Debug)]
@@ -294,7 +504,32 @@ mod test {
         (Talk, TalkState)
     );
 
-    fn snapshot(manager: &mut ActionManager) {
+    #[allow(dead_code)]
+    fn debug_pull_action_result(
+        tag: &str,
+        result: &Option<PullActionResult>,
+        validator: &ActionSessionValidator,
+    ) {
+        if let Some(result) = result {
+            println!(
+                "[{}] move_states: {:?}",
+                tag,
+                result.map.get::<MoveState>(validator)
+            );
+            println!(
+                "[{}] jump_states: {:?}",
+                tag,
+                result.map.get::<JumpState>(validator)
+            );
+            println!(
+                "[{}] talk_states: {:?}",
+                tag,
+                result.map.get::<TalkState>(validator)
+            );
+        }
+    }
+
+    fn assert_snapshot(manager: &mut ActionManager) {
         while let Some(actions) = manager.pull_actions() {
             insta::assert_debug_snapshot!(SnapshotResult {
                 current_tick: manager.current_tick(),
@@ -304,10 +539,10 @@ mod test {
                 talk_actions: actions.map.get(&manager.validator())
             });
         }
-        snapshot_update(manager);
+        assert_snapshot_update(manager);
     }
 
-    fn snapshot_update(manager: &mut ActionManager) {
+    fn assert_snapshot_update(manager: &mut ActionManager) {
         let actions = manager.pull_updates();
 
         insta::assert_debug_snapshot!(SnapshotResult {
@@ -317,6 +552,79 @@ mod test {
             jump_actions: actions.get(),
             talk_actions: actions.get()
         });
+    }
+
+    fn assert_actions<T>(actions0: Option<Vec<&ArcAction<T>>>, actions1: Option<Vec<&ArcAction<T>>>)
+    where
+        T: 'static + Eq + Debug,
+    {
+        assert_eq!(actions0.is_none(), actions1.is_none());
+        if let Some(actions0) = actions0 {
+            let actions1 = actions1.unwrap();
+            assert_eq!(actions0.len(), actions1.len());
+            for (action0, action1) in actions0.iter().zip(actions1.iter()) {
+                assert_eq!(action0.entity_id, action1.entity_id);
+                assert_eq!(action0.ty, action1.ty);
+                assert_eq!(action0.raw, action1.raw);
+            }
+        }
+    }
+
+    fn assert_action_map<T>(
+        map0: &TypedActionAnyMap,
+        map1: &TypedActionAnyMap,
+        manager0: &ActionManager,
+        manager1: &ActionManager,
+    ) where
+        T: 'static + Eq + Debug,
+    {
+        let actions0 = map0.get::<T>(&manager0.validator());
+        let actions1 = map1.get::<T>(&manager1.validator());
+        assert_actions(actions0, actions1);
+    }
+
+    fn assert_managers(
+        manager0: &mut ActionManager,
+        manager1: &mut ActionManager,
+    ) -> (usize, Option<BTreeSet<EntityId>>) {
+        let mut tick_count = 0;
+        loop {
+            let result0 = manager0.pull_actions();
+            let result1 = manager1.pull_actions();
+            if result0.is_none() != result1.is_none() {
+                debug_pull_action_result("result0", &result0, &manager0.validator());
+                debug_pull_action_result("result1", &result1, &manager0.validator());
+                assert_eq!(result0.is_none(), result1.is_none());
+            }
+
+            if let Some(result0) = result0 {
+                let result1 = result1.unwrap();
+                assert_action_map::<MoveState>(&result0.map, &result1.map, manager0, manager1);
+                assert_action_map::<JumpState>(&result0.map, &result1.map, manager0, manager1);
+                assert_action_map::<TalkState>(&result0.map, &result1.map, manager0, manager1);
+            } else {
+                break;
+            }
+            tick_count += 1;
+
+            let vacated_entities0 = manager0.pull_vacated_entities();
+            let vacated_entities1 = manager1.pull_vacated_entities();
+
+            assert_eq!(vacated_entities0, vacated_entities1);
+
+            if !vacated_entities0.is_empty() {
+                return (tick_count, Some(vacated_entities0));
+            }
+        }
+
+        let map0 = manager0.pull_updates();
+        let map1 = manager1.pull_updates();
+
+        assert_actions::<MoveState>(map0.get(), map1.get());
+        assert_actions::<JumpState>(map0.get(), map1.get());
+        assert_actions::<TalkState>(map0.get(), map1.get());
+
+        (tick_count, None)
     }
 
     #[test]
@@ -334,22 +642,22 @@ mod test {
         manager.enqueue(2, Arc::new(JumpState), 1500); // tick: 22(29)
         manager.enqueue(2, Arc::new(TalkState), 2000); // tick: 30(59)
 
-        snapshot(&mut manager);
+        assert_snapshot(&mut manager);
 
         // --- Tick: 3 ---- //
         manager.update(200);
 
-        snapshot(&mut manager);
+        assert_snapshot(&mut manager);
 
         // --- Tick: 7 ---- //
         manager.update(300);
 
-        snapshot(&mut manager);
+        assert_snapshot(&mut manager);
 
         // --- Tick: 60
         manager.update(3328);
 
-        snapshot(&mut manager);
+        assert_snapshot(&mut manager);
     }
 
     #[test]
@@ -469,6 +777,7 @@ mod test {
         manager.update(2112); // tick: 32
 
         let result = manager.pull_actions(); // tick: 0 - start1 start2
+        assert_eq!(manager.current_tick(), 0);
         assert_eq!(result.unwrap().cancels.len(), 0);
         let result = manager.pull_actions(); // tick: 7 - end2 start2
         assert_eq!(result.unwrap().cancels.len(), 0);
@@ -555,11 +864,162 @@ mod test {
     }
 
     #[test]
-    fn test_zero_time_action() {}
+    fn test_zero_time_action() {
+        let mut manager = ActionManager::default();
+        manager.attach(1);
+        manager.attach(2);
+
+        manager.enqueue(1, Arc::new(MoveState), 1000); // tick: 15
+        manager.enqueue(2, Arc::new(MoveState), 500); // tick: 7
+
+        manager.update(462);
+
+        manager.pull_actions().unwrap();
+        manager.pull_actions().unwrap();
+
+        assert_eq!(
+            manager
+                .pull_vacated_entities()
+                .into_iter()
+                .collect::<Vec<_>>(),
+            vec![2]
+        );
+
+        manager.enqueue(2, Arc::new(JumpState), 0);
+        let result = manager.pull_actions().unwrap();
+        assert_eq!(manager.current_tick(), 7);
+        insta::assert_debug_snapshot!(SnapshotResult::from_result(
+            "changes",
+            manager.current_tick(),
+            &result,
+            &manager.validator()
+        ));
+
+        assert_eq!(
+            manager
+                .pull_vacated_entities()
+                .into_iter()
+                .collect::<Vec<_>>(),
+            vec![2]
+        );
+
+        manager.enqueue(2, Arc::new(TalkState), 1000);
+
+        let result = manager.pull_actions().unwrap();
+        assert_eq!(manager.current_tick(), 7);
+        insta::assert_debug_snapshot!(SnapshotResult::from_result(
+            "changes",
+            manager.current_tick(),
+            &result,
+            &manager.validator()
+        ));
+
+        manager.update(0);
+
+        manager.cancel(2, true);
+
+        let result = manager.pull_actions().unwrap();
+        assert_eq!(manager.current_tick(), 7);
+        insta::assert_debug_snapshot!(SnapshotResult::from_result(
+            "changes",
+            manager.current_tick(),
+            &result,
+            &manager.validator()
+        ));
+
+        assert_eq!(result.cancels.into_iter().collect::<Vec<_>>(), vec![2]);
+        assert_eq!(
+            manager
+                .pull_vacated_entities()
+                .into_iter()
+                .collect::<Vec<_>>(),
+            vec![2]
+        );
+    }
 
     #[test]
-    fn test_detach() {}
+    fn test_detach() {
+        let mut manager = ActionManager::default();
+        manager.attach(1);
+        manager.attach(2);
+
+        manager.enqueue(1, Arc::new(MoveState), 1000); // tick: 15
+        manager.enqueue(2, Arc::new(MoveState), 500); // tick: 7
+
+        manager.update(396);
+
+        manager.pull_actions().unwrap();
+
+        manager.detach(1);
+        manager.detach(2);
+
+        assert!(manager.contexts.get(&1).is_none());
+        assert!(manager.contexts.get(&2).is_none());
+        assert_eq!(manager.pull_vacated_entities().len(), 0);
+        assert!(manager.pull_updates().get::<MoveState>().is_none());
+
+        assert!(manager.pull_actions().is_none());
+        assert_eq!(manager.pull_vacated_entities().len(), 0);
+
+        manager.update(1000);
+
+        let result = manager.pull_actions().unwrap();
+        insta::assert_debug_snapshot!(SnapshotResult::from_result(
+            "changes",
+            manager.current_tick(),
+            &result,
+            &manager.validator()
+        ));
+
+        let result = manager.pull_actions().unwrap();
+        insta::assert_debug_snapshot!(SnapshotResult::from_result(
+            "changes",
+            manager.current_tick(),
+            &result,
+            &manager.validator()
+        ));
+
+        assert!(manager.pull_actions().is_none());
+    }
 
     #[test]
-    fn test_serialization() {}
+    fn test_serialization() {
+        let mut manager = ActionManager::default();
+        manager.attach(1);
+        manager.attach(2);
+
+        manager.enqueue(1, Arc::new(MoveState), 3000);
+        manager.enqueue(1, Arc::new(JumpState), 500);
+        manager.enqueue(1, Arc::new(TalkState), 1500);
+        manager.enqueue(1, Arc::new(JumpState), 2000);
+        manager.enqueue(1, Arc::new(MoveState), 3000);
+        manager.enqueue(1, Arc::new(TalkState), 1000);
+
+        manager.enqueue(2, Arc::new(MoveState), 500);
+        manager.enqueue(2, Arc::new(TalkState), 1000);
+        manager.enqueue(2, Arc::new(JumpState), 2000);
+        manager.enqueue(2, Arc::new(TalkState), 2500);
+        manager.enqueue(2, Arc::new(MoveState), 4000);
+        manager.enqueue(2, Arc::new(JumpState), 2000);
+
+        manager.update(500);
+
+        while manager.pull_actions().is_some() {}
+
+        let data = manager.to_data(
+            convert_actions_from_typed_action_any_map,
+            convert_actions_from_typed_any_action_map,
+        );
+        let str = serde_json::to_string(&data).unwrap();
+
+        let data: ActionManagerData<TestAction> = serde_json::from_str(&str).unwrap();
+
+        let mut new_manager = ActionManager::from_data(data, convert_from_actions).unwrap();
+
+        manager.update(10000);
+        new_manager.update(10000);
+
+        let (tick_count, _) = assert_managers(&mut manager, &mut new_manager);
+        println!("Tick count = {}", tick_count);
+    }
 }

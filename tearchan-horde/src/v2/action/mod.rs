@@ -7,14 +7,29 @@ use tearchan_ecs::component::EntityId;
 pub mod collection;
 pub mod manager;
 
-pub const VALID_SESSION_ID: ActionSessionId = 0;
+pub const VALID_SESSION_ID: ActionSessionId = ActionSessionId(0);
 
-pub type ActionSessionId = u64;
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ActionSessionId(u128);
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+impl Default for ActionSessionId {
+    fn default() -> Self {
+        ActionSessionId(1)
+    }
+}
+
+impl ActionSessionId {
+    pub fn next(&self) -> Self {
+        ActionSessionId(self.0 + 1)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ActionType {
     Start {
         tick: Tick,
+        start: TimeMilliseconds,
+        end: TimeMilliseconds,
     },
     Update {
         start: TimeMilliseconds,
@@ -22,6 +37,8 @@ pub enum ActionType {
     },
     End {
         tick: Tick,
+        start: TimeMilliseconds,
+        end: TimeMilliseconds,
     },
 }
 
