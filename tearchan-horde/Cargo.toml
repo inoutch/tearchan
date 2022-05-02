@@ -5,8 +5,10 @@ edition = "2018"
 
 [dependencies]
 serde = { version = "1.0.125", features = ["rc"] }
+once_cell = "1.5.2"
 tearchan-ecs = { path = "../tearchan-ecs" }
 tearchan-util = { path = "../tearchan-util" }
 
 [dev-dependencies]
 insta = "1.8.0"
+serde_json = "1.0.79"
