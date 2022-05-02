@@ -52,7 +52,7 @@ impl ActionType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Action<T> {
     raw: T,
     entity_id: EntityId,
@@ -86,5 +86,9 @@ impl<T> Action<T> {
 
     pub fn entity_id(&self) -> EntityId {
         self.entity_id
+    }
+
+    pub fn ty(&self) -> &ActionType {
+        &self.ty
     }
 }

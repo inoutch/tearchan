@@ -95,23 +95,11 @@ impl Default for ActionManager {
 
 impl ActionManager {
     pub fn attach(&mut self, entity_id: EntityId) {
-        debug_assert!(!self.contexts.contains_key(&entity_id));
-
-        self.contexts.insert(
-            entity_id,
-            ActionContext {
-                last_tick: self.current_tick,
-                running_end_tick: self.current_tick,
-                session_id: self.session_id_manager.gen(),
-                session_expired_at: self.current_tick,
-            },
-        );
+        self.controller().attach(entity_id);
     }
 
     pub fn detach(&mut self, entity_id: EntityId) {
-        self.contexts.remove(&entity_id);
-        self.vacated_entities.remove(&entity_id);
-        self.update_actions.remove(entity_id);
+        self.controller().detach(entity_id);
     }
 
     pub fn update(&mut self, delta: TimeMilliseconds) {
@@ -125,72 +113,7 @@ impl ActionManager {
     where
         T: 'static,
     {
-        let type_id = TypeId::of::<T>();
-        let context = self
-            .contexts
-            .get_mut(&entity_id)
-            .unwrap_or_else(|| panic!("entity of {} is not attached", entity_id));
-        debug_assert!(self.current_tick <= context.running_end_tick);
-        debug_assert!(context.running_end_tick <= context.last_tick);
-
-        let start_tick = context.last_tick;
-        let end_tick = start_tick + duration / self.tick_duration;
-        let start = start_tick * self.tick_duration;
-        let end = end_tick * self.tick_duration;
-        {
-            let item = self
-                .actions
-                .entry(start_tick)
-                .or_insert_with(Default::default);
-            item.map.push(
-                Action {
-                    raw: Arc::clone(&raw),
-                    entity_id,
-                    ty: ActionType::Start {
-                        tick: start_tick,
-                        start,
-                        end,
-                    },
-                },
-                context.session_id,
-            );
-            item.events.push_back((
-                entity_id,
-                (
-                    context.session_id,
-                    Event::Started {
-                        type_id,
-                        update_action: Box::new(Action {
-                            raw: Arc::clone(&raw),
-                            entity_id,
-                            ty: ActionType::Update { start, end },
-                        }),
-                        running_end_tick: end_tick,
-                    },
-                ),
-            ));
-        }
-        {
-            let item = self
-                .actions
-                .entry(end_tick)
-                .or_insert_with(Default::default);
-            item.map.push(
-                Action {
-                    raw,
-                    entity_id,
-                    ty: ActionType::End {
-                        tick: end_tick,
-                        start,
-                        end,
-                    },
-                },
-                context.session_id,
-            );
-            item.events
-                .push_back((entity_id, (context.session_id, Event::Ended)));
-        }
-        context.last_tick = end_tick;
+        self.controller().enqueue(entity_id, raw, duration);
     }
 
     pub fn pull_actions(&mut self) -> Option<PullActionResult> {
@@ -247,6 +170,10 @@ impl ActionManager {
         std::mem::take(&mut self.vacated_entities)
     }
 
+    pub fn get_vacated_entities(&self) -> &BTreeSet<EntityId> {
+        &self.vacated_entities
+    }
+
     pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
         self.update_actions.remove(entity_id);
 
@@ -276,6 +203,11 @@ impl ActionManager {
     #[inline]
     pub fn current_tick(&self) -> Tick {
         self.current_tick
+    }
+
+    #[inline]
+    pub fn next_time(&self) -> TimeMilliseconds {
+        self.next_time
     }
 
     pub fn to_data<T>(
@@ -362,6 +294,26 @@ impl ActionManager {
 
         Ok(manager)
     }
+
+    pub fn controller(&mut self) -> ActionController {
+        ActionController {
+            tick_duration: self.tick_duration,
+            current_tick: self.current_tick,
+            actions: &mut self.actions,
+            update_actions: &mut self.update_actions,
+            contexts: &mut self.contexts,
+            vacated_entities: &mut self.vacated_entities,
+            session_id_manager: &mut self.session_id_manager,
+        }
+    }
+
+    pub fn has_some_actions(&self, entity_id: EntityId) -> bool {
+        let context = match self.contexts.get(&entity_id) {
+            None => return false,
+            Some(context) => context,
+        };
+        context.last_tick != self.current_tick
+    }
 }
 
 pub struct ActionManagerConverter<'a> {
@@ -430,6 +382,122 @@ impl<'a> ActionManagerConverter<'a> {
                 self.update_actions.insert(entity_id, action);
             }
         }
+    }
+}
+
+pub struct ActionController<'a> {
+    tick_duration: TimeMilliseconds,
+    current_tick: Tick,
+    actions: &'a mut BTreeMap<Tick, TickBundle>,
+    update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
+    contexts: &'a mut HashMap<EntityId, ActionContext>,
+    vacated_entities: &'a mut BTreeSet<EntityId>,
+    session_id_manager: &'a mut IdManager<ActionSessionId>,
+}
+
+impl<'a> ActionController<'a> {
+    #[inline]
+    pub fn enqueue<T>(&mut self, entity_id: EntityId, raw: Arc<T>, duration: TimeMilliseconds)
+    where
+        T: 'static,
+    {
+        let type_id = TypeId::of::<T>();
+        let context = self
+            .contexts
+            .get_mut(&entity_id)
+            .unwrap_or_else(|| panic!("entity of {} is not attached", entity_id));
+
+        debug_assert!(self.current_tick <= context.running_end_tick);
+        debug_assert!(context.running_end_tick <= context.last_tick);
+
+        self.vacated_entities.remove(&entity_id);
+
+        let start_tick = context.last_tick;
+        let end_tick = start_tick + duration / self.tick_duration;
+        let start = start_tick * self.tick_duration;
+        let end = end_tick * self.tick_duration;
+        {
+            let item = self
+                .actions
+                .entry(start_tick)
+                .or_insert_with(Default::default);
+            item.map.push(
+                Action {
+                    raw: Arc::clone(&raw),
+                    entity_id,
+                    ty: ActionType::Start {
+                        tick: start_tick,
+                        start,
+                        end,
+                    },
+                },
+                context.session_id,
+            );
+            item.events.push_back((
+                entity_id,
+                (
+                    context.session_id,
+                    Event::Started {
+                        type_id,
+                        update_action: Box::new(Action {
+                            raw: Arc::clone(&raw),
+                            entity_id,
+                            ty: ActionType::Update { start, end },
+                        }),
+                        running_end_tick: end_tick,
+                    },
+                ),
+            ));
+        }
+        {
+            let item = self
+                .actions
+                .entry(end_tick)
+                .or_insert_with(Default::default);
+            item.map.push(
+                Action {
+                    raw,
+                    entity_id,
+                    ty: ActionType::End {
+                        tick: end_tick,
+                        start,
+                        end,
+                    },
+                },
+                context.session_id,
+            );
+            item.events
+                .push_back((entity_id, (context.session_id, Event::Ended)));
+        }
+        context.last_tick = end_tick;
+    }
+
+    #[inline]
+    pub fn current_tick(&self) -> Tick {
+        self.current_tick
+    }
+
+    #[inline]
+    pub fn attach(&mut self, entity_id: EntityId) {
+        debug_assert!(!self.contexts.contains_key(&entity_id));
+
+        self.contexts.insert(
+            entity_id,
+            ActionContext {
+                last_tick: self.current_tick,
+                running_end_tick: self.current_tick,
+                session_id: self.session_id_manager.gen(),
+                session_expired_at: self.current_tick,
+            },
+        );
+        self.vacated_entities.insert(entity_id);
+    }
+
+    #[inline]
+    pub fn detach(&mut self, entity_id: EntityId) {
+        self.contexts.remove(&entity_id);
+        self.vacated_entities.remove(&entity_id);
+        self.update_actions.remove(entity_id);
     }
 }
 
@@ -670,6 +738,8 @@ mod test {
         manager.enqueue(2, Arc::new(MoveState), 500); // tick: 7
 
         assert!(manager.pull_vacated_entities().is_empty());
+        assert!(manager.has_some_actions(1));
+        assert!(manager.has_some_actions(2));
 
         // Just ended time
         manager.update(500);
@@ -698,6 +768,7 @@ mod test {
                 .collect::<Vec<_>>(),
             vec![2]
         );
+        assert!(!manager.has_some_actions(2));
 
         manager.enqueue(2, Arc::new(JumpState), 2000);
 
@@ -729,6 +800,8 @@ mod test {
                 .collect::<Vec<_>>(),
             vec![1]
         );
+        assert!(!manager.has_some_actions(1));
+        assert!(manager.has_some_actions(2));
 
         manager.enqueue(1, Arc::new(TalkState), 3000);
 
@@ -757,6 +830,8 @@ mod test {
                 .collect::<Vec<_>>(),
             vec![2]
         );
+        assert!(manager.has_some_actions(1));
+        assert!(!manager.has_some_actions(2));
     }
 
     #[test]

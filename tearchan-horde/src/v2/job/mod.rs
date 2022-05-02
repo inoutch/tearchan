@@ -1,0 +1,23 @@
+use crate::action::manager::TimeMilliseconds;
+use crate::v2::action::collection::{TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId};
+use crate::v2::action::manager::{ActionController, ActionSessionValidator};
+use tearchan_ecs::component::EntityId;
+
+pub mod manager;
+
+pub trait HordeInterface {
+    type Job;
+
+    fn on_change_tick(&mut self, map: &TypedActionAnyMap, validator: &ActionSessionValidator);
+
+    fn on_change_time(&mut self, map: &TypedAnyActionMapGroupedByEntityId, time: TimeMilliseconds);
+
+    fn on_first(&self, entity_id: EntityId, priority: u32) -> Self::Job;
+
+    fn on_next(
+        &self,
+        entity_id: EntityId,
+        job: Self::Job,
+        controller: &mut ActionController,
+    ) -> Option<Self::Job>;
+}

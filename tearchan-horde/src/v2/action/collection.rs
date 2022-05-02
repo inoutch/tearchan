@@ -44,6 +44,22 @@ impl ActionAnyVec {
             .collect()
     }
 
+    pub fn cast_cloned<T: 'static>(&self, validator: &ActionSessionValidator) -> Vec<ArcAction<T>> {
+        self.actions
+            .downcast_ref::<Vec<ArcAction<T>>>()
+            .expect("Invalid type")
+            .iter()
+            .zip(self.metas.iter())
+            .filter_map(|(action, meta)| {
+                if validator.validate(meta) {
+                    Some(action.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     fn push<T: 'static>(&mut self, action: ArcAction<T>, session_id: ActionSessionId, tick: Tick) {
         let type_id = TypeId::of::<T>();
         self.metas.push(ActionMeta {
@@ -88,6 +104,17 @@ impl TypedActionAnyMap {
         Some(vec)
     }
 
+    pub fn get_cloned<T>(&self, validator: &ActionSessionValidator) -> Option<Vec<ArcAction<T>>>
+    where
+        T: 'static,
+    {
+        let vec = self.map.get(&TypeId::of::<T>())?.cast_cloned(validator);
+        if vec.is_empty() {
+            return None;
+        }
+        Some(vec)
+    }
+
     pub fn iter(&self) -> Iter<'_, TypeId, ActionAnyVec> {
         self.map.iter()
     }
@@ -104,6 +131,14 @@ impl AnyActionVec {
             .iter()
             .filter_map(|item| item.downcast_ref())
             .collect()
+    }
+
+    pub fn cast_cloned<T: 'static>(&self) -> Vec<ArcAction<T>> {
+        self.vec
+            .iter()
+            .filter_map(|item| item.downcast_ref::<ArcAction<T>>())
+            .cloned()
+            .collect::<Vec<_>>()
     }
 
     pub fn push<T: 'static>(&mut self, item: T) {
@@ -151,6 +186,13 @@ impl TypedAnyActionMapGroupedByEntityId {
         T: 'static,
     {
         Some(self.map.get(&TypeId::of::<T>())?.cast())
+    }
+
+    pub fn get_cloned<T>(&self) -> Option<Vec<ArcAction<T>>>
+    where
+        T: 'static,
+    {
+        Some(self.map.get(&TypeId::of::<T>())?.cast_cloned())
     }
 
     pub fn insert<T>(&mut self, entity_id: EntityId, action: ArcAction<T>)
@@ -226,7 +268,7 @@ mod test {
     struct JumpState;
 
     #[test]
-    fn test_typed_map_vec_grouped_by_entities() {
+    fn test_typed_any_vec_grouped_by_entities() {
         let mut collection = TypedAnyActionMapGroupedByEntityId::default();
 
         collection.insert(

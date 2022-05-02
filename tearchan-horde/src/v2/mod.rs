@@ -5,6 +5,22 @@ pub use serde;
 pub type Lazy<T> = once_cell::sync::Lazy<T>;
 pub type Tick = u64;
 
+pub fn calc_ratio_f32_from_ms(
+    start: TimeMilliseconds,
+    end: TimeMilliseconds,
+    value: TimeMilliseconds,
+) -> f32 {
+    if value < start {
+        return 0.0f32;
+    }
+    if value > end {
+        return 1.0f32;
+    }
+    let d = end - start;
+    let v = value - start;
+    v as f32 / d as f32
+}
+
 #[macro_export]
 macro_rules! define_actions {
     ($name:tt, $(($member:tt, $struct:tt)),*) => {
@@ -68,13 +84,15 @@ macro_rules! define_actions {
             match action.raw() {
             $(
                 $name::$member(state) => {
-                    converter.load(action.replace(Arc::clone(state)));
+                    converter.load(action.replace(std::sync::Arc::clone(state)));
                 },
             )*
             }
         }
     }
 }
+use crate::action::manager::TimeMilliseconds;
+pub use define_actions;
 
 #[cfg(test)]
 mod test {
