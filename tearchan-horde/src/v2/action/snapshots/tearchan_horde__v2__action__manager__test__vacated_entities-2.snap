@@ -13,6 +13,8 @@ SnapshotResult {
                 entity_id: 2,
                 ty: End {
                     tick: 7,
+                    start: 0,
+                    end: 462,
                 },
             },
         ],

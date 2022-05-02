@@ -14,6 +14,8 @@ SnapshotResult {
                 entity_id: 2,
                 ty: End {
                     tick: 29,
+                    start: 462,
+                    end: 1914,
                 },
             },
         ],
@@ -25,6 +27,8 @@ SnapshotResult {
                 entity_id: 2,
                 ty: Start {
                     tick: 29,
+                    start: 1914,
+                    end: 3894,
                 },
             },
         ],

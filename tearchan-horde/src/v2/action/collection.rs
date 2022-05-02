@@ -226,7 +226,7 @@ mod test {
     struct JumpState;
 
     #[test]
-    fn test_typed_any_vec_grouped_by_entities() {
+    fn test_typed_map_vec_grouped_by_entities() {
         let mut collection = TypedAnyActionMapGroupedByEntityId::default();
 
         collection.insert(

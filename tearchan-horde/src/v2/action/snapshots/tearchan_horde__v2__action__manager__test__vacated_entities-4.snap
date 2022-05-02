@@ -1,6 +1,6 @@
 ---
 source: tearchan-horde/src/v2/action/manager.rs
-expression: "SnapshotResult::from_result(\"changes\", manager.current_tick(), &result,\n    &ActionSessionValidator::default())"
+expression: "SnapshotResult::from_result(\"changes\", manager.current_tick(), &result,\n    &manager.validator())"
 
 ---
 SnapshotResult {
@@ -13,6 +13,8 @@ SnapshotResult {
                 entity_id: 1,
                 ty: End {
                     tick: 15,
+                    start: 0,
+                    end: 990,
                 },
             },
         ],

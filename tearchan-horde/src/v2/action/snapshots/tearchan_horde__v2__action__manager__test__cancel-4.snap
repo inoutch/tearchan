@@ -13,6 +13,8 @@ SnapshotResult {
                 entity_id: 2,
                 ty: Start {
                     tick: 59,
+                    start: 3894,
+                    end: 6864,
                 },
             },
         ],
@@ -25,6 +27,8 @@ SnapshotResult {
                 entity_id: 2,
                 ty: End {
                     tick: 59,
+                    start: 1914,
+                    end: 3894,
                 },
             },
             Action {
@@ -32,6 +36,8 @@ SnapshotResult {
                 entity_id: 1,
                 ty: End {
                     tick: 59,
+                    start: 1914,
+                    end: 3894,
                 },
             },
         ],
