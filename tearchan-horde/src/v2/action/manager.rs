@@ -228,6 +228,7 @@ impl ActionManager {
         );
         ActionManagerData {
             actions,
+            tick_duration: self.tick_duration,
             current_tick: self.current_tick,
             next_time: self.next_time,
         }
@@ -245,13 +246,15 @@ impl ActionManager {
         };
         let mut tick_validation: Tick = data.current_tick;
         for action in data.actions.iter() {
-            if !manager.contexts.contains_key(&action.entity_id) {
-                manager.attach(action.entity_id);
-                manager
-                    .contexts
-                    .get_mut(&action.entity_id)
-                    .unwrap()
-                    .running_end_tick = Tick::MAX;
+            if let std::collections::hash_map::Entry::Vacant(entry) =
+                manager.contexts.entry(action.entity_id)
+            {
+                entry.insert(ActionContext {
+                    last_tick: manager.current_tick,
+                    running_end_tick: Tick::MAX,
+                    session_id: manager.session_id_manager.gen(),
+                    session_expired_at: manager.current_tick,
+                });
             }
             match action.ty {
                 ActionType::Start { .. } | ActionType::End { .. } => {
@@ -270,6 +273,7 @@ impl ActionManager {
         }
 
         let mut c = ActionManagerConverter {
+            tick_duration: data.tick_duration,
             actions: &mut manager.actions,
             contexts: &mut manager.contexts,
             update_actions: &mut manager.update_actions,
@@ -309,6 +313,7 @@ impl ActionManager {
 }
 
 pub struct ActionManagerConverter<'a> {
+    tick_duration: TimeMilliseconds,
     actions: &'a mut BTreeMap<Tick, TickBundle>,
     contexts: &'a mut HashMap<EntityId, ActionContext>,
     update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
@@ -330,6 +335,8 @@ impl<'a> ActionManagerConverter<'a> {
             ActionType::Start { start, end, .. } => {
                 let tick = action.tick().expect("Invalid action type");
                 let item = self.actions.entry(tick).or_insert_with(Default::default);
+                let start_time = start * self.tick_duration;
+                let end_time = end * self.tick_duration;
                 item.events.push_back((
                     entity_id,
                     (
@@ -339,7 +346,10 @@ impl<'a> ActionManagerConverter<'a> {
                             update_action: Box::new(Action {
                                 raw: Arc::clone(&action.raw),
                                 entity_id,
-                                ty: ActionType::Update { start, end },
+                                ty: ActionType::Update {
+                                    start: start_time,
+                                    end: end_time,
+                                },
                             }),
                             running_end_tick: 0,
                         },
@@ -521,6 +531,7 @@ pub enum ActionManagerError {
 #[derive(Serialize, Deserialize)]
 pub struct ActionManagerData<T> {
     actions: Vec<Action<T>>,
+    tick_duration: TimeMilliseconds,
     current_tick: Tick,
     next_time: TimeMilliseconds,
 }
