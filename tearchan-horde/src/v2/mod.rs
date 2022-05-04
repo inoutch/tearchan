@@ -21,6 +21,18 @@ pub fn calc_ratio_f32_from_ms(
     v as f32 / d as f32
 }
 
+pub fn calc_ratio_f32_from_tick(start: Tick, end: Tick, value: Tick) -> f32 {
+    if value < start {
+        return 0.0f32;
+    }
+    if value > end {
+        return 1.0f32;
+    }
+    let d = end - start;
+    let v = value - start;
+    v as f32 / d as f32
+}
+
 #[macro_export]
 macro_rules! define_actions {
     ($name:tt, $(($member:tt, $struct:tt)),*) => {
@@ -118,11 +130,7 @@ mod test {
             Action::new(
                 Arc::new(MoveState),
                 1,
-                ActionType::Start {
-                    tick: 0,
-                    start: 0,
-                    end: 0,
-                },
+                ActionType::Start { start: 0, end: 0 },
             ),
             ActionSessionId::default(),
         );
@@ -143,11 +151,7 @@ mod test {
             Action::new(
                 Arc::new(MoveState),
                 1,
-                ActionType::Start {
-                    tick: 0,
-                    start: 0,
-                    end: 0,
-                },
+                ActionType::Start { start: 0, end: 0 },
             ),
         );
 
