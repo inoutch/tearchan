@@ -1,4 +1,4 @@
-use crate::game::{CreatePassageParams, CreatePlayerParams, Game};
+use crate::game::{CellType, CreatePassageParams, CreatePlayerParams, DirectionState, Game};
 use crate::renderer::Renderer;
 use crate::utils::create_texture_view;
 use maze_generator::prelude::{Coordinates, Direction, Generator};
@@ -12,7 +12,7 @@ use tearchan::scene::factory::SceneFactory;
 use tearchan::scene::{Scene, SceneControlFlow};
 use tearchan_horde::action::manager::TimeMilliseconds;
 use tearchan_horde::v2::job::manager::JobManager;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, VirtualKeyCode, WindowEvent};
 use winit::window::WindowBuilder;
 
 mod game;
@@ -21,7 +21,7 @@ mod utils;
 
 struct HordeScene {
     game: Game,
-    job_manager: JobManager,
+    job_manager: JobManager<Game>,
 }
 
 impl HordeScene {
@@ -38,13 +38,20 @@ impl HordeScene {
 
             let mut game = Game::new(Renderer::new(context));
 
+            game.player_id = game.create_cell(CreatePlayerParams {
+                job_manager: &mut job_manager,
+                initial_position: vec2(rng.gen_range(0..maze_width), rng.gen_range(0..maze_height)),
+                cell_type: CellType::Player,
+            });
+
             for _ in 0..500 {
-                game.create_player(CreatePlayerParams {
-                    controller: &mut job_manager.action_controller(),
+                game.create_cell(CreatePlayerParams {
+                    job_manager: &mut job_manager,
                     initial_position: vec2(
                         rng.gen_range(0..maze_width),
                         rng.gen_range(0..maze_height),
                     ),
+                    cell_type: CellType::Enemy,
                 });
             }
 
@@ -73,6 +80,28 @@ impl Scene for HordeScene {
         match event {
             WindowEvent::Resized(_size) => {
                 self.game.renderer.resize(context);
+            }
+            WindowEvent::KeyboardInput { input, .. } => {
+                if let Some(keycode) = input.virtual_keycode {
+                    match input.state {
+                        ElementState::Pressed => match keycode {
+                            VirtualKeyCode::W => self
+                                .game
+                                .go_player(&mut self.job_manager, DirectionState::Up),
+                            VirtualKeyCode::A => self
+                                .game
+                                .go_player(&mut self.job_manager, DirectionState::Left),
+                            VirtualKeyCode::S => self
+                                .game
+                                .go_player(&mut self.job_manager, DirectionState::Down),
+                            VirtualKeyCode::D => self
+                                .game
+                                .go_player(&mut self.job_manager, DirectionState::Right),
+                            _ => {}
+                        },
+                        ElementState::Released => {}
+                    }
+                }
             }
             _ => {}
         }

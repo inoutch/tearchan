@@ -1,5 +1,5 @@
 use crate::create_texture_view;
-use crate::utils::SCALE_SIZE;
+use crate::utils::CELL_SCALE_SIZE;
 use nalgebra_glm::{translate, vec3, vec4, Mat4, Vec2, Vec3};
 use std::collections::HashMap;
 use tearchan::gfx::batch::batch_billboard::{
@@ -50,8 +50,8 @@ impl Renderer {
         let batch_line = BatchLine::new(device);
 
         let mut camera = Camera3D::new(aspect, 0.1f32, 10.0f32);
-        camera.position = vec3(25.0f32 * SCALE_SIZE, 2.0f32, 50.0f32 * SCALE_SIZE);
-        camera.target_position = vec3(25.0f32 * SCALE_SIZE, 0.0f32, 25.0f32 * SCALE_SIZE);
+        camera.position = vec3(25.0f32 * CELL_SCALE_SIZE, 2.0f32, 50.0f32 * CELL_SCALE_SIZE);
+        camera.target_position = vec3(25.0f32 * CELL_SCALE_SIZE, 0.0f32, 25.0f32 * CELL_SCALE_SIZE);
         camera.update();
 
         let depth_texture = Texture::new_depth_texture(
@@ -184,10 +184,10 @@ impl Renderer {
 
     pub fn add_sprite(&mut self, entity_id: EntityId, position: &Vec2) {
         let mesh = MeshBuilder::new()
-            .with_rect(&rect2(-0.01f32, -0.01f32, 0.02f32, 0.02f32))
+            .with_rect(&rect2(-0.02f32, -0.02f32, 0.04f32, 0.04f32))
             .build()
             .unwrap();
-        let origins = mesh.positions.to_vec();
+        let origins = vec![vec3(0.0f32, 0.0f32, 0.0f32); mesh.positions.len()];
         let id = self.batch_billboard.add(
             BatchTypeArray::V1U32 { data: mesh.indices },
             vec![

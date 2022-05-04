@@ -6,7 +6,7 @@ use tearchan::gfx::wgpu::{
     TextureViewDescriptor,
 };
 
-pub const SCALE_SIZE: f32 = 0.1f32;
+pub const CELL_SCALE_SIZE: f32 = 0.1f32;
 
 pub fn calc_position_from_ratio(start: &Vec2, end: &Vec2, ratio: f32) -> Vec2 {
     vec2(
@@ -24,8 +24,8 @@ where
 
 pub fn calc_center_from_scaled_position(scaled_position: &TVec2<i32>) -> Vec2 {
     vec2(
-        (scaled_position.x) as f32 * SCALE_SIZE + SCALE_SIZE / 2.0f32,
-        (scaled_position.y) as f32 * SCALE_SIZE + SCALE_SIZE / 2.0f32,
+        (scaled_position.x) as f32 * CELL_SCALE_SIZE + CELL_SCALE_SIZE / 2.0f32,
+        (scaled_position.y) as f32 * CELL_SCALE_SIZE + CELL_SCALE_SIZE / 2.0f32,
     )
 }
 
