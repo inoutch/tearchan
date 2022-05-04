@@ -12,9 +12,8 @@ SnapshotResult {
                 raw: MoveState,
                 entity_id: 1,
                 ty: End {
-                    tick: 15,
                     start: 0,
-                    end: 990,
+                    end: 15,
                 },
             },
         ],
@@ -25,9 +24,8 @@ SnapshotResult {
                 raw: JumpState,
                 entity_id: 1,
                 ty: Start {
-                    tick: 15,
-                    start: 990,
-                    end: 2970,
+                    start: 15,
+                    end: 45,
                 },
             },
         ],

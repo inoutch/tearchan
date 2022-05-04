@@ -13,18 +13,16 @@ SnapshotResult {
                 raw: JumpState,
                 entity_id: 2,
                 ty: Start {
-                    tick: 7,
-                    start: 462,
-                    end: 462,
+                    start: 7,
+                    end: 7,
                 },
             },
             Action {
                 raw: JumpState,
                 entity_id: 2,
                 ty: End {
-                    tick: 7,
-                    start: 462,
-                    end: 462,
+                    start: 7,
+                    end: 7,
                 },
             },
         ],

@@ -13,9 +13,8 @@ SnapshotResult {
                 raw: JumpState,
                 entity_id: 1,
                 ty: End {
-                    tick: 45,
-                    start: 990,
-                    end: 2970,
+                    start: 15,
+                    end: 45,
                 },
             },
         ],
@@ -26,9 +25,8 @@ SnapshotResult {
                 raw: TalkState,
                 entity_id: 1,
                 ty: Start {
-                    tick: 45,
-                    start: 2970,
-                    end: 4422,
+                    start: 45,
+                    end: 67,
                 },
             },
         ],

@@ -14,9 +14,8 @@ SnapshotResult {
                 raw: TalkState,
                 entity_id: 1,
                 ty: Start {
-                    tick: 29,
-                    start: 1914,
-                    end: 3894,
+                    start: 29,
+                    end: 59,
                 },
             },
         ],

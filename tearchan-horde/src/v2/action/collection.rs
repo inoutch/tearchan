@@ -268,7 +268,7 @@ mod test {
     struct JumpState;
 
     #[test]
-    fn test_typed_any_vec_grouped_by_entities() {
+    fn test_typed_any_map_grouped_by_entities() {
         let mut collection = TypedAnyActionMapGroupedByEntityId::default();
 
         collection.insert(
@@ -276,11 +276,7 @@ mod test {
             Action {
                 raw: Arc::new(MoveState),
                 entity_id: 1,
-                ty: ActionType::Start {
-                    tick: 0,
-                    start: 0,
-                    end: 0,
-                },
+                ty: ActionType::Start { start: 0, end: 0 },
             },
         );
 
@@ -289,11 +285,7 @@ mod test {
             Action {
                 raw: Arc::new(JumpState),
                 entity_id: 2,
-                ty: ActionType::Start {
-                    tick: 0,
-                    start: 0,
-                    end: 0,
-                },
+                ty: ActionType::Start { start: 0, end: 0 },
             },
         );
         collection.insert(
@@ -301,11 +293,7 @@ mod test {
             Action {
                 raw: Arc::new(JumpState),
                 entity_id: 2,
-                ty: ActionType::Start {
-                    tick: 0,
-                    start: 0,
-                    end: 0,
-                },
+                ty: ActionType::Start { start: 0, end: 0 },
             },
         );
 

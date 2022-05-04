@@ -9,7 +9,6 @@ Some(
             raw: MoveState,
             entity_id: 1,
             ty: Start {
-                tick: 0,
                 start: 0,
                 end: 0,
             },

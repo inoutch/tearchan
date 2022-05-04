@@ -12,18 +12,16 @@ SnapshotResult {
                 raw: MoveState,
                 entity_id: 1,
                 ty: Start {
-                    tick: 0,
                     start: 0,
-                    end: 990,
+                    end: 15,
                 },
             },
             Action {
                 raw: MoveState,
                 entity_id: 2,
                 ty: Start {
-                    tick: 0,
                     start: 0,
-                    end: 462,
+                    end: 7,
                 },
             },
         ],
