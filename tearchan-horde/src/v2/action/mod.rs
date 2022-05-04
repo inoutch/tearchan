@@ -27,27 +27,25 @@ impl ActionSessionId {
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum ActionType {
     Start {
-        tick: Tick,
-        start: TimeMilliseconds,
-        end: TimeMilliseconds,
+        start: Tick,
+        end: Tick,
     },
     Update {
         start: TimeMilliseconds,
         end: TimeMilliseconds,
     },
     End {
-        tick: Tick,
-        start: TimeMilliseconds,
-        end: TimeMilliseconds,
+        start: Tick,
+        end: Tick,
     },
 }
 
 impl ActionType {
     pub fn tick(&self) -> Option<Tick> {
         match self {
-            ActionType::Start { tick, .. } => Some(*tick),
+            ActionType::Start { start, .. } => Some(*start),
             ActionType::Update { .. } => None,
-            ActionType::End { tick, .. } => Some(*tick),
+            ActionType::End { end, .. } => Some(*end),
         }
     }
 }

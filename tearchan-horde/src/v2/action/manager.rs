@@ -116,6 +116,14 @@ impl ActionManager {
         self.controller().enqueue(entity_id, raw, duration);
     }
 
+    pub fn interrupt<T>(&mut self, entity_id: EntityId, raw: Arc<T>, duration: TimeMilliseconds)
+    where
+        T: 'static,
+    {
+        self.cancel(entity_id, true);
+        self.enqueue(entity_id, raw, duration);
+    }
+
     pub fn pull_actions(&mut self) -> Option<PullActionResult> {
         let (tick, mut item) = self.actions.pop_first()?;
         if tick > self.next_tick {
@@ -175,23 +183,7 @@ impl ActionManager {
     }
 
     pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
-        self.update_actions.remove(entity_id);
-
-        let context = self.contexts.get_mut(&entity_id).unwrap();
-        context.session_id = self.session_id_manager.gen();
-        let tick = if immediate {
-            self.current_tick
-        } else {
-            context.running_end_tick
-        };
-        context.last_tick = tick;
-        context.running_end_tick = tick;
-        context.session_expired_at = tick;
-
-        let item = self.actions.entry(tick).or_insert_with(Default::default);
-        item.cancels.insert(entity_id);
-        item.events
-            .push_back((entity_id, (context.session_id, Event::Canceled)));
+        self.controller().cancel(entity_id, immediate);
     }
 
     pub fn validator(&self) -> ActionSessionValidator {
@@ -415,7 +407,7 @@ impl<'a> ActionController<'a> {
         let start_tick = context.last_tick;
         let end_tick = start_tick + duration / self.tick_duration;
         let start = start_tick * self.tick_duration;
-        let end = end_tick * self.tick_duration;
+        let end = end_tick.wrapping_mul(self.tick_duration);
         {
             let item = self
                 .actions
@@ -426,9 +418,8 @@ impl<'a> ActionController<'a> {
                     raw: Arc::clone(&raw),
                     entity_id,
                     ty: ActionType::Start {
-                        tick: start_tick,
-                        start,
-                        end,
+                        start: start_tick,
+                        end: end_tick,
                     },
                 },
                 context.session_id,
@@ -459,9 +450,8 @@ impl<'a> ActionController<'a> {
                     raw,
                     entity_id,
                     ty: ActionType::End {
-                        tick: end_tick,
-                        start,
-                        end,
+                        start: start_tick,
+                        end: end_tick,
                     },
                 },
                 context.session_id,
@@ -498,6 +488,27 @@ impl<'a> ActionController<'a> {
         self.contexts.remove(&entity_id);
         self.vacated_entities.remove(&entity_id);
         self.update_actions.remove(entity_id);
+    }
+
+    #[inline]
+    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
+        self.update_actions.remove(entity_id);
+
+        let context = self.contexts.get_mut(&entity_id).unwrap();
+        context.session_id = self.session_id_manager.gen();
+        let tick = if immediate {
+            self.current_tick
+        } else {
+            context.running_end_tick
+        };
+        context.last_tick = tick;
+        context.running_end_tick = tick;
+        context.session_expired_at = tick;
+
+        let item = self.actions.entry(tick).or_insert_with(Default::default);
+        item.cancels.insert(entity_id);
+        item.events
+            .push_back((entity_id, (context.session_id, Event::Canceled)));
     }
 }
 
