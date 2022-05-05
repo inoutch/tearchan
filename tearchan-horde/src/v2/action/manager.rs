@@ -8,6 +8,7 @@ use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
+use tearchan_ecs::entity::manager::ENTITY_REMAPPER;
 use tearchan_util::id_manager::IdManager;
 
 #[derive(Default)]
@@ -273,6 +274,8 @@ impl ActionManager {
         }
 
         let mut c = ActionManagerConverter {
+            remapping_tick: 0,
+            remapping_tick_positive: true,
             tick_duration: data.tick_duration,
             actions: &mut manager.actions,
             contexts: &mut manager.contexts,
@@ -289,6 +292,60 @@ impl ActionManager {
         }
 
         Ok(manager)
+    }
+
+    pub fn load_data<T>(
+        &mut self,
+        data: ActionManagerData<T>,
+        converter: fn(action: Action<T>, manager: &mut ActionManagerConverter),
+    ) {
+        let mut tick_validation: Tick = data.current_tick;
+        for action in data.actions.iter() {
+            match action.ty {
+                ActionType::Start { .. } | ActionType::End { .. } => {
+                    let tick = action.tick().unwrap();
+                    if tick < tick_validation {
+                        return;
+                    }
+                    tick_validation = tick;
+                }
+                ActionType::Update { .. } => {
+                    if tick_validation != data.current_tick {
+                        return;
+                    }
+                }
+            }
+        }
+        for action in data.actions.iter() {
+            if let std::collections::hash_map::Entry::Vacant(entry) =
+                self.contexts.entry(ENTITY_REMAPPER.remap(action.entity_id))
+            {
+                entry.insert(ActionContext {
+                    last_tick: self.current_tick,
+                    running_end_tick: Tick::MAX,
+                    session_id: self.session_id_manager.gen(),
+                    session_expired_at: self.current_tick,
+                });
+            }
+        }
+
+        let mut c = ActionManagerConverter {
+            remapping_tick: (self.current_tick as i128 - data.current_tick as i128).abs() as Tick,
+            remapping_tick_positive: self.current_tick > data.current_tick,
+            tick_duration: data.tick_duration,
+            actions: &mut self.actions,
+            contexts: &mut self.contexts,
+            update_actions: &mut self.update_actions,
+        };
+        for action in data.actions.into_iter() {
+            converter(action, &mut c);
+        }
+
+        for (_entity, context) in self.contexts.iter() {
+            if context.running_end_tick == Tick::MAX {
+                panic!();
+            }
+        }
     }
 
     pub fn controller(&mut self) -> ActionController {
@@ -313,6 +370,8 @@ impl ActionManager {
 }
 
 pub struct ActionManagerConverter<'a> {
+    remapping_tick: Tick,
+    remapping_tick_positive: bool,
     tick_duration: TimeMilliseconds,
     actions: &'a mut BTreeMap<Tick, TickBundle>,
     contexts: &'a mut HashMap<EntityId, ActionContext>,
@@ -325,18 +384,23 @@ impl<'a> ActionManagerConverter<'a> {
         T: 'static,
     {
         let type_id = TypeId::of::<T>();
-        let entity_id = action.entity_id();
+        let entity_id = ENTITY_REMAPPER.remap(action.entity_id);
         let context = self
             .contexts
             .get_mut(&entity_id)
             .unwrap_or_else(|| panic!("entity of {} is not attached", entity_id));
 
-        match action.ty {
-            ActionType::Start { start, end, .. } => {
-                let tick = action.tick().expect("Invalid action type");
+        let remapped_action_type = action.ty.remap(
+            self.remapping_tick,
+            self.remapping_tick_positive,
+            self.tick_duration,
+        );
+        match remapped_action_type {
+            ActionType::Start { start, end } => {
+                let tick = remapped_action_type.tick().unwrap();
                 let item = self.actions.entry(tick).or_insert_with(Default::default);
-                let start_time = start * self.tick_duration;
-                let end_time = end * self.tick_duration;
+                let start_time = start.wrapping_mul(self.tick_duration);
+                let end_time = end.wrapping_mul(self.tick_duration);
                 item.events.push_back((
                     entity_id,
                     (
@@ -351,7 +415,7 @@ impl<'a> ActionManagerConverter<'a> {
                                     end: end_time,
                                 },
                             }),
-                            running_end_tick: 0,
+                            running_end_tick: end,
                         },
                     ),
                 ));
@@ -359,13 +423,13 @@ impl<'a> ActionManagerConverter<'a> {
                     Action {
                         raw: Arc::clone(action.raw()),
                         entity_id,
-                        ty: action.ty,
+                        ty: remapped_action_type,
                     },
                     context.session_id,
                 );
             }
             ActionType::End { .. } => {
-                let tick = action.tick().expect("Invalid action type");
+                let tick = remapped_action_type.tick().unwrap();
                 let item = self.actions.entry(tick).or_insert_with(Default::default);
                 item.events
                     .push_back((entity_id, (context.session_id, Event::Ended)));
@@ -373,7 +437,7 @@ impl<'a> ActionManagerConverter<'a> {
                     Action {
                         raw: Arc::clone(action.raw()),
                         entity_id,
-                        ty: action.ty,
+                        ty: remapped_action_type,
                     },
                     context.session_id,
                 );
@@ -381,7 +445,14 @@ impl<'a> ActionManagerConverter<'a> {
                 context.running_end_tick = context.running_end_tick.min(tick);
             }
             ActionType::Update { .. } => {
-                self.update_actions.insert(entity_id, action);
+                self.update_actions.insert(
+                    entity_id,
+                    Action {
+                        raw: Arc::clone(action.raw()),
+                        entity_id,
+                        ty: remapped_action_type,
+                    },
+                );
             }
         }
     }
@@ -409,8 +480,18 @@ impl<'a> ActionController<'a> {
             .get_mut(&entity_id)
             .unwrap_or_else(|| panic!("entity of {} is not attached", entity_id));
 
-        debug_assert!(self.current_tick <= context.running_end_tick);
-        debug_assert!(context.running_end_tick <= context.last_tick);
+        debug_assert!(
+            self.current_tick <= context.running_end_tick,
+            "{} <= {}",
+            self.current_tick,
+            context.running_end_tick
+        );
+        debug_assert!(
+            context.running_end_tick <= context.last_tick,
+            "{} <= {}",
+            context.running_end_tick,
+            context.last_tick
+        );
 
         self.vacated_entities.remove(&entity_id);
 

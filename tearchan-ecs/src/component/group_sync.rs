@@ -90,7 +90,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::component::group::ComponentGroup;
+    use crate::component::group::{ComponentGroup, ComponentGroupDeserializableData};
     use crate::component::group_sync::ComponentGroupSync;
     use crate::component::zip::ZipEntity1;
     use tearchan_util::thread::ThreadPool;
@@ -175,10 +175,11 @@ mod test {
 
         let read = group.read();
         let value: &ComponentGroup<i32> = &read.get();
-        let str = serde_json::to_string(value).unwrap();
-        let component_group: ComponentGroup<i32> = serde_json::from_str(&str).unwrap();
-        let component_group_sync = ComponentGroupSync::new(component_group);
-
+        let str = serde_json::to_string(&value.to_data()).unwrap();
+        let data: ComponentGroupDeserializableData<i32> = serde_json::from_str(&str).unwrap();
+        let component_group = ComponentGroup::default();
+        let mut component_group_sync = ComponentGroupSync::new(component_group);
+        component_group_sync.write().get_mut().load_data(data);
         assert_eq!(*component_group_sync.read().get().get(0).unwrap(), 0);
         assert_eq!(*component_group_sync.read().get().get(1).unwrap(), 11);
         assert_eq!(*component_group_sync.read().get().get(2).unwrap(), 22);

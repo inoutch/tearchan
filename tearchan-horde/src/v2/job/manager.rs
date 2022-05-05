@@ -6,10 +6,12 @@ use crate::v2::action::manager::{
 };
 use crate::v2::action::Action;
 use crate::v2::job::HordeInterface;
+use crate::v2::Tick;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
+use tearchan_ecs::entity::manager::ENTITY_REMAPPER;
 
 pub struct JobManager<T: HordeInterface> {
     action_manager: ActionManager,
@@ -71,6 +73,18 @@ where
         }
     }
 
+    pub fn load_data<U>(
+        &mut self,
+        mut data: JobManagerData<U, T::Job>,
+        converter: fn(action: Action<U>, manager: &mut ActionManagerConverter),
+    ) {
+        self.action_manager
+            .load_data(data.action_manager_data, converter);
+        for (entity_id, job) in data.jobs.drain() {
+            self.jobs.insert(ENTITY_REMAPPER.remap(entity_id), job);
+        }
+    }
+
     pub fn from_data<U>(
         data: JobManagerData<U, T::Job>,
         converter: fn(action: Action<U>, manager: &mut ActionManagerConverter),
@@ -86,6 +100,11 @@ where
             action_manager,
             jobs: data.jobs,
         })
+    }
+
+    #[inline]
+    pub fn current_tick(&self) -> Tick {
+        self.action_manager.current_tick()
     }
 
     fn run_actions(&mut self, provider: &mut T) {

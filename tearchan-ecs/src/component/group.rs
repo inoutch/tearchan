@@ -1,8 +1,8 @@
 use crate::component::zip::{ZipEntityBase, ZipEntityIter, ZipEntityIterMut};
 use crate::component::{Component, EntityId};
+use crate::entity::manager::ENTITY_REMAPPER;
 use serde::de::{MapAccess, Visitor};
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
@@ -15,15 +15,13 @@ pub type ComponentIndex = usize;
 pub struct ComponentGroup<T> {
     indices: HashMap<EntityId, ComponentIndex>,
     components: Vec<Component<T>>,
-    pending_indices: Vec<ComponentIndex>,
 }
 
 impl<T> Default for ComponentGroup<T> {
     fn default() -> Self {
         Self {
-            indices: HashMap::new(),
-            components: Vec::new(),
-            pending_indices: Vec::new(),
+            indices: Default::default(),
+            components: Default::default(),
         }
     }
 }
@@ -33,30 +31,28 @@ impl<T> ComponentGroup<T> {
         debug_assert!(!self.indices.contains_key(&entity_id));
 
         let component = Component::new(entity_id, inner);
-        if let Some(index) = self.pending_indices.pop() {
-            *self.components.get_mut(index).unwrap() = component;
-            self.indices.insert(entity_id, index);
-            return;
-        }
-
+        let index = self.components.len();
         self.components.push(component);
-        self.indices.insert(entity_id, self.components.len() - 1);
+        self.indices.insert(entity_id, index);
     }
 
-    pub fn remove(&mut self, entity_id: EntityId) -> Option<&T> {
+    pub fn remove(&mut self, entity_id: EntityId) -> Option<T> {
         let index = match self.indices.remove(&entity_id) {
             None => return None,
             Some(index) => index,
         };
-        self.pending_indices.push(index);
-        self.components
-            .get(index)
-            .map(|component| component.inner())
+
+        if index != self.components.len() - 1 {
+            let last = self.components.pop().unwrap();
+            *self.indices.get_mut(&last.entity_id).unwrap() = index;
+            Some(std::mem::replace(self.components.get_mut(index).unwrap(), last).inner)
+        } else {
+            Some(self.components.remove(index).into_inner())
+        }
     }
 
     pub fn remove_all(&mut self) {
         self.indices.clear();
-        self.pending_indices.clear();
         self.components.clear();
     }
 
@@ -116,79 +112,23 @@ impl<T> ComponentGroup<T> {
         }
     }
 
+    pub fn load_data(&mut self, data: ComponentGroupDeserializableData<T>) {
+        for component in data.components {
+            self.push(component.entity_id, component.inner);
+        }
+    }
+
+    pub fn to_data(&self) -> ComponentGroupSerializableData<T> {
+        ComponentGroupSerializableData {
+            components: &self.components,
+        }
+    }
+
     pub fn debug(&self) -> ComponentGroupDebug<T>
     where
         T: Debug,
     {
         ComponentGroupDebug(&self.components)
-    }
-}
-
-impl<T> Serialize for ComponentGroup<T>
-where
-    T: Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let components = self
-            .components
-            .iter()
-            .filter(|component| self.indices.contains_key(&component.entity_id))
-            .collect::<Vec<_>>();
-
-        let mut seq = serializer.serialize_map(Some(components.len()))?;
-        for component in components {
-            seq.serialize_entry(&component.entity_id(), &component.inner)?;
-        }
-        seq.end()
-    }
-}
-
-impl<'de, T> Deserialize<'de> for ComponentGroup<T>
-where
-    T: Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ComponentGroupVisitor<T>(PhantomData<T>);
-        impl<'de, T> Visitor<'de> for ComponentGroupVisitor<T>
-        where
-            T: Deserialize<'de>,
-        {
-            type Value = ComponentGroup<T>;
-
-            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-                formatter.write_str("componentGroup")
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, <A as MapAccess<'de>>::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                let mut components = Vec::with_capacity(map.size_hint().unwrap_or(0));
-                while let Some((key, value)) = map.next_entry()? {
-                    components.push(Component::new(key, value));
-                }
-
-                let indices = components
-                    .iter()
-                    .enumerate()
-                    .map(|(index, component): (usize, &Component<T>)| {
-                        (component.entity_id(), index)
-                    })
-                    .collect();
-                Ok(ComponentGroup {
-                    indices,
-                    components,
-                    pending_indices: Vec::new(),
-                })
-            }
-        }
-        deserializer.deserialize_map(ComponentGroupVisitor(PhantomData))
     }
 }
 
@@ -256,6 +196,57 @@ impl<'a, T> IterMut<'a, T> {
     }
 }
 
+#[derive(Serialize)]
+pub struct ComponentGroupSerializableData<'a, T> {
+    components: &'a Vec<Component<T>>,
+}
+
+pub struct ComponentGroupDeserializableData<T> {
+    components: Vec<Component<T>>,
+}
+
+impl<'de, T> Deserialize<'de> for ComponentGroupDeserializableData<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ComponentGroupVisitor<T>(PhantomData<T>);
+        impl<'de, T> Visitor<'de> for ComponentGroupVisitor<T>
+        where
+            T: Deserialize<'de>,
+        {
+            type Value = ComponentGroupDeserializableData<T>;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                formatter.write_str("ComponentGroupDeserializableData")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, <A as MapAccess<'de>>::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut components = Vec::with_capacity(map.size_hint().unwrap_or(0));
+                while let Some((key, value)) = map.next_entry::<String, Vec<Component<T>>>()? {
+                    if &key != "components" {
+                        continue;
+                    }
+                    for component in value {
+                        components.push(Component::new(
+                            ENTITY_REMAPPER.remap(component.entity_id),
+                            component.inner,
+                        ));
+                    }
+                }
+                Ok(ComponentGroupDeserializableData { components })
+            }
+        }
+        deserializer.deserialize_map(ComponentGroupVisitor(PhantomData))
+    }
+}
+
 #[derive(Debug)]
 pub enum ComponentGroupError {
     NotFoundEntity { id: EntityId },
@@ -278,8 +269,9 @@ pub struct ComponentGroupDebug<'a, T: Debug>(&'a Vec<Component<T>>);
 
 #[cfg(test)]
 mod test {
-    use crate::component::group::ComponentGroup;
+    use crate::component::group::{ComponentGroup, ComponentGroupDeserializableData};
     use crate::component::zip::ZipEntity2;
+    use crate::entity::manager::EntityManager;
     use serde::{Deserialize, Serialize};
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -387,8 +379,11 @@ mod test {
         group.push(3, SerializationInner("entity 3".to_string()));
         group.remove(3);
 
-        let str = serde_json::to_string(&group).unwrap();
-        let group: ComponentGroup<SerializationInner> = serde_json::from_str(&str).unwrap();
+        let str = serde_json::to_string(&group.to_data()).unwrap();
+        let data: ComponentGroupDeserializableData<SerializationInner> =
+            serde_json::from_str(&str).unwrap();
+        let mut group = ComponentGroup::default();
+        group.load_data(data);
         assert_eq!(group.get(0).as_ref().unwrap().0, "entity 0");
         assert_eq!(group.get(1).as_ref().unwrap().0, "entity 1");
         assert_eq!(group.get(2).as_ref().unwrap().0, "entity 2");
@@ -415,5 +410,33 @@ mod test {
         assert_eq!(iter.next(), Some((1, &mut 11)));
         assert_eq!(iter.next(), Some((2, &mut 12)));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_serialization_and_remapping() {
+        let world = {
+            let entity_manager = EntityManager::default();
+
+            let mut group = ComponentGroup::default();
+            group.push(entity_manager.gen(), 10);
+            group.push(entity_manager.gen(), 11);
+            group.push(entity_manager.gen(), 12);
+            group.push(entity_manager.gen(), 13);
+
+            (
+                serde_json::to_string(&entity_manager.to_data()).unwrap(),
+                serde_json::to_string(&group.to_data()).unwrap(),
+            )
+        };
+
+        let entity_manager = EntityManager::default();
+        let mut group = ComponentGroup::default();
+        group.push(entity_manager.gen(), 20);
+        group.push(entity_manager.gen(), 21);
+        group.push(entity_manager.gen(), 22);
+        group.push(entity_manager.gen(), 23);
+
+        let _token = entity_manager.load_data(serde_json::from_str(&world.0).unwrap());
+        group.load_data(serde_json::from_str(&world.1).unwrap());
     }
 }

@@ -30,4 +30,8 @@ impl<T> Component<T> {
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
     }
+    
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
 }

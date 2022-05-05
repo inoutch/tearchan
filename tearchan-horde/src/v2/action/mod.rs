@@ -48,6 +48,50 @@ impl ActionType {
             ActionType::End { end, .. } => Some(*end),
         }
     }
+
+    pub fn remap(&self, tick: Tick, positive: bool, tick_duration: TimeMilliseconds) -> ActionType {
+        match self {
+            ActionType::Start { start, end } => {
+                let start = if positive {
+                    start.wrapping_add(tick)
+                } else {
+                    start.wrapping_sub(tick)
+                };
+                let end = if positive {
+                    end.wrapping_add(tick)
+                } else {
+                    end.wrapping_sub(tick)
+                };
+                ActionType::Start { start, end }
+            }
+            ActionType::Update { start, end } => {
+                let start = if positive {
+                    start.wrapping_add(tick * tick_duration)
+                } else {
+                    start.wrapping_sub(tick * tick_duration)
+                };
+                let end = if positive {
+                    end.wrapping_add(tick * tick_duration)
+                } else {
+                    end.wrapping_sub(tick * tick_duration)
+                };
+                ActionType::Update { start, end }
+            }
+            ActionType::End { start, end } => {
+                let start = if positive {
+                    start.wrapping_add(tick)
+                } else {
+                    start.wrapping_sub(tick)
+                };
+                let end = if positive {
+                    end.wrapping_add(tick)
+                } else {
+                    end.wrapping_sub(tick)
+                };
+                ActionType::End { start, end }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
