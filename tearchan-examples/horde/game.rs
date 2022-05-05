@@ -3,35 +3,43 @@ use crate::utils::{calc_center_from_scaled_position, calc_position_from_ratio, C
 use maze_generator::prelude::Direction;
 use nalgebra_glm::{distance, vec2, vec3, TVec2, Vec2, Vec3};
 use rand::Rng;
+use std::path::PathBuf;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
+use tearchan::fs::{file_util, write_bytes_to_file};
 use tearchan::util::array_2d::Array2D;
 use tearchan::util::thread::ThreadPool;
+use tearchan_ecs::component::group::{
+    ComponentGroupDeserializableData, ComponentGroupSerializableData,
+};
 use tearchan_ecs::component::group_sync::ComponentGroupSync;
 use tearchan_ecs::component::resource_sync::ResourceSync;
 use tearchan_ecs::component::EntityId;
-use tearchan_ecs::entity::manager::EntityManager;
+use tearchan_ecs::entity::manager::{EntityManager, EntityManagerData, ENTITY_REMAPPER};
 use tearchan_horde::action::manager::TimeMilliseconds;
 use tearchan_horde::v2::action::collection::{
     TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId,
 };
 use tearchan_horde::v2::action::manager::{ActionController, ActionSessionValidator};
 use tearchan_horde::v2::action::{ActionType, ArcAction};
-use tearchan_horde::v2::job::manager::JobManager;
+use tearchan_horde::v2::job::manager::{JobManager, JobManagerData};
 use tearchan_horde::v2::job::HordeInterface;
 use tearchan_horde::v2::serde::{Deserialize, Serialize};
 use tearchan_horde::v2::{calc_ratio_f32_from_ms, calc_ratio_f32_from_tick, define_actions, Tick};
 
 const PLAYER_SPEED: f32 = 500.0f32; // ms/cell
+const SAVE_FILE_NAME: &str = "world.json";
 
 enum Command {
     UpdateRenderSpritePosition(EntityId, Vec2),
     UpdateRenderSpriteColor(EntityId, Vec3),
 }
 
-pub enum CellType {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum EntityType {
     Player,
     Enemy,
+    Passage,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -94,26 +102,32 @@ define_actions!(
     (Direction, DirectionState)
 );
 
+#[derive(Serialize, Deserialize)]
 pub enum HordeJob {
     Wander,
     Wait(TimeMilliseconds),
     GoDestination,
 }
 
+#[derive(Serialize, Deserialize)]
 struct PositionData {
     from: (Vec2, Tick),
     to: (Vec2, Tick),
 }
 
+#[derive(Serialize, Deserialize)]
 struct ScaledPositionData(TVec2<i32>);
 
+#[derive(Serialize, Deserialize)]
 struct ColorData(Vec3);
 
+#[derive(Serialize, Deserialize)]
 struct PathData {
-    _from: TVec2<i32>,
+    from: TVec2<i32>,
     to: TVec2<i32>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct DirectionData(DirectionState);
 
 trait MapperTrait {
@@ -130,12 +144,13 @@ pub struct Game {
     pool: ThreadPool,
     entity_manager: EntityManager,
     pub player_id: EntityId,
+    pub speed: f32,
     // components
     positions: ComponentGroupSync<PositionData>,
     scaled_positions: ComponentGroupSync<ScaledPositionData>,
     colors: ComponentGroupSync<ColorData>,
     paths: ComponentGroupSync<Vec<PathData>>,
-    cell_types: ComponentGroupSync<CellType>,
+    entity_types: ComponentGroupSync<EntityType>,
     directions: ComponentGroupSync<DirectionData>,
     // runtime
     passages: Array2D<EntityId>,
@@ -149,11 +164,12 @@ impl Game {
             pool: Default::default(),
             entity_manager: Default::default(),
             player_id: 0, // Invalid EntityId
+            speed: 1.0f32,
             positions: Default::default(),
             scaled_positions: Default::default(),
             colors: Default::default(),
             paths: Default::default(),
-            cell_types: Default::default(),
+            entity_types: Default::default(),
             directions: Default::default(),
             passages: Default::default(),
             renderer,
@@ -252,28 +268,29 @@ impl Game {
             }
             {
                 let rsync_child = rsync.child();
-                let cell_types = self.cell_types.read();
+                let entity_types = self.entity_types.read();
                 let mut colors = self.colors.write();
                 let sender = Sender::clone(&sender);
                 let walk_actions = Arc::clone(&walk_actions);
 
                 self.pool.execute(move || {
                     rsync_child.begin();
-                    let cell_types = cell_types.get();
+                    let entity_types = entity_types.get();
                     let mut colors = colors.get_mut();
                     rsync_child.end();
 
                     for walk_action in walk_actions.iter() {
                         let _state = walk_action.raw();
                         let color = colors.get_mut(walk_action.entity_id());
-                        let cell_type = cell_types.get(walk_action.entity_id());
+                        let entity_type = entity_types.get(walk_action.entity_id());
                         if let Some(color) = color {
-                            if let Some(cell_type) = cell_type {
+                            if let Some(entity_type) = entity_type {
                                 match walk_action.ty() {
                                     ActionType::Start { .. } => {
-                                        color.0 = match cell_type {
-                                            CellType::Player => vec3(0.0f32, 0.0f32, 1.0f32),
-                                            CellType::Enemy => vec3(0.0f32, 1.0f32, 0.0f32),
+                                        color.0 = match entity_type {
+                                            EntityType::Player => vec3(0.0f32, 0.0f32, 1.0f32),
+                                            EntityType::Enemy => vec3(0.0f32, 1.0f32, 0.0f32),
+                                            EntityType::Passage => vec3(1.0f32, 1.0f32, 1.0f32),
                                         };
                                         sender
                                             .send(Command::UpdateRenderSpriteColor(
@@ -324,28 +341,29 @@ impl Game {
             let wait_actions = Arc::new(wait_actions);
             {
                 let rsync_child = rsync.child();
-                let cell_types = self.cell_types.read();
+                let entity_types = self.entity_types.read();
                 let mut colors = self.colors.write();
                 let sender = Sender::clone(&sender);
                 let wait_actions = Arc::clone(&wait_actions);
 
                 self.pool.execute(move || {
                     rsync_child.begin();
-                    let cell_types = cell_types.get();
+                    let entity_types = entity_types.get();
                     let mut colors = colors.get_mut();
                     rsync_child.end();
 
                     for wait_action in wait_actions.iter() {
                         let _state = wait_action.raw();
                         let color = colors.get_mut(wait_action.entity_id());
-                        let cell_type = cell_types.get(wait_action.entity_id());
-                        if let Some(cell_type) = cell_type {
+                        let entity_type = entity_types.get(wait_action.entity_id());
+                        if let Some(entity_type) = entity_type {
                             if let Some(color) = color {
                                 match wait_action.ty() {
                                     ActionType::Start { .. } => {
-                                        color.0 = match cell_type {
-                                            CellType::Player => vec3(0.0f32, 0.0f32, 1.0f32),
-                                            CellType::Enemy => vec3(1.0f32, 0.0f32, 0.0f32),
+                                        color.0 = match entity_type {
+                                            EntityType::Player => vec3(0.0f32, 0.0f32, 1.0f32),
+                                            EntityType::Enemy => vec3(1.0f32, 0.0f32, 0.0f32),
+                                            EntityType::Passage => vec3(1.0f32, 1.0f32, 1.0f32),
                                         };
                                         sender
                                             .send(Command::UpdateRenderSpriteColor(
@@ -476,18 +494,19 @@ impl HordeInterface for Game {
     }
 
     fn on_first(&self, entity_id: EntityId, priority: u32) -> Self::Job {
-        let cell_types = self.cell_types.read();
-        let cell_types = cell_types.get();
-        let cell_type = cell_types.get(entity_id).unwrap();
-        match cell_type {
-            CellType::Player => match priority {
+        let entity_types = self.entity_types.read();
+        let entity_types = entity_types.get();
+        let entity_type = entity_types.get(entity_id).unwrap();
+        match entity_type {
+            EntityType::Player => match priority {
                 0 => Arc::new(HordeJob::GoDestination),
                 _ => Arc::new(HordeJob::Wait(3000)),
             },
-            CellType::Enemy => match priority {
+            EntityType::Enemy => match priority {
                 0 => Arc::new(HordeJob::Wander),
                 _ => Arc::new(HordeJob::Wait(3000)),
             },
+            _ => unreachable!(),
         }
     }
 
@@ -638,7 +657,7 @@ fn run_go_destination_job(
 pub struct CreatePlayerParams<'a> {
     pub job_manager: &'a mut JobManager<Game>,
     pub initial_position: TVec2<i32>,
-    pub cell_type: CellType,
+    pub entity_type: EntityType,
 }
 
 fn create_cell(game: &mut Game, params: CreatePlayerParams) -> EntityId {
@@ -659,18 +678,16 @@ fn create_cell(game: &mut Game, params: CreatePlayerParams) -> EntityId {
         .write()
         .get_mut()
         .push(entity_id, ColorData(vec3(1.0f32, 0.0f32, 0.0f32)));
-    game.cell_types
+    game.entity_types
         .write()
         .get_mut()
-        .push(entity_id, params.cell_type);
+        .push(entity_id, params.entity_type);
     game.directions
         .write()
         .get_mut()
         .push(entity_id, DirectionData(DirectionState::None));
 
     params.job_manager.attach(entity_id);
-
-    game.renderer.add_sprite(entity_id, &position);
 
     entity_id
 }
@@ -688,8 +705,6 @@ fn create_passage(game: &mut Game, params: CreatePassageParams) -> EntityId {
     );
 
     let mut paths = Vec::new();
-    let mut lines = Vec::new();
-    let from = calc_center_from_scaled_position(&params.initial_position);
     for direction in params.directions {
         let scaled_to = match direction {
             Direction::North => vec2(0, -1),
@@ -697,24 +712,151 @@ fn create_passage(game: &mut Game, params: CreatePassageParams) -> EntityId {
             Direction::East => vec2(1, 0),
             Direction::West => vec2(-1, 0),
         } + params.initial_position;
-        let to = calc_center_from_scaled_position(&scaled_to);
-        lines.push((from, to));
         paths.push(PathData {
-            _from: params.initial_position.clone_owned(),
+            from: params.initial_position.clone_owned(),
             to: scaled_to,
         });
     }
 
     game.paths.write().get_mut().push(entity_id, paths);
 
-    game.passages.set(&params.initial_position, entity_id);
-
-    game.renderer.add_line(entity_id, &lines);
+    game.entity_types
+        .write()
+        .get_mut()
+        .push(entity_id, EntityType::Passage);
 
     entity_id
 }
 
+pub struct RestoreCellParams {
+    entity_id: EntityId,
+    current_tick: Tick,
+}
+
+fn restore_cell(game: &mut Game, params: RestoreCellParams) -> Option<()> {
+    let positions = game.positions.read();
+    let positions = positions.get();
+    let position = positions.get(params.entity_id)?;
+
+    let colors = game.colors.read();
+    let colors = colors.get();
+    let color = colors.get(params.entity_id)?;
+
+    game.renderer.add_sprite(
+        params.entity_id,
+        &calc_position_from_ratio(
+            &position.from.0,
+            &position.to.0,
+            calc_ratio_f32_from_tick(position.from.1, position.to.1, params.current_tick),
+        ),
+    );
+    game.renderer
+        .update_sprite_color(params.entity_id, &color.0);
+
+    Some(())
+}
+
+struct RestorePassageParams {
+    entity_id: EntityId,
+}
+
+fn restore_passage(game: &mut Game, params: RestorePassageParams) -> Option<()> {
+    let scaled_positions = game.scaled_positions.read();
+    let scaled_positions = scaled_positions.get();
+    let scaled_position = scaled_positions.get(params.entity_id)?;
+
+    let paths = game.paths.read();
+    let paths = paths.get();
+    let paths = paths.get(params.entity_id)?;
+
+    game.passages.set(&scaled_position.0, params.entity_id);
+
+    game.renderer.add_line(
+        params.entity_id,
+        &paths
+            .iter()
+            .map(|path| {
+                (
+                    calc_center_from_scaled_position(&path.from),
+                    calc_center_from_scaled_position(&path.to),
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    Some(())
+}
+
+struct RestoreEntityParams<'a> {
+    entity_id: EntityId,
+    game: &'a mut Game,
+    current_tick: Tick,
+}
+
+fn restore_entity(params: RestoreEntityParams) {
+    let entity_types = params.game.entity_types.read();
+    let entity_types = entity_types.get();
+    let entity_type = match entity_types.get(params.entity_id) {
+        None => return,
+        Some(entity_type) => entity_type,
+    };
+    match entity_type {
+        EntityType::Player => {
+            restore_cell(
+                params.game,
+                RestoreCellParams {
+                    entity_id: params.entity_id,
+                    current_tick: params.current_tick,
+                },
+            );
+        }
+        EntityType::Enemy => {
+            restore_cell(
+                params.game,
+                RestoreCellParams {
+                    entity_id: params.entity_id,
+                    current_tick: params.current_tick,
+                },
+            );
+        }
+        EntityType::Passage => {
+            restore_passage(
+                params.game,
+                RestorePassageParams {
+                    entity_id: params.entity_id,
+                },
+            );
+        }
+    }
+}
+
 impl Game {
+    pub fn restore(&mut self, current_tick: Tick) {
+        for entity_id in self.entity_manager.pull_vacated_entities() {
+            restore_entity(RestoreEntityParams {
+                entity_id,
+                game: self,
+                current_tick,
+            });
+        }
+    }
+
+    pub fn destroy_entity(&mut self, job_manager: &mut JobManager<Game>, entity_id: EntityId) {
+        self.entity_manager.free(entity_id);
+
+        self.positions.write().get_mut().remove(entity_id);
+        self.scaled_positions.write().get_mut().remove(entity_id);
+        self.colors.write().get_mut().remove(entity_id);
+        self.paths.write().get_mut().remove(entity_id);
+        self.entity_types.write().get_mut().remove(entity_id);
+        self.directions.write().get_mut().remove(entity_id);
+
+        self.renderer.remove_sprite(entity_id);
+        self.renderer.remove_lines(entity_id);
+
+        job_manager.detach(entity_id);
+    }
+
     pub fn create_cell(&mut self, params: CreatePlayerParams) -> EntityId {
         create_cell(self, params)
     }
@@ -735,4 +877,124 @@ impl Game {
             job_manager.interrupt(self.player_id, Arc::new(direction), 0);
         }
     }
+
+    pub fn save_world(&self, job_manager: &JobManager<Game>) {
+        let job_manager_data = job_manager.to_data(
+            convert_actions_from_typed_action_any_map,
+            convert_actions_from_typed_any_action_map,
+        );
+        let json = serde_json::to_string(&GameSerializableData {
+            entity_manager_data: self.entity_manager.to_data(),
+            payload: GameSerializablePayload {
+                player_id: self.player_id,
+                speed: self.speed,
+                job_manager_data,
+                positions: self.positions.read().get().to_data(),
+                scaled_positions: self.scaled_positions.read().get().to_data(),
+                colors: self.colors.read().get().to_data(),
+                paths: self.paths.read().get().to_data(),
+                entity_types: self.entity_types.read().get().to_data(),
+                directions: self.directions.read().get().to_data(),
+            },
+        })
+        .unwrap();
+
+        let file = file_util();
+        let mut output_path = PathBuf::new();
+        output_path.push(file.writable_path());
+        output_path.push(SAVE_FILE_NAME);
+        let result = write_bytes_to_file(output_path, json.as_bytes());
+        match result {
+            Ok(_) => println!("world data is saved!"),
+            Err(err) => println!("{:?}", err),
+        }
+    }
+
+    pub fn load_world(&mut self, job_manager: &mut JobManager<Game>) {
+        let entity_ids = self
+            .entity_manager
+            .read()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        for entity_id in entity_ids {
+            self.destroy_entity(job_manager, entity_id);
+        }
+
+        let file = file_util();
+        let mut output_path = PathBuf::new();
+        output_path.push(file.writable_path());
+        output_path.push(SAVE_FILE_NAME);
+        let result = std::fs::read_to_string(output_path);
+        match result {
+            Ok(result) => {
+                let data: GameDeserializableData = serde_json::from_str(&result).unwrap();
+                let _token = self.entity_manager.load_data(data.entity_manager_data);
+
+                let payload: GameDeserializablePayload =
+                    serde_json::from_str(data.payload.get()).unwrap();
+                self.player_id = ENTITY_REMAPPER.remap(payload.player_id);
+                self.speed = payload.speed;
+                self.positions
+                    .write()
+                    .get_mut()
+                    .load_data(payload.positions);
+                self.scaled_positions
+                    .write()
+                    .get_mut()
+                    .load_data(payload.scaled_positions);
+                self.colors.write().get_mut().load_data(payload.colors);
+                self.paths.write().get_mut().load_data(payload.paths);
+                self.entity_types
+                    .write()
+                    .get_mut()
+                    .load_data(payload.entity_types);
+                self.directions
+                    .write()
+                    .get_mut()
+                    .load_data(payload.directions);
+
+                job_manager.load_data(payload.job_manager_data, convert_from_actions);
+            }
+            Err(err) => println!("{:?}", err),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct GameSerializableData<'a> {
+    entity_manager_data: EntityManagerData,
+    payload: GameSerializablePayload<'a>,
+}
+
+#[derive(Serialize)]
+pub struct GameSerializablePayload<'a> {
+    player_id: EntityId,
+    speed: f32,
+    job_manager_data: JobManagerData<HordeAction, Arc<HordeJob>>,
+    positions: ComponentGroupSerializableData<'a, PositionData>,
+    scaled_positions: ComponentGroupSerializableData<'a, ScaledPositionData>,
+    colors: ComponentGroupSerializableData<'a, ColorData>,
+    paths: ComponentGroupSerializableData<'a, Vec<PathData>>,
+    entity_types: ComponentGroupSerializableData<'a, EntityType>,
+    directions: ComponentGroupSerializableData<'a, DirectionData>,
+}
+
+#[derive(Deserialize)]
+pub struct GameDeserializableData {
+    entity_manager_data: EntityManagerData,
+    payload: Box<serde_json::value::RawValue>,
+}
+
+#[derive(Deserialize)]
+pub struct GameDeserializablePayload {
+    player_id: EntityId,
+    speed: f32,
+    job_manager_data: JobManagerData<HordeAction, Arc<HordeJob>>,
+    positions: ComponentGroupDeserializableData<PositionData>,
+    scaled_positions: ComponentGroupDeserializableData<ScaledPositionData>,
+    colors: ComponentGroupDeserializableData<ColorData>,
+    paths: ComponentGroupDeserializableData<Vec<PathData>>,
+    entity_types: ComponentGroupDeserializableData<EntityType>,
+    directions: ComponentGroupDeserializableData<DirectionData>,
 }

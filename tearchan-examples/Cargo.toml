@@ -48,6 +48,7 @@ tearchan = { path = ".." }
 tearchan-ecs = { path = "../tearchan-ecs" }
 tearchan-horde = { path = "../tearchan-horde" }
 serde = { version = "1.0.125", features = ["rc"] }
+serde_json = { version = "1.0.79", features = ["raw_value"] }
 wavefront_obj = "9.0.0"
 maze_generator = "2.0.0"
 

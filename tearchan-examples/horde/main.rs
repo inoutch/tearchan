@@ -1,4 +1,4 @@
-use crate::game::{CellType, CreatePassageParams, CreatePlayerParams, DirectionState, Game};
+use crate::game::{CreatePassageParams, CreatePlayerParams, DirectionState, EntityType, Game};
 use crate::renderer::Renderer;
 use crate::utils::create_texture_view;
 use maze_generator::prelude::{Coordinates, Direction, Generator};
@@ -41,7 +41,7 @@ impl HordeScene {
             game.player_id = game.create_cell(CreatePlayerParams {
                 job_manager: &mut job_manager,
                 initial_position: vec2(rng.gen_range(0..maze_width), rng.gen_range(0..maze_height)),
-                cell_type: CellType::Player,
+                entity_type: EntityType::Player,
             });
 
             for _ in 0..500 {
@@ -51,7 +51,7 @@ impl HordeScene {
                         rng.gen_range(0..maze_width),
                         rng.gen_range(0..maze_height),
                     ),
-                    cell_type: CellType::Enemy,
+                    entity_type: EntityType::Enemy,
                 });
             }
 
@@ -97,6 +97,12 @@ impl Scene for HordeScene {
                             VirtualKeyCode::D => self
                                 .game
                                 .go_player(&mut self.job_manager, DirectionState::Right),
+                            VirtualKeyCode::Key0 => self.game.speed = 0.0f32,
+                            VirtualKeyCode::Key1 => self.game.speed = 1.0f32,
+                            VirtualKeyCode::Key2 => self.game.speed = 2.0f32,
+                            VirtualKeyCode::Key3 => self.game.speed = 3.0f32,
+                            VirtualKeyCode::Z => self.game.save_world(&self.job_manager),
+                            VirtualKeyCode::X => self.game.load_world(&mut self.job_manager),
                             _ => {}
                         },
                         ElementState::Released => {}
@@ -109,7 +115,9 @@ impl Scene for HordeScene {
     }
 
     fn render(&mut self, context: &mut SceneRenderContext) -> SceneControlFlow {
-        let delta = (context.delta * 1000.0f32) as TimeMilliseconds;
+        self.game.restore(self.job_manager.current_tick());
+
+        let delta = (context.delta * 1000.0f32 * self.game.speed) as TimeMilliseconds;
         self.job_manager.run(&mut self.game, delta);
 
         self.game.renderer.render(context);

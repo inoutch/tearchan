@@ -84,7 +84,7 @@ impl Renderer {
             MaterialLineParams {
                 transform_buffer: transform_buffer.buffer(),
                 color_format: context.gfx().surface_config.format,
-                depth_format: None,
+                depth_format: Some(depth_texture.format()),
                 shader_module: None,
             },
         );
@@ -159,7 +159,14 @@ impl Renderer {
                         store: true,
                     },
                 }],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: self.depth_texture.view(),
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Load,
+                        store: true,
+                    }),
+                    stencil_ops: None,
+                }),
             });
             self.material_line.bind(&mut rpass);
             self.batch_line.bind(&mut rpass);
@@ -230,6 +237,20 @@ impl Renderer {
             ids.push(id);
         }
         self.lines.insert(entity_id, ids);
+    }
+
+    pub fn remove_sprite(&mut self, entity_id: EntityId) {
+        if let Some(id) = self.sprites.remove(&entity_id) {
+            self.batch_billboard.remove(id);
+        }
+    }
+
+    pub fn remove_lines(&mut self, entity_id: EntityId) {
+        if let Some(ids) = self.lines.remove(&entity_id) {
+            for id in ids {
+                self.batch_line.remove(id);
+            }
+        }
     }
 
     pub fn update_sprite_position(&mut self, entity_id: EntityId, position: &Vec2) {
