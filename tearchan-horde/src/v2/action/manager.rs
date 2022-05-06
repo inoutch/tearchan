@@ -3,10 +3,11 @@ use crate::v2::action::collection::{
     ActionMeta, TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId,
 };
 use crate::v2::action::{Action, ActionSessionId, ActionType, ArcAction, VALID_SESSION_ID};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use tearchan_ecs::component::EntityId;
 use tearchan_ecs::entity::manager::ENTITY_REMAPPER;
 use tearchan_util::id_manager::IdManager;
@@ -298,20 +299,20 @@ impl ActionManager {
         &mut self,
         data: ActionManagerData<T>,
         converter: fn(action: Action<T>, manager: &mut ActionManagerConverter),
-    ) {
+    ) -> Result<ActionRemapperToken, ActionManagerError> {
         let mut tick_validation: Tick = data.current_tick;
         for action in data.actions.iter() {
             match action.ty {
                 ActionType::Start { .. } | ActionType::End { .. } => {
                     let tick = action.tick().unwrap();
                     if tick < tick_validation {
-                        return;
+                        return Err(ActionManagerError::InvalidDataCauseBySortedActions);
                     }
                     tick_validation = tick;
                 }
                 ActionType::Update { .. } => {
                     if tick_validation != data.current_tick {
-                        return;
+                        return Err(ActionManagerError::InvalidDataCauseBySortedActions);
                     }
                 }
             }
@@ -329,9 +330,11 @@ impl ActionManager {
             }
         }
 
+        let remapping_tick = (self.current_tick as i128 - data.current_tick as i128).abs() as Tick;
+        let remapping_tick_positive = self.current_tick > data.current_tick;
         let mut c = ActionManagerConverter {
-            remapping_tick: (self.current_tick as i128 - data.current_tick as i128).abs() as Tick,
-            remapping_tick_positive: self.current_tick > data.current_tick,
+            remapping_tick,
+            remapping_tick_positive,
             tick_duration: data.tick_duration,
             actions: &mut self.actions,
             contexts: &mut self.contexts,
@@ -343,9 +346,14 @@ impl ActionManager {
 
         for (_entity, context) in self.contexts.iter() {
             if context.running_end_tick == Tick::MAX {
-                panic!();
+                return Err(ActionManagerError::InvalidDataNoEndAction);
             }
         }
+
+        Ok(ActionRemapperToken::new(
+            remapping_tick,
+            remapping_tick_positive,
+        ))
     }
 
     pub fn controller(&mut self) -> ActionController {
@@ -615,6 +623,48 @@ pub struct ActionManagerData<T> {
     tick_duration: TimeMilliseconds,
     current_tick: Tick,
     next_time: TimeMilliseconds,
+}
+
+#[derive(Default)]
+pub struct ActionRemapper {
+    mapping: Mutex<Option<(Tick, bool)>>,
+}
+
+impl ActionRemapper {
+    pub fn remap(&self, tick: Tick) -> Tick {
+        self.mapping
+            .lock()
+            .unwrap()
+            .map(|(value, positive)| {
+                if positive {
+                    tick.wrapping_add(value)
+                } else {
+                    tick.wrapping_sub(value)
+                }
+            })
+            .unwrap_or(tick)
+    }
+}
+
+pub static ACTION_REMAPPER: Lazy<ActionRemapper> = Lazy::new(ActionRemapper::default);
+static ACTION_REMAPPER_WRITE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+pub struct ActionRemapperToken<'a> {
+    _guard: MutexGuard<'a, ()>,
+}
+
+impl<'a> ActionRemapperToken<'a> {
+    fn new(tick: Tick, positive: bool) -> Self {
+        let guard = ACTION_REMAPPER_WRITE_LOCK.lock().unwrap();
+        *ACTION_REMAPPER.mapping.lock().unwrap() = Some((tick, positive));
+        ActionRemapperToken { _guard: guard }
+    }
+}
+
+impl<'a> Drop for ActionRemapperToken<'a> {
+    fn drop(&mut self) {
+        *ACTION_REMAPPER.mapping.lock().unwrap() = None;
+    }
 }
 
 #[cfg(test)]

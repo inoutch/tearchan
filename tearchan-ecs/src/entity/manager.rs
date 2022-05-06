@@ -82,7 +82,7 @@ impl EntityManager {
         for entity_id in data.entity_ids {
             mapping.insert(entity_id, self.gen());
         }
-        EntityRemapperToken::new(mapping)
+        EntityRemapperToken::new(Some(mapping))
     }
 
     pub fn to_data(&self) -> EntityManagerData {
@@ -96,7 +96,6 @@ impl EntityManager {
         EntityToken {
             entity_id: guard.next(),
             guard_id_manager: guard,
-            _guard_remapper: ENTITY_REMAPPER.mapping.lock().unwrap(),
         }
     }
 
@@ -108,7 +107,6 @@ impl EntityManager {
 pub struct EntityToken<'a> {
     entity_id: EntityId,
     guard_id_manager: RwLockWriteGuard<'a, IdManager>,
-    _guard_remapper: MutexGuard<'a, Option<HashMap<EntityId, EntityId>>>,
 }
 
 impl<'a> EntityToken<'a> {
@@ -147,20 +145,30 @@ impl EntityRemapper {
         }
         entity_id
     }
-}
 
-pub static ENTITY_REMAPPER: Lazy<EntityRemapper> = Lazy::new(EntityRemapper::default);
-
-pub struct EntityRemapperToken;
-
-impl EntityRemapperToken {
-    fn new(mapping: HashMap<EntityId, EntityId>) -> Self {
-        *ENTITY_REMAPPER.mapping.lock().unwrap() = Some(mapping);
-        Self
+    pub fn lock(&self) -> EntityRemapperToken {
+        EntityRemapperToken {
+            _guard: ENTITY_REMAPPER_WRITE_LOCK.lock().unwrap(),
+        }
     }
 }
 
-impl Drop for EntityRemapperToken {
+pub static ENTITY_REMAPPER: Lazy<EntityRemapper> = Lazy::new(EntityRemapper::default);
+static ENTITY_REMAPPER_WRITE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
+pub struct EntityRemapperToken<'a> {
+    _guard: MutexGuard<'a, ()>,
+}
+
+impl<'a> EntityRemapperToken<'a> {
+    fn new(mapping: Option<HashMap<EntityId, EntityId>>) -> Self {
+        let guard = ENTITY_REMAPPER_WRITE_LOCK.lock().unwrap();
+        *ENTITY_REMAPPER.mapping.lock().unwrap() = mapping;
+        Self { _guard: guard }
+    }
+}
+
+impl<'a> Drop for EntityRemapperToken<'a> {
     fn drop(&mut self) {
         *ENTITY_REMAPPER.mapping.lock().unwrap() = None;
     }
@@ -169,6 +177,8 @@ impl Drop for EntityRemapperToken {
 #[cfg(test)]
 mod test {
     use crate::entity::manager::{EntityManager, EntityManagerData, IdManager, ENTITY_REMAPPER};
+    use std::collections::BTreeSet;
+    use std::time::Duration;
 
     #[test]
     fn test_iter() {
@@ -251,5 +261,51 @@ mod test {
             entity_manager.read().iter().collect::<Vec<_>>(),
             vec![&entity_id0, &entity_id1]
         );
+    }
+
+    #[test]
+    fn test_sync() {
+        let h0 = std::thread::spawn(|| {
+            let entity_manager = EntityManager::default();
+            entity_manager.gen(); // 1
+            entity_manager.gen(); // 2
+
+            let mut entity_ids = BTreeSet::default();
+            entity_ids.insert(1);
+            entity_ids.insert(2);
+
+            let _token = entity_manager.load_data(EntityManagerData { entity_ids });
+            std::thread::sleep(Duration::from_millis(500));
+
+            assert_eq!(
+                ENTITY_REMAPPER
+                    .mapping
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .get(&1),
+                Some(&3)
+            );
+            assert_eq!(
+                ENTITY_REMAPPER
+                    .mapping
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .get(&2),
+                Some(&4)
+            );
+        });
+        let h1 = std::thread::spawn(|| {
+            let _lock = ENTITY_REMAPPER.lock();
+            std::thread::sleep(Duration::from_millis(200));
+
+            assert_eq!(ENTITY_REMAPPER.remap(1), 1);
+            assert_eq!(ENTITY_REMAPPER.remap(2), 2);
+        });
+        h0.join().unwrap();
+        h1.join().unwrap();
     }
 }

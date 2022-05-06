@@ -2,7 +2,7 @@ use crate::action::manager::TimeMilliseconds;
 use crate::v2::action::collection::{TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId};
 use crate::v2::action::manager::{
     ActionManager, ActionManagerConverter, ActionManagerData, ActionManagerError,
-    ActionSessionValidator,
+    ActionRemapperToken, ActionSessionValidator,
 };
 use crate::v2::action::Action;
 use crate::v2::job::HordeInterface;
@@ -77,12 +77,15 @@ where
         &mut self,
         mut data: JobManagerData<U, T::Job>,
         converter: fn(action: Action<U>, manager: &mut ActionManagerConverter),
-    ) {
-        self.action_manager
-            .load_data(data.action_manager_data, converter);
+    ) -> Result<ActionRemapperToken, JobManagerError> {
+        let token = self
+            .action_manager
+            .load_data(data.action_manager_data, converter)
+            .map_err(JobManagerError::ActionManagerError)?;
         for (entity_id, job) in data.jobs.drain() {
             self.jobs.insert(ENTITY_REMAPPER.remap(entity_id), job);
         }
+        Ok(token)
     }
 
     pub fn from_data<U>(

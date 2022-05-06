@@ -28,7 +28,11 @@ impl<T> Default for ComponentGroup<T> {
 
 impl<T> ComponentGroup<T> {
     pub fn push(&mut self, entity_id: EntityId, inner: T) {
-        debug_assert!(!self.indices.contains_key(&entity_id));
+        debug_assert!(
+            !self.indices.contains_key(&entity_id),
+            "{} is already pushed",
+            entity_id
+        );
 
         let component = Component::new(entity_id, inner);
         let index = self.components.len();
@@ -271,7 +275,7 @@ pub struct ComponentGroupDebug<'a, T: Debug>(&'a Vec<Component<T>>);
 mod test {
     use crate::component::group::{ComponentGroup, ComponentGroupDeserializableData};
     use crate::component::zip::ZipEntity2;
-    use crate::entity::manager::EntityManager;
+    use crate::entity::manager::{EntityManager, ENTITY_REMAPPER};
     use serde::{Deserialize, Serialize};
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -372,6 +376,7 @@ mod test {
 
     #[test]
     fn test_serialization() {
+        let _lock = ENTITY_REMAPPER.lock();
         let mut group = ComponentGroup::default();
         group.push(0, SerializationInner("entity 0".to_string()));
         group.push(1, SerializationInner("entity 1".to_string()));

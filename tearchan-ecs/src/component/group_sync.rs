@@ -93,6 +93,7 @@ mod test {
     use crate::component::group::{ComponentGroup, ComponentGroupDeserializableData};
     use crate::component::group_sync::ComponentGroupSync;
     use crate::component::zip::ZipEntity1;
+    use crate::entity::manager::ENTITY_REMAPPER;
     use tearchan_util::thread::ThreadPool;
 
     #[test]
@@ -168,6 +169,7 @@ mod test {
 
     #[test]
     fn test_serialization() {
+        let _lock = ENTITY_REMAPPER.lock();
         let mut group: ComponentGroupSync<i32> = ComponentGroupSync::default();
         group.write().get_mut().push(0, 0);
         group.write().get_mut().push(1, 11);
