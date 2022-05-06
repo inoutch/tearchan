@@ -3,15 +3,17 @@ use crate::utils::{calc_center_from_scaled_position, calc_position_from_ratio, C
 use maze_generator::prelude::Direction;
 use nalgebra_glm::{distance, vec2, vec3, TVec2, Vec2, Vec3};
 use rand::Rng;
+use serde::de::{Error, MapAccess, Visitor};
+use serde::Deserializer;
+use serde_json::value::RawValue;
+use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 use tearchan::fs::{file_util, write_bytes_to_file};
 use tearchan::util::array_2d::Array2D;
 use tearchan::util::thread::ThreadPool;
-use tearchan_ecs::component::group::{
-    ComponentGroupDeserializableData, ComponentGroupSerializableData,
-};
+use tearchan_ecs::component::group::ComponentGroupSerializableData;
 use tearchan_ecs::component::group_sync::ComponentGroupSync;
 use tearchan_ecs::component::resource_sync::ResourceSync;
 use tearchan_ecs::component::EntityId;
@@ -20,7 +22,9 @@ use tearchan_horde::action::manager::TimeMilliseconds;
 use tearchan_horde::v2::action::collection::{
     TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId,
 };
-use tearchan_horde::v2::action::manager::{ActionController, ActionSessionValidator};
+use tearchan_horde::v2::action::manager::{
+    ActionController, ActionSessionValidator, ACTION_REMAPPER,
+};
 use tearchan_horde::v2::action::{ActionType, ArcAction};
 use tearchan_horde::v2::job::manager::{JobManager, JobManagerData};
 use tearchan_horde::v2::job::HordeInterface;
@@ -30,9 +34,11 @@ use tearchan_horde::v2::{calc_ratio_f32_from_ms, calc_ratio_f32_from_tick, defin
 const PLAYER_SPEED: f32 = 500.0f32; // ms/cell
 const SAVE_FILE_NAME: &str = "world.json";
 
+#[allow(clippy::enum_variant_names)]
 enum Command {
     UpdateRenderSpritePosition(EntityId, Vec2),
     UpdateRenderSpriteColor(EntityId, Vec3),
+    UpdateCameraPosition(Vec3),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -111,8 +117,46 @@ pub enum HordeJob {
 
 #[derive(Serialize, Deserialize)]
 struct PositionData {
-    from: (Vec2, Tick),
-    to: (Vec2, Tick),
+    from: (Vec2, TickData),
+    to: (Vec2, TickData),
+}
+
+#[derive(Serialize)]
+struct TickData {
+    value: Tick,
+}
+
+impl<'de> Deserialize<'de> for TickData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct TickDataVisitor;
+
+        impl<'de> Visitor<'de> for TickDataVisitor {
+            type Value = TickData;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                write!(formatter, "TickData")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, <A as MapAccess<'de>>::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                if let Some((key, value)) = map.next_entry::<String, Tick>()? {
+                    if key == "value" {
+                        return Ok(TickData {
+                            value: ACTION_REMAPPER.remap(value),
+                        });
+                    }
+                }
+                Err(<A as MapAccess<'de>>::Error::custom("not value property"))
+            }
+        }
+
+        deserializer.deserialize_map(TickDataVisitor)
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -194,6 +238,7 @@ impl Game {
                 let walk_actions = Arc::clone(&walk_actions);
                 let sender = Sender::clone(&sender);
                 let time = map.time();
+                let player_id = self.player_id;
 
                 self.pool.execute(move || {
                     rsync_child.begin();
@@ -206,14 +251,25 @@ impl Game {
                         if let Some(position) = position {
                             match walk_action.ty() {
                                 ActionType::Start { start, end } => {
-                                    position.from = (state.from.clone_owned(), *start);
-                                    position.to = (state.to.clone_owned(), *end);
+                                    position.from =
+                                        (state.from.clone_owned(), TickData { value: *start });
+                                    position.to =
+                                        (state.to.clone_owned(), TickData { value: *end });
                                     sender
                                         .send(Command::UpdateRenderSpritePosition(
                                             walk_action.entity_id(),
                                             state.from.clone_owned(),
                                         ))
                                         .unwrap();
+                                    if player_id == walk_action.entity_id() {
+                                        sender
+                                            .send(Command::UpdateCameraPosition(vec3(
+                                                state.from.x,
+                                                0.0f32,
+                                                state.from.y,
+                                            )))
+                                            .unwrap();
+                                    }
                                 }
                                 ActionType::Update { start, end } => {
                                     let ratio = calc_ratio_f32_from_ms(*start, *end, time);
@@ -225,6 +281,13 @@ impl Game {
                                             position,
                                         ))
                                         .unwrap();
+                                    if player_id == walk_action.entity_id() {
+                                        sender
+                                            .send(Command::UpdateCameraPosition(vec3(
+                                                position.x, 0.0f32, position.y,
+                                            )))
+                                            .unwrap();
+                                    }
                                 }
                                 ActionType::End { .. } => {
                                     sender
@@ -233,6 +296,13 @@ impl Game {
                                             state.to.clone_owned(),
                                         ))
                                         .unwrap();
+                                    if player_id == walk_action.entity_id() {
+                                        sender
+                                            .send(Command::UpdateCameraPosition(vec3(
+                                                state.to.x, 0.0f32, state.to.y,
+                                            )))
+                                            .unwrap();
+                                    }
                                 }
                             }
                         }
@@ -440,6 +510,9 @@ impl Game {
                 Command::UpdateRenderSpriteColor(entity_id, color) => {
                     self.renderer.update_sprite_color(entity_id, &color);
                 }
+                Command::UpdateCameraPosition(position) => {
+                    self.renderer.update_camera_target_position(&position);
+                }
             }
         }
     }
@@ -591,7 +664,11 @@ fn run_go_destination_job(
     let position = calc_position_from_ratio(
         &position.from.0,
         &position.to.0,
-        calc_ratio_f32_from_tick(position.from.1, position.to.1, controller.current_tick()),
+        calc_ratio_f32_from_tick(
+            position.from.1.value,
+            position.to.1.value,
+            controller.current_tick(),
+        ),
     );
 
     let center_of_scaled_position = calc_center_from_scaled_position(&scaled_position.0);
@@ -666,8 +743,18 @@ fn create_cell(game: &mut Game, params: CreatePlayerParams) -> EntityId {
     game.positions.write().get_mut().push(
         entity_id,
         PositionData {
-            from: (position.clone_owned(), 0),
-            to: (position.clone_owned(), 0),
+            from: (
+                position.clone_owned(),
+                TickData {
+                    value: params.job_manager.current_tick(),
+                },
+            ),
+            to: (
+                position.clone_owned(),
+                TickData {
+                    value: params.job_manager.current_tick(),
+                },
+            ),
         },
     );
     game.scaled_positions.write().get_mut().push(
@@ -742,16 +829,23 @@ fn restore_cell(game: &mut Game, params: RestoreCellParams) -> Option<()> {
     let colors = colors.get();
     let color = colors.get(params.entity_id)?;
 
-    game.renderer.add_sprite(
-        params.entity_id,
-        &calc_position_from_ratio(
-            &position.from.0,
-            &position.to.0,
-            calc_ratio_f32_from_tick(position.from.1, position.to.1, params.current_tick),
+    let position = calc_position_from_ratio(
+        &position.from.0,
+        &position.to.0,
+        calc_ratio_f32_from_tick(
+            position.from.1.value,
+            position.to.1.value,
+            params.current_tick,
         ),
     );
+    game.renderer.add_sprite(params.entity_id, &position);
     game.renderer
         .update_sprite_color(params.entity_id, &color.0);
+
+    if game.player_id == params.entity_id {
+        game.renderer
+            .update_camera_target_position(&vec3(position.x, 0.0f32, position.y))
+    }
 
     Some(())
 }
@@ -929,32 +1023,40 @@ impl Game {
         match result {
             Ok(result) => {
                 let data: GameDeserializableData = serde_json::from_str(&result).unwrap();
-                let _token = self.entity_manager.load_data(data.entity_manager_data);
+                let _entity_token = self.entity_manager.load_data(data.entity_manager_data);
 
                 let payload: GameDeserializablePayload =
                     serde_json::from_str(data.payload.get()).unwrap();
                 self.player_id = ENTITY_REMAPPER.remap(payload.player_id);
                 self.speed = payload.speed;
+
+                let _tick_token =
+                    job_manager.load_data(payload.job_manager_data, convert_from_actions);
+
                 self.positions
                     .write()
                     .get_mut()
-                    .load_data(payload.positions);
+                    .load_data(serde_json::from_str(payload.positions.get()).unwrap());
                 self.scaled_positions
                     .write()
                     .get_mut()
-                    .load_data(payload.scaled_positions);
-                self.colors.write().get_mut().load_data(payload.colors);
-                self.paths.write().get_mut().load_data(payload.paths);
+                    .load_data(serde_json::from_str(payload.scaled_positions.get()).unwrap());
+                self.colors
+                    .write()
+                    .get_mut()
+                    .load_data(serde_json::from_str(payload.colors.get()).unwrap());
+                self.paths
+                    .write()
+                    .get_mut()
+                    .load_data(serde_json::from_str(payload.paths.get()).unwrap());
                 self.entity_types
                     .write()
                     .get_mut()
-                    .load_data(payload.entity_types);
+                    .load_data(serde_json::from_str(payload.entity_types.get()).unwrap());
                 self.directions
                     .write()
                     .get_mut()
-                    .load_data(payload.directions);
-
-                job_manager.load_data(payload.job_manager_data, convert_from_actions);
+                    .load_data(serde_json::from_str(payload.directions.get()).unwrap());
             }
             Err(err) => println!("{:?}", err),
         }
@@ -983,7 +1085,7 @@ pub struct GameSerializablePayload<'a> {
 #[derive(Deserialize)]
 pub struct GameDeserializableData {
     entity_manager_data: EntityManagerData,
-    payload: Box<serde_json::value::RawValue>,
+    payload: Box<RawValue>,
 }
 
 #[derive(Deserialize)]
@@ -991,10 +1093,10 @@ pub struct GameDeserializablePayload {
     player_id: EntityId,
     speed: f32,
     job_manager_data: JobManagerData<HordeAction, Arc<HordeJob>>,
-    positions: ComponentGroupDeserializableData<PositionData>,
-    scaled_positions: ComponentGroupDeserializableData<ScaledPositionData>,
-    colors: ComponentGroupDeserializableData<ColorData>,
-    paths: ComponentGroupDeserializableData<Vec<PathData>>,
-    entity_types: ComponentGroupDeserializableData<EntityType>,
-    directions: ComponentGroupDeserializableData<DirectionData>,
+    positions: Box<RawValue>,
+    scaled_positions: Box<RawValue>,
+    colors: Box<RawValue>,
+    paths: Box<RawValue>,
+    entity_types: Box<RawValue>,
+    directions: Box<RawValue>,
 }

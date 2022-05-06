@@ -1,5 +1,4 @@
 use crate::create_texture_view;
-use crate::utils::CELL_SCALE_SIZE;
 use nalgebra_glm::{translate, vec3, vec4, Mat4, Vec2, Vec3};
 use std::collections::HashMap;
 use tearchan::gfx::batch::batch_billboard::{
@@ -23,6 +22,9 @@ use tearchan::util::math::rect::rect2;
 use tearchan::util::math::vec::vec4_white;
 use tearchan::util::mesh::MeshBuilder;
 use tearchan_ecs::component::EntityId;
+use tearchan_horde::v2::Lazy;
+
+static CAMERA_OFFSET: Lazy<Vec3> = Lazy::new(|| vec3(0.0f32, 1.0f32, 1.0f32));
 
 pub struct Renderer {
     #[allow(dead_code)]
@@ -50,8 +52,7 @@ impl Renderer {
         let batch_line = BatchLine::new(device);
 
         let mut camera = Camera3D::new(aspect, 0.1f32, 10.0f32);
-        camera.position = vec3(25.0f32 * CELL_SCALE_SIZE, 2.0f32, 50.0f32 * CELL_SCALE_SIZE);
-        camera.target_position = vec3(25.0f32 * CELL_SCALE_SIZE, 0.0f32, 25.0f32 * CELL_SCALE_SIZE);
+        camera.position = CAMERA_OFFSET.clone_owned();
         camera.update();
 
         let depth_texture = Texture::new_depth_texture(
@@ -275,5 +276,10 @@ impl Renderer {
                 },
             );
         }
+    }
+
+    pub fn update_camera_target_position(&mut self, position: &Vec3) {
+        self.camera.position = position + CAMERA_OFFSET.clone_owned();
+        self.camera.target_position = position.clone_owned();
     }
 }
