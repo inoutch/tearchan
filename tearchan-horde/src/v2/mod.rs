@@ -17,6 +17,9 @@ pub fn calc_ratio_f32_from_ms(
         return 1.0f32;
     }
     let d = end - start;
+    if d == 0 {
+        return 0.0f32;
+    }
     let v = value - start;
     v as f32 / d as f32
 }
@@ -30,6 +33,9 @@ pub fn calc_ratio_f32_from_tick(start: Tick, end: Tick, value: Tick) -> f32 {
     }
     let d = end - start;
     let v = value - start;
+    if d == 0 {
+        return 0.0f32;
+    }
     v as f32 / d as f32
 }
 
