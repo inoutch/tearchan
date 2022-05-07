@@ -1,6 +1,6 @@
 use crate::action::manager::TimeMilliseconds;
 use crate::v2::action::collection::{
-    ActionMeta, TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId,
+    ActionMeta, TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId,
 };
 use crate::v2::action::{Action, ActionSessionId, ActionType, ArcAction, VALID_SESSION_ID};
 use once_cell::sync::Lazy;
@@ -56,14 +56,14 @@ struct ActionContext {
 }
 
 #[derive(Default)]
-struct TickBundle {
-    map: TypedActionAnyMap,
+struct BundleForeachTick {
+    map: TypedAnyActionMap,
     events: VecDeque<(EntityId, (ActionSessionId, Event))>,
     cancels: BTreeSet<EntityId>,
 }
 
 pub struct PullActionResult {
-    pub map: TypedActionAnyMap,
+    pub map: TypedAnyActionMap,
     pub cancels: BTreeSet<EntityId>,
 }
 
@@ -72,7 +72,7 @@ pub struct ActionManager {
     next_time: TimeMilliseconds,
     next_tick: Tick,
     current_tick: Tick,
-    actions: BTreeMap<Tick, TickBundle>,
+    actions: BTreeMap<Tick, BundleForeachTick>,
     update_actions: TypedAnyActionMapGroupedByEntityId,
     contexts: HashMap<EntityId, ActionContext>,
     vacated_entities: BTreeSet<EntityId>,
@@ -206,7 +206,7 @@ impl ActionManager {
 
     pub fn to_data<T>(
         &self,
-        converter0: fn(&TypedActionAnyMap, &ActionSessionValidator) -> Vec<Action<T>>,
+        converter0: fn(&TypedAnyActionMap, &ActionSessionValidator) -> Vec<Action<T>>,
         converter1: fn(&TypedAnyActionMapGroupedByEntityId) -> Vec<Action<T>>,
     ) -> ActionManagerData<T> {
         debug_assert!(
@@ -381,7 +381,7 @@ pub struct ActionManagerConverter<'a> {
     remapping_tick: Tick,
     remapping_tick_positive: bool,
     tick_duration: TimeMilliseconds,
-    actions: &'a mut BTreeMap<Tick, TickBundle>,
+    actions: &'a mut BTreeMap<Tick, BundleForeachTick>,
     contexts: &'a mut HashMap<EntityId, ActionContext>,
     update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
 }
@@ -469,7 +469,7 @@ impl<'a> ActionManagerConverter<'a> {
 pub struct ActionController<'a> {
     tick_duration: TimeMilliseconds,
     current_tick: Tick,
-    actions: &'a mut BTreeMap<Tick, TickBundle>,
+    actions: &'a mut BTreeMap<Tick, BundleForeachTick>,
     update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
     contexts: &'a mut HashMap<EntityId, ActionContext>,
     vacated_entities: &'a mut BTreeSet<EntityId>,
@@ -671,7 +671,7 @@ impl<'a> Drop for ActionRemapperToken<'a> {
 #[macro_use]
 mod test {
     use crate::define_actions;
-    use crate::v2::action::collection::TypedActionAnyMap;
+    use crate::v2::action::collection::TypedAnyActionMap;
     use crate::v2::action::manager::{
         ActionManager, ActionManagerData, ActionSessionValidator, PullActionResult, Tick,
     };
@@ -792,8 +792,8 @@ mod test {
     }
 
     fn assert_action_map<T>(
-        map0: &TypedActionAnyMap,
-        map1: &TypedActionAnyMap,
+        map0: &TypedAnyActionMap,
+        map1: &TypedAnyActionMap,
         manager0: &ActionManager,
         manager1: &ActionManager,
     ) where

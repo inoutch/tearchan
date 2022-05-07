@@ -1,5 +1,5 @@
 use crate::action::manager::TimeMilliseconds;
-use crate::v2::action::collection::{TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId};
+use crate::v2::action::collection::{TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId};
 use crate::v2::action::manager::{
     ActionManager, ActionManagerConverter, ActionManagerData, ActionManagerError,
     ActionRemapperToken, ActionSessionValidator,
@@ -64,7 +64,7 @@ where
 
     pub fn to_data<U>(
         &self,
-        converter0: fn(&TypedActionAnyMap, &ActionSessionValidator) -> Vec<Action<U>>,
+        converter0: fn(&TypedAnyActionMap, &ActionSessionValidator) -> Vec<Action<U>>,
         converter1: fn(&TypedAnyActionMapGroupedByEntityId) -> Vec<Action<U>>,
     ) -> JobManagerData<U, T::Job> {
         JobManagerData {

@@ -4,139 +4,35 @@ use crate::v2::Tick;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
 pub struct ActionMeta {
-    pub type_id: TypeId,
     pub entity_id: EntityId,
     pub session_id: ActionSessionId,
     pub tick: Tick,
 }
 
-pub struct ActionAnyVec {
-    metas: Vec<ActionMeta>,
-    actions: Box<dyn Any>,
-}
-
-impl ActionAnyVec {
-    pub fn new<T: 'static>() -> Self {
-        ActionAnyVec {
-            metas: vec![],
-            actions: Box::new(Vec::<ArcAction<T>>::new()),
-        }
-    }
-}
-
-impl ActionAnyVec {
-    pub fn cast<T: 'static>(&self, validator: &ActionSessionValidator) -> Vec<&ArcAction<T>> {
-        self.actions
-            .downcast_ref::<Vec<ArcAction<T>>>()
-            .expect("Invalid type")
-            .iter()
-            .zip(self.metas.iter())
-            .filter_map(|(action, meta)| {
-                if validator.validate(meta) {
-                    Some(action)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    pub fn cast_cloned<T: 'static>(&self, validator: &ActionSessionValidator) -> Vec<ArcAction<T>> {
-        self.actions
-            .downcast_ref::<Vec<ArcAction<T>>>()
-            .expect("Invalid type")
-            .iter()
-            .zip(self.metas.iter())
-            .filter_map(|(action, meta)| {
-                if validator.validate(meta) {
-                    Some(action.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    fn push<T: 'static>(&mut self, action: ArcAction<T>, session_id: ActionSessionId, tick: Tick) {
-        let type_id = TypeId::of::<T>();
-        self.metas.push(ActionMeta {
-            type_id,
-            entity_id: action.entity_id,
-            session_id,
-            tick,
-        });
-        self.actions
-            .downcast_mut::<Vec<ArcAction<T>>>()
-            .expect("Invalid type")
-            .push(action);
-    }
-}
-
 #[derive(Default)]
-pub struct TypedActionAnyMap {
-    map: HashMap<TypeId, ActionAnyVec>,
-}
-
-impl TypedActionAnyMap {
-    pub fn push<T>(&mut self, action: ArcAction<T>, session_id: ActionSessionId)
-    where
-        T: 'static,
-    {
-        let type_id = TypeId::of::<T>();
-        let tick = action.tick().expect("Must have tick");
-        self.map
-            .entry(type_id)
-            .or_insert_with(ActionAnyVec::new::<T>)
-            .push(action, session_id, tick);
-    }
-
-    pub fn get<T>(&self, validator: &ActionSessionValidator) -> Option<Vec<&ArcAction<T>>>
-    where
-        T: 'static,
-    {
-        let vec = self.map.get(&TypeId::of::<T>())?.cast(validator);
-        if vec.is_empty() {
-            return None;
-        }
-        Some(vec)
-    }
-
-    pub fn get_cloned<T>(&self, validator: &ActionSessionValidator) -> Option<Vec<ArcAction<T>>>
-    where
-        T: 'static,
-    {
-        let vec = self.map.get(&TypeId::of::<T>())?.cast_cloned(validator);
-        if vec.is_empty() {
-            return None;
-        }
-        Some(vec)
-    }
-
-    pub fn iter(&self) -> Iter<'_, TypeId, ActionAnyVec> {
-        self.map.iter()
-    }
-}
-
-#[derive(Default)]
-pub struct AnyActionVec {
+pub struct AnyVec {
     vec: Vec<Box<dyn Any>>,
 }
 
-impl AnyActionVec {
-    pub fn cast<T: 'static>(&self) -> Vec<&ArcAction<T>> {
+impl AnyVec {
+    pub fn cast<T: 'static>(&self) -> Vec<&T> {
         self.vec
             .iter()
             .filter_map(|item| item.downcast_ref())
             .collect()
     }
 
-    pub fn cast_cloned<T: 'static>(&self) -> Vec<ArcAction<T>> {
+    pub fn cast_cloned<T: 'static>(&self) -> Vec<T>
+    where
+        T: Clone,
+    {
         self.vec
             .iter()
-            .filter_map(|item| item.downcast_ref::<ArcAction<T>>())
+            .filter_map(|item| item.downcast_ref::<T>())
             .cloned()
             .collect::<Vec<_>>()
     }
@@ -175,7 +71,7 @@ impl AnyActionVec {
 
 #[derive(Default)]
 pub struct TypedAnyActionMapGroupedByEntityId {
-    map: HashMap<TypeId, AnyActionVec>,
+    map: HashMap<TypeId, AnyVec>,
     indices: HashMap<EntityId, (TypeId, usize)>,
     entities: HashMap<(TypeId, usize), EntityId>,
 }
@@ -202,10 +98,7 @@ impl TypedAnyActionMapGroupedByEntityId {
         let type_id = TypeId::of::<T>();
 
         self.remove(entity_id);
-        let vec = self
-            .map
-            .entry(type_id)
-            .or_insert_with(AnyActionVec::default);
+        let vec = self.map.entry(type_id).or_insert_with(AnyVec::default);
         let index = vec.len();
         vec.push(action);
         self.entities.insert((type_id, index), entity_id);
@@ -220,10 +113,7 @@ impl TypedAnyActionMapGroupedByEntityId {
     ) {
         self.remove(entity_id);
 
-        let collection = self
-            .map
-            .entry(type_id)
-            .or_insert_with(AnyActionVec::default);
+        let collection = self.map.entry(type_id).or_insert_with(AnyVec::default);
         let index = collection.len();
         collection.push_as_raw(action);
         self.entities.insert((type_id, index), entity_id);
@@ -248,6 +138,111 @@ impl TypedAnyActionMapGroupedByEntityId {
                 self.map.remove(&type_id);
             }
         }
+    }
+
+    pub fn iter(&self) -> Iter<'_, TypeId, AnyVec> {
+        self.map.iter()
+    }
+}
+
+#[derive(Default)]
+pub struct AnyActionVec {
+    vec: Vec<(ActionMeta, Arc<Box<dyn Any>>)>,
+}
+
+impl AnyActionVec {
+    pub fn cast<T: 'static>(&self, validator: &ActionSessionValidator) -> Vec<&ArcAction<T>> {
+        self.vec
+            .iter()
+            .filter_map(|(meta, action)| {
+                if validator.validate(meta) {
+                    action.downcast_ref()
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn cast_cloned<T: 'static>(&self, validator: &ActionSessionValidator) -> Vec<ArcAction<T>> {
+        self.vec
+            .iter()
+            .filter_map(|(meta, item)| {
+                if validator.validate(meta) {
+                    item.downcast_ref()
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+    }
+
+    pub fn push<T: 'static>(
+        &mut self,
+        action: ArcAction<T>,
+        session_id: ActionSessionId,
+        tick: Tick,
+    ) {
+        self.vec.push((
+            ActionMeta {
+                entity_id: action.entity_id,
+                session_id,
+                tick,
+            },
+            Arc::new(Box::new(action)),
+        ));
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.vec.is_empty()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.vec.len()
+    }
+}
+
+#[derive(Default)]
+pub struct TypedAnyActionMap {
+    map: HashMap<TypeId, AnyActionVec>,
+}
+
+impl TypedAnyActionMap {
+    pub fn push<T>(&mut self, action: ArcAction<T>, session_id: ActionSessionId)
+    where
+        T: 'static,
+    {
+        let type_id = TypeId::of::<T>();
+        let tick = action.tick().expect("Must have tick");
+        self.map
+            .entry(type_id)
+            .or_insert_with(AnyActionVec::default)
+            .push(action, session_id, tick);
+    }
+
+    pub fn get<T>(&self, validator: &ActionSessionValidator) -> Option<Vec<&ArcAction<T>>>
+    where
+        T: 'static,
+    {
+        let vec = self.map.get(&TypeId::of::<T>())?.cast(validator);
+        if vec.is_empty() {
+            return None;
+        }
+        Some(vec)
+    }
+
+    pub fn get_cloned<T>(&self, validator: &ActionSessionValidator) -> Option<Vec<ArcAction<T>>>
+    where
+        T: 'static,
+    {
+        let vec = self.map.get(&TypeId::of::<T>())?.cast_cloned(validator);
+        if vec.is_empty() {
+            return None;
+        }
+        Some(vec)
     }
 
     pub fn iter(&self) -> Iter<'_, TypeId, AnyActionVec> {

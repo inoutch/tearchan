@@ -20,7 +20,7 @@ use tearchan_ecs::component::EntityId;
 use tearchan_ecs::entity::manager::{EntityManager, EntityManagerData, ENTITY_REMAPPER};
 use tearchan_horde::action::manager::TimeMilliseconds;
 use tearchan_horde::v2::action::collection::{
-    TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId,
+    TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId,
 };
 use tearchan_horde::v2::action::manager::{
     ActionController, ActionSessionValidator, ACTION_REMAPPER,
@@ -521,9 +521,9 @@ impl Game {
 impl HordeInterface for Game {
     type Job = Arc<HordeJob>;
 
-    fn on_change_tick(&mut self, map: &TypedActionAnyMap, validator: &ActionSessionValidator) {
+    fn on_change_tick(&mut self, map: &TypedAnyActionMap, validator: &ActionSessionValidator) {
         struct Mapper<'a> {
-            map: &'a TypedActionAnyMap,
+            map: &'a TypedAnyActionMap,
             validator: &'a ActionSessionValidator<'a>,
         }
         impl<'a> MapperTrait for Mapper<'a> {

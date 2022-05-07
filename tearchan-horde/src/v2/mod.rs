@@ -42,8 +42,8 @@ pub fn calc_ratio_f32_from_tick(start: Tick, end: Tick, value: Tick) -> f32 {
 #[macro_export]
 macro_rules! define_actions {
     ($name:tt, $(($member:tt, $struct:tt)),*) => {
-        type Mapper0 = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::ActionAnyVec, validator: &$crate::v2::action::manager::ActionSessionValidator) -> Vec<$crate::v2::action::Action<$name>>>;
-        type Mapper1 = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::AnyActionVec) -> Vec<$crate::v2::action::Action<$name>>>;
+        type Mapper0 = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::AnyActionVec, validator: &$crate::v2::action::manager::ActionSessionValidator) -> Vec<$crate::v2::action::Action<$name>>>;
+        type Mapper1 = std::collections::HashMap<std::any::TypeId, fn(any: &$crate::v2::action::collection::AnyVec) -> Vec<$crate::v2::action::Action<$name>>>;
         static MAPPER0: $crate::v2::Lazy<Mapper0> = $crate::v2::Lazy::new(|| {
             let mut map: Mapper0 = std::collections::HashMap::new();
             $(
@@ -60,7 +60,7 @@ macro_rules! define_actions {
             let mut map: Mapper1 = std::collections::HashMap::new();
             $(
             map.insert(std::any::TypeId::of::<$struct>(), |vec| {
-                vec.cast::<$struct>()
+                vec.cast::<$crate::v2::action::ArcAction<$struct>>()
                     .iter()
                     .map(|action| action.replace($name::$member(action.raw().clone())))
                     .collect::<Vec<_>>()
@@ -79,7 +79,7 @@ macro_rules! define_actions {
 
         #[allow(dead_code)]
         fn convert_actions_from_typed_action_any_map(
-            map: &$crate::v2::action::collection::TypedActionAnyMap,
+            map: &$crate::v2::action::collection::TypedAnyActionMap,
             validator: &$crate::v2::action::manager::ActionSessionValidator
         ) -> Vec<$crate::v2::action::Action<$name>> {
             map.iter()
@@ -115,7 +115,7 @@ pub use define_actions;
 
 #[cfg(test)]
 mod test {
-    use crate::v2::action::collection::{TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId};
+    use crate::v2::action::collection::{TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId};
     use crate::v2::action::manager::ActionSessionValidator;
     use crate::v2::action::{Action, ActionSessionId, ActionType};
     use serde::{Deserialize, Serialize};
@@ -132,7 +132,7 @@ mod test {
     #[test]
     fn test_macro_0() {
         let validator = ActionSessionValidator::default();
-        let mut collections = TypedActionAnyMap::default();
+        let mut collections = TypedAnyActionMap::default();
         collections.push(
             Action::new(
                 Arc::new(MoveState),

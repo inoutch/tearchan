@@ -1,5 +1,5 @@
 use crate::action::manager::TimeMilliseconds;
-use crate::v2::action::collection::{TypedActionAnyMap, TypedAnyActionMapGroupedByEntityId};
+use crate::v2::action::collection::{TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId};
 use crate::v2::action::manager::{ActionController, ActionSessionValidator};
 use tearchan_ecs::component::EntityId;
 
@@ -8,7 +8,7 @@ pub mod manager;
 pub trait HordeInterface {
     type Job: Clone;
 
-    fn on_change_tick(&mut self, map: &TypedActionAnyMap, validator: &ActionSessionValidator);
+    fn on_change_tick(&mut self, map: &TypedAnyActionMap, validator: &ActionSessionValidator);
 
     fn on_change_time(&mut self, map: &TypedAnyActionMapGroupedByEntityId, time: TimeMilliseconds);
 
