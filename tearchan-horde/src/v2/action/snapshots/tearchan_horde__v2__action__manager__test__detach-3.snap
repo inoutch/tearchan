@@ -5,7 +5,7 @@ expression: "SnapshotResult::from_result(\"changes\", manager.current_tick(), &r
 ---
 SnapshotResult {
     tag: "changes",
-    current_tick: 14,
+    current_tick: 15,
     move_actions: None,
     jump_actions: None,
     talk_actions: None,

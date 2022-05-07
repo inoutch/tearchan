@@ -5,7 +5,7 @@ expression: "SnapshotResult {\n    current_tick: manager.current_tick(),\n    ta
 ---
 SnapshotResult {
     tag: "changes",
-    current_tick: 15,
+    current_tick: 4,
     move_actions: Some(
         [
             Action {
@@ -13,7 +13,7 @@ SnapshotResult {
                 entity_id: 1,
                 ty: End {
                     start: 0,
-                    end: 15,
+                    end: 4,
                 },
             },
         ],
@@ -24,9 +24,9 @@ SnapshotResult {
                 raw: JumpState,
                 entity_id: 1,
                 ty: Start {
-                    start: 15,
-                    end: 45,
-                    each: false,
+                    start: 4,
+                    end: 7,
+                    each: true,
                 },
             },
         ],

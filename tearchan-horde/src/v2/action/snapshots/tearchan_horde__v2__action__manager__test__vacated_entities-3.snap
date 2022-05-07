@@ -15,6 +15,7 @@ SnapshotResult {
                 ty: Start {
                     start: 7,
                     end: 37,
+                    each: false,
                 },
             },
         ],

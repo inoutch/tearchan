@@ -14,6 +14,7 @@ SnapshotResult {
                 ty: Start {
                     start: 0,
                     end: 15,
+                    each: false,
                 },
             },
             Action {
@@ -22,6 +23,7 @@ SnapshotResult {
                 ty: Start {
                     start: 0,
                     end: 7,
+                    each: false,
                 },
             },
         ],

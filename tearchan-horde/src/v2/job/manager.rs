@@ -1,5 +1,7 @@
 use crate::action::manager::TimeMilliseconds;
-use crate::v2::action::collection::{TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId};
+use crate::v2::action::collection::{
+    AnyActionVec, TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId,
+};
 use crate::v2::action::manager::{
     ActionManager, ActionManagerConverter, ActionManagerData, ActionManagerError,
     ActionRemapperToken, ActionSessionValidator,
@@ -8,6 +10,7 @@ use crate::v2::action::Action;
 use crate::v2::job::HordeInterface;
 use crate::v2::Tick;
 use serde::{Deserialize, Serialize};
+use std::any::TypeId;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
@@ -66,9 +69,12 @@ where
         &self,
         converter0: fn(&TypedAnyActionMap, &ActionSessionValidator) -> Vec<Action<U>>,
         converter1: fn(&TypedAnyActionMapGroupedByEntityId) -> Vec<Action<U>>,
+        converter2: fn(&TypeId, &AnyActionVec, &ActionSessionValidator) -> Vec<Action<U>>,
     ) -> JobManagerData<U, T::Job> {
         JobManagerData {
-            action_manager_data: self.action_manager.to_data(converter0, converter1),
+            action_manager_data: self
+                .action_manager
+                .to_data(converter0, converter1, converter2),
             jobs: self.jobs.clone(),
         }
     }

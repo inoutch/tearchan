@@ -1,6 +1,7 @@
 use crate::action::manager::TimeMilliseconds;
 use crate::v2::action::collection::{
-    ActionMeta, TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId,
+    ActionMeta, AnyActionVec, TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId,
+    TypedCloneableAnyActionMapGroupedByEntityId,
 };
 use crate::v2::action::{Action, ActionSessionId, ActionType, ArcAction, VALID_SESSION_ID};
 use once_cell::sync::Lazy;
@@ -42,6 +43,7 @@ enum Event {
     Started {
         type_id: TypeId,
         update_action: Box<dyn Any>,
+        each_action: Option<Box<dyn Any>>,
         running_end_tick: Tick,
     },
     Ended,
@@ -74,6 +76,7 @@ pub struct ActionManager {
     current_tick: Tick,
     actions: BTreeMap<Tick, BundleForeachTick>,
     update_actions: TypedAnyActionMapGroupedByEntityId,
+    each_tick_actions: TypedCloneableAnyActionMapGroupedByEntityId,
     contexts: HashMap<EntityId, ActionContext>,
     vacated_entities: BTreeSet<EntityId>,
     session_id_manager: IdManager<ActionSessionId>,
@@ -88,6 +91,7 @@ impl Default for ActionManager {
             current_tick: 0,
             actions: Default::default(),
             update_actions: Default::default(),
+            each_tick_actions: Default::default(),
             contexts: Default::default(),
             vacated_entities: Default::default(),
             session_id_manager: IdManager::new(ActionSessionId::default(), |id| id.next()),
@@ -118,6 +122,19 @@ impl ActionManager {
         self.controller().enqueue(entity_id, raw, duration);
     }
 
+    pub fn enqueue_with_options<T>(
+        &mut self,
+        entity_id: EntityId,
+        raw: Arc<T>,
+        duration: TimeMilliseconds,
+        options: EnqueueOptions,
+    ) where
+        T: 'static,
+    {
+        self.controller()
+            .enqueue_with_options(entity_id, raw, duration, options);
+    }
+
     pub fn interrupt<T>(&mut self, entity_id: EntityId, raw: Arc<T>, duration: TimeMilliseconds)
     where
         T: 'static,
@@ -128,13 +145,33 @@ impl ActionManager {
 
     pub fn pull_actions(&mut self) -> Option<PullActionResult> {
         let (tick, mut item) = self.actions.pop_first()?;
-        if tick > self.next_tick {
+
+        let current_tick_plus_1 = self.next_tick.min(self.current_tick + 1);
+        if !self.each_tick_actions.is_empty() && current_tick_plus_1 < tick {
+            self.actions.insert(tick, item);
+            if self.current_tick == current_tick_plus_1 {
+                return None;
+            }
+            self.current_tick = current_tick_plus_1;
+            let mut map = TypedAnyActionMap::default();
+            self.each_tick_actions
+                .push_actions_to(&mut map, self.current_tick);
+            return Some(PullActionResult {
+                map,
+                cancels: BTreeSet::new(),
+            });
+        }
+
+        if self.next_tick < tick {
             self.current_tick = self.next_tick;
             self.actions.insert(tick, item);
             return None;
         }
 
         self.current_tick = tick;
+
+        self.each_tick_actions
+            .push_actions_to(&mut item.map, self.current_tick);
 
         while let Some((entity_id, (session_id, event))) = item.events.pop_front() {
             let context = match self.contexts.get_mut(&entity_id) {
@@ -147,11 +184,21 @@ impl ActionManager {
             match event {
                 Event::Started {
                     type_id,
-                    update_action: action,
+                    update_action,
+                    each_action,
                     running_end_tick,
                 } => {
                     self.update_actions
-                        .insert_with_type_id(entity_id, action, type_id);
+                        .insert_as_raw(Arc::new(update_action), type_id, entity_id);
+                    if let Some(each_action) = each_action {
+                        self.each_tick_actions.insert_as_raw(
+                            Arc::new(each_action),
+                            type_id,
+                            entity_id,
+                            context.session_id,
+                            running_end_tick,
+                        );
+                    }
                     context.running_end_tick = running_end_tick;
                 }
                 Event::Ended => {
@@ -159,9 +206,13 @@ impl ActionManager {
                     if context.last_tick == self.current_tick {
                         self.vacated_entities.insert(entity_id);
                     }
+                    self.each_tick_actions.remove(entity_id);
+                    self.update_actions.remove(entity_id);
                 }
                 Event::Canceled => {
                     self.vacated_entities.insert(entity_id);
+                    self.update_actions.remove(entity_id);
+                    self.each_tick_actions.remove(entity_id);
                 }
             }
         }
@@ -208,6 +259,7 @@ impl ActionManager {
         &self,
         converter0: fn(&TypedAnyActionMap, &ActionSessionValidator) -> Vec<Action<T>>,
         converter1: fn(&TypedAnyActionMapGroupedByEntityId) -> Vec<Action<T>>,
+        converter2: fn(&TypeId, &AnyActionVec, &ActionSessionValidator) -> Vec<Action<T>>,
     ) -> ActionManagerData<T> {
         debug_assert!(
             self.vacated_entities.is_empty(),
@@ -221,6 +273,13 @@ impl ActionManager {
             contexts: Some(&self.contexts),
         };
         let mut actions = converter1(&self.update_actions);
+        actions.append(
+            &mut self
+                .each_tick_actions
+                .iter()
+                .flat_map(|(type_id, actions)| converter2(type_id, actions, &validator))
+                .collect::<Vec<_>>(),
+        );
         actions.append(
             &mut self
                 .actions
@@ -259,7 +318,7 @@ impl ActionManager {
                 });
             }
             match action.ty {
-                ActionType::Start { .. } | ActionType::End { .. } => {
+                ActionType::Start { .. } | ActionType::End { .. } | ActionType::EachTick { .. } => {
                     let tick = action.tick().unwrap();
                     if tick < tick_validation {
                         return Err(ActionManagerError::InvalidDataCauseBySortedActions);
@@ -281,6 +340,7 @@ impl ActionManager {
             actions: &mut manager.actions,
             contexts: &mut manager.contexts,
             update_actions: &mut manager.update_actions,
+            each_tick_actions: &mut manager.each_tick_actions,
         };
         for action in data.actions.into_iter() {
             converter(action, &mut c);
@@ -303,7 +363,7 @@ impl ActionManager {
         let mut tick_validation: Tick = data.current_tick;
         for action in data.actions.iter() {
             match action.ty {
-                ActionType::Start { .. } | ActionType::End { .. } => {
+                ActionType::Start { .. } | ActionType::End { .. } | ActionType::EachTick { .. } => {
                     let tick = action.tick().unwrap();
                     if tick < tick_validation {
                         return Err(ActionManagerError::InvalidDataCauseBySortedActions);
@@ -339,6 +399,7 @@ impl ActionManager {
             actions: &mut self.actions,
             contexts: &mut self.contexts,
             update_actions: &mut self.update_actions,
+            each_tick_actions: &mut self.each_tick_actions,
         };
         for action in data.actions.into_iter() {
             converter(action, &mut c);
@@ -362,6 +423,7 @@ impl ActionManager {
             current_tick: self.current_tick,
             actions: &mut self.actions,
             update_actions: &mut self.update_actions,
+            each_tick_actions: &mut self.each_tick_actions,
             contexts: &mut self.contexts,
             vacated_entities: &mut self.vacated_entities,
             session_id_manager: &mut self.session_id_manager,
@@ -377,6 +439,11 @@ impl ActionManager {
     }
 }
 
+#[derive(Default)]
+pub struct EnqueueOptions {
+    pub each: bool,
+}
+
 pub struct ActionManagerConverter<'a> {
     remapping_tick: Tick,
     remapping_tick_positive: bool,
@@ -384,6 +451,7 @@ pub struct ActionManagerConverter<'a> {
     actions: &'a mut BTreeMap<Tick, BundleForeachTick>,
     contexts: &'a mut HashMap<EntityId, ActionContext>,
     update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
+    each_tick_actions: &'a mut TypedCloneableAnyActionMapGroupedByEntityId,
 }
 
 impl<'a> ActionManagerConverter<'a> {
@@ -404,7 +472,7 @@ impl<'a> ActionManagerConverter<'a> {
             self.tick_duration,
         );
         match remapped_action_type {
-            ActionType::Start { start, end } => {
+            ActionType::Start { start, end, each } => {
                 let tick = remapped_action_type.tick().unwrap();
                 let item = self.actions.entry(tick).or_insert_with(Default::default);
                 let start_time = start.wrapping_mul(self.tick_duration);
@@ -423,6 +491,15 @@ impl<'a> ActionManagerConverter<'a> {
                                     end: end_time,
                                 },
                             }),
+                            each_action: if each {
+                                Some(Box::new(Action {
+                                    raw: Arc::clone(&action.raw),
+                                    entity_id,
+                                    ty: ActionType::EachTick { start, end },
+                                }))
+                            } else {
+                                None
+                            },
                             running_end_tick: end,
                         },
                     ),
@@ -462,6 +539,18 @@ impl<'a> ActionManagerConverter<'a> {
                     },
                 );
             }
+            ActionType::EachTick { .. } => {
+                let tick = remapped_action_type.tick().unwrap();
+                self.each_tick_actions.insert(
+                    Action {
+                        raw: Arc::clone(action.raw()),
+                        entity_id,
+                        ty: remapped_action_type,
+                    },
+                    context.session_id,
+                    tick,
+                );
+            }
         }
     }
 }
@@ -471,6 +560,7 @@ pub struct ActionController<'a> {
     current_tick: Tick,
     actions: &'a mut BTreeMap<Tick, BundleForeachTick>,
     update_actions: &'a mut TypedAnyActionMapGroupedByEntityId,
+    each_tick_actions: &'a mut TypedCloneableAnyActionMapGroupedByEntityId,
     contexts: &'a mut HashMap<EntityId, ActionContext>,
     vacated_entities: &'a mut BTreeSet<EntityId>,
     session_id_manager: &'a mut IdManager<ActionSessionId>,
@@ -480,6 +570,19 @@ impl<'a> ActionController<'a> {
     #[inline]
     pub fn enqueue<T>(&mut self, entity_id: EntityId, raw: Arc<T>, duration: TimeMilliseconds)
     where
+        T: 'static,
+    {
+        self.enqueue_with_options(entity_id, raw, duration, EnqueueOptions::default());
+    }
+
+    #[inline]
+    pub fn enqueue_with_options<T>(
+        &mut self,
+        entity_id: EntityId,
+        raw: Arc<T>,
+        duration: TimeMilliseconds,
+        options: EnqueueOptions,
+    ) where
         T: 'static,
     {
         let type_id = TypeId::of::<T>();
@@ -507,6 +610,7 @@ impl<'a> ActionController<'a> {
         let end_tick = start_tick + duration / self.tick_duration;
         let start = start_tick * self.tick_duration;
         let end = end_tick.wrapping_mul(self.tick_duration);
+        let each = options.each;
         {
             let item = self
                 .actions
@@ -519,6 +623,7 @@ impl<'a> ActionController<'a> {
                     ty: ActionType::Start {
                         start: start_tick,
                         end: end_tick,
+                        each,
                     },
                 },
                 context.session_id,
@@ -534,6 +639,18 @@ impl<'a> ActionController<'a> {
                             entity_id,
                             ty: ActionType::Update { start, end },
                         }),
+                        each_action: if each {
+                            Some(Box::new(Action {
+                                raw: Arc::clone(&raw),
+                                entity_id,
+                                ty: ActionType::EachTick {
+                                    start: start_tick,
+                                    end: end_tick,
+                                },
+                            }))
+                        } else {
+                            None
+                        },
                         running_end_tick: end_tick,
                     },
                 ),
@@ -546,7 +663,7 @@ impl<'a> ActionController<'a> {
                 .or_insert_with(Default::default);
             item.map.push(
                 Action {
-                    raw,
+                    raw: Arc::clone(&raw),
                     entity_id,
                     ty: ActionType::End {
                         start: start_tick,
@@ -587,12 +704,11 @@ impl<'a> ActionController<'a> {
         self.contexts.remove(&entity_id);
         self.vacated_entities.remove(&entity_id);
         self.update_actions.remove(entity_id);
+        self.each_tick_actions.remove(entity_id);
     }
 
     #[inline]
     pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
-        self.update_actions.remove(entity_id);
-
         let context = self.contexts.get_mut(&entity_id).unwrap();
         context.session_id = self.session_id_manager.gen();
         let tick = if immediate {
@@ -673,7 +789,8 @@ mod test {
     use crate::define_actions;
     use crate::v2::action::collection::TypedAnyActionMap;
     use crate::v2::action::manager::{
-        ActionManager, ActionManagerData, ActionSessionValidator, PullActionResult, Tick,
+        ActionManager, ActionManagerData, ActionSessionValidator, EnqueueOptions, PullActionResult,
+        Tick,
     };
     use crate::v2::action::ArcAction;
     use serde::{Deserialize, Serialize};
@@ -1173,6 +1290,7 @@ mod test {
 
         manager.enqueue(1, Arc::new(MoveState), 1000); // tick: 15
         manager.enqueue(2, Arc::new(MoveState), 500); // tick: 7
+        manager.enqueue_with_options(2, Arc::new(MoveState), 500, EnqueueOptions { each: true });
 
         manager.update(396);
 
@@ -1183,6 +1301,7 @@ mod test {
 
         assert!(manager.contexts.get(&1).is_none());
         assert!(manager.contexts.get(&2).is_none());
+        assert!(manager.each_tick_actions.is_empty());
         assert_eq!(manager.pull_vacated_entities().len(), 0);
         assert!(manager.pull_updates().get::<MoveState>().is_none());
 
@@ -1190,6 +1309,14 @@ mod test {
         assert_eq!(manager.pull_vacated_entities().len(), 0);
 
         manager.update(1000);
+
+        let result = manager.pull_actions().unwrap();
+        insta::assert_debug_snapshot!(SnapshotResult::from_result(
+            "changes",
+            manager.current_tick(),
+            &result,
+            &manager.validator()
+        ));
 
         let result = manager.pull_actions().unwrap();
         insta::assert_debug_snapshot!(SnapshotResult::from_result(
@@ -1237,6 +1364,7 @@ mod test {
         let data = manager.to_data(
             convert_actions_from_typed_action_any_map,
             convert_actions_from_typed_any_action_map,
+            convert_actions_from_any_action_vec,
         );
         let str = serde_json::to_string(&data).unwrap();
 
@@ -1249,5 +1377,26 @@ mod test {
 
         let (tick_count, _) = assert_managers(&mut manager, &mut new_manager);
         println!("Tick count = {}", tick_count);
+    }
+
+    #[test]
+    fn test_each_tick() {
+        let mut manager = ActionManager::default();
+        manager.attach(1);
+        manager.attach(2);
+
+        manager.enqueue(1, Arc::new(MoveState), 264); // tick: 4
+        manager.enqueue_with_options(1, Arc::new(JumpState), 198, EnqueueOptions { each: true }); // tick: 3(7)
+        manager.enqueue(1, Arc::new(TalkState), 198); // tick: 3(10)
+
+        manager.enqueue_with_options(2, Arc::new(MoveState), 132, EnqueueOptions { each: true }); // tick: 2
+        manager.enqueue(2, Arc::new(JumpState), 66); // tick: 1(3)
+        manager.enqueue(2, Arc::new(TalkState), 264); // tick: 4(7)
+
+        assert_snapshot(&mut manager);
+
+        manager.update(462);
+
+        assert_snapshot(&mut manager);
     }
 }

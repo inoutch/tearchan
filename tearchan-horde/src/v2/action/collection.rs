@@ -3,7 +3,7 @@ use crate::v2::action::{ActionSessionId, ArcAction};
 use crate::v2::Tick;
 use std::any::{Any, TypeId};
 use std::collections::hash_map::Iter;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use tearchan_ecs::component::EntityId;
 
@@ -15,7 +15,7 @@ pub struct ActionMeta {
 
 #[derive(Default)]
 pub struct AnyVec {
-    vec: Vec<Box<dyn Any>>,
+    vec: Vec<Arc<Box<dyn Any>>>,
 }
 
 impl AnyVec {
@@ -38,7 +38,7 @@ impl AnyVec {
     }
 
     pub fn push<T: 'static>(&mut self, item: T) {
-        self.vec.push(Box::new(item));
+        self.vec.push(Arc::new(Box::new(item)));
     }
 
     #[inline]
@@ -52,19 +52,19 @@ impl AnyVec {
     }
 
     #[inline]
-    fn replace(&mut self, index: usize, item: Box<dyn Any>) {
+    fn replace(&mut self, index: usize, item: Arc<Box<dyn Any>>) {
         if let Some(x) = self.vec.get_mut(index) {
             *x = item
         }
     }
 
     #[inline]
-    fn pop(&mut self) -> Option<Box<dyn Any>> {
+    fn pop(&mut self) -> Option<Arc<Box<dyn Any>>> {
         self.vec.pop()
     }
 
     #[inline]
-    fn push_as_raw(&mut self, raw: Box<dyn Any>) {
+    fn push_as_raw(&mut self, raw: Arc<Box<dyn Any>>) {
         self.vec.push(raw);
     }
 }
@@ -105,11 +105,11 @@ impl TypedAnyActionMapGroupedByEntityId {
         self.indices.insert(entity_id, (type_id, index));
     }
 
-    pub fn insert_with_type_id(
+    pub fn insert_as_raw(
         &mut self,
-        entity_id: EntityId,
-        action: Box<dyn Any>,
+        action: Arc<Box<dyn Any>>,
         type_id: TypeId,
+        entity_id: EntityId,
     ) {
         self.remove(entity_id);
 
@@ -203,6 +203,35 @@ impl AnyActionVec {
     pub fn len(&self) -> usize {
         self.vec.len()
     }
+
+    #[inline]
+    fn replace(&mut self, index: usize, item: (ActionMeta, Arc<Box<dyn Any>>)) {
+        if let Some(x) = self.vec.get_mut(index) {
+            *x = item;
+        }
+    }
+
+    #[inline]
+    fn pop(&mut self) -> Option<(ActionMeta, Arc<Box<dyn Any>>)> {
+        self.vec.pop()
+    }
+
+    fn push_as_raw(
+        &mut self,
+        action: Arc<Box<dyn Any>>,
+        entity_id: EntityId,
+        session_id: ActionSessionId,
+        tick: Tick,
+    ) {
+        self.vec.push((
+            ActionMeta {
+                entity_id,
+                session_id,
+                tick,
+            },
+            action,
+        ));
+    }
 }
 
 #[derive(Default)]
@@ -221,6 +250,20 @@ impl TypedAnyActionMap {
             .entry(type_id)
             .or_insert_with(AnyActionVec::default)
             .push(action, session_id, tick);
+    }
+
+    pub fn push_as_raw(
+        &mut self,
+        type_id: TypeId,
+        action: Arc<Box<dyn Any>>,
+        entity_id: EntityId,
+        session_id: ActionSessionId,
+        tick: Tick,
+    ) {
+        self.map
+            .entry(type_id)
+            .or_insert_with(AnyActionVec::default)
+            .push_as_raw(action, entity_id, session_id, tick);
     }
 
     pub fn get<T>(&self, validator: &ActionSessionValidator) -> Option<Vec<&ArcAction<T>>>
@@ -250,6 +293,101 @@ impl TypedAnyActionMap {
     }
 }
 
+#[derive(Default)]
+pub struct TypedCloneableAnyActionMapGroupedByEntityId {
+    map: HashMap<TypeId, AnyActionVec>,
+    indices: BTreeMap<EntityId, (TypeId, usize)>,
+    entities: HashMap<(TypeId, usize), EntityId>,
+}
+
+impl TypedCloneableAnyActionMapGroupedByEntityId {
+    pub fn insert<T>(&mut self, action: ArcAction<T>, session_id: ActionSessionId, tick: Tick)
+    where
+        T: 'static,
+    {
+        let type_id = TypeId::of::<T>();
+        let entity_id = action.entity_id();
+
+        self.remove(entity_id);
+        let vec = self
+            .map
+            .entry(type_id)
+            .or_insert_with(AnyActionVec::default);
+        let index = vec.len();
+        vec.push(action, session_id, tick);
+        self.entities.insert((type_id, index), entity_id);
+        self.indices.insert(entity_id, (type_id, index));
+    }
+
+    pub fn insert_as_raw(
+        &mut self,
+        action: Arc<Box<dyn Any>>,
+        type_id: TypeId,
+        entity_id: EntityId,
+        session_id: ActionSessionId,
+        tick: Tick,
+    ) {
+        self.remove(entity_id);
+
+        let collection = self
+            .map
+            .entry(type_id)
+            .or_insert_with(AnyActionVec::default);
+        let index = collection.len();
+        collection.push_as_raw(action, entity_id, session_id, tick);
+        self.entities.insert((type_id, index), entity_id);
+        self.indices.insert(entity_id, (type_id, index));
+    }
+
+    pub fn remove(&mut self, entity_id: EntityId) {
+        if let Some((type_id, index)) = self.indices.remove(&entity_id) {
+            self.entities.remove(&(type_id, index));
+
+            let collection = self.map.get_mut(&type_id).unwrap();
+            let last = collection.len() - 1;
+            let last_item = collection.pop().unwrap();
+            if index != last {
+                let last_entity_id = self.entities.remove(&(type_id, last)).unwrap();
+                self.indices.remove(&last_entity_id);
+
+                collection.replace(index, last_item);
+                self.entities.insert((type_id, index), last_entity_id);
+                self.indices.insert(last_entity_id, (type_id, index));
+            } else if index == 0 {
+                self.map.remove(&type_id);
+            }
+        }
+    }
+
+    pub fn push_actions_to(&self, map: &mut TypedAnyActionMap, current_tick: Tick) {
+        for (_entity_id, (type_id, index)) in self.indices.iter() {
+            let vec = match self.map.get(type_id) {
+                None => continue,
+                Some(vec) => vec,
+            };
+            let (meta, action) = &vec.vec[*index];
+            if meta.tick != current_tick {
+                map.push_as_raw(
+                    *type_id,
+                    Arc::clone(action),
+                    meta.entity_id,
+                    meta.session_id,
+                    meta.tick,
+                );
+            }
+        }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    pub fn iter(&self) -> Iter<'_, TypeId, AnyActionVec> {
+        self.map.iter()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::v2::action::collection::TypedAnyActionMapGroupedByEntityId;
@@ -271,7 +409,11 @@ mod test {
             Action {
                 raw: Arc::new(MoveState),
                 entity_id: 1,
-                ty: ActionType::Start { start: 0, end: 0 },
+                ty: ActionType::Start {
+                    start: 0,
+                    end: 0,
+                    each: false,
+                },
             },
         );
 
@@ -280,7 +422,11 @@ mod test {
             Action {
                 raw: Arc::new(JumpState),
                 entity_id: 2,
-                ty: ActionType::Start { start: 0, end: 0 },
+                ty: ActionType::Start {
+                    start: 0,
+                    end: 0,
+                    each: false,
+                },
             },
         );
         collection.insert(
@@ -288,7 +434,11 @@ mod test {
             Action {
                 raw: Arc::new(JumpState),
                 entity_id: 2,
-                ty: ActionType::Start { start: 0, end: 0 },
+                ty: ActionType::Start {
+                    start: 0,
+                    end: 0,
+                    each: false,
+                },
             },
         );
 

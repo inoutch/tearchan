@@ -99,6 +99,15 @@ macro_rules! define_actions {
         }
 
         #[allow(dead_code)]
+        fn convert_actions_from_any_action_vec(
+            type_id: &std::any::TypeId,
+            vec: &$crate::v2::action::collection::AnyActionVec,
+            validator: &$crate::v2::action::manager::ActionSessionValidator
+        ) -> Vec<$crate::v2::action::Action<$name>> {
+            MAPPER0.get(type_id).map(|f| f(vec, validator)).unwrap_or_else(Vec::new)
+        }
+
+        #[allow(dead_code)]
         fn convert_from_actions(action: $crate::v2::action::Action<$name>, converter: &mut $crate::v2::action::manager::ActionManagerConverter) {
             match action.raw() {
             $(
@@ -137,7 +146,11 @@ mod test {
             Action::new(
                 Arc::new(MoveState),
                 1,
-                ActionType::Start { start: 0, end: 0 },
+                ActionType::Start {
+                    start: 0,
+                    end: 0,
+                    each: false,
+                },
             ),
             ActionSessionId::default(),
         );
@@ -158,7 +171,11 @@ mod test {
             Action::new(
                 Arc::new(MoveState),
                 1,
-                ActionType::Start { start: 0, end: 0 },
+                ActionType::Start {
+                    start: 0,
+                    end: 0,
+                    each: false,
+                },
             ),
         );
 

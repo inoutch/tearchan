@@ -1,29 +1,27 @@
 ---
 source: tearchan-horde/src/v2/action/manager.rs
-expression: "SnapshotResult::from_result(\"changes\", manager.current_tick(), &result,\n    &manager.validator())"
+expression: "SnapshotResult {\n    current_tick: manager.current_tick(),\n    tag: \"updates\",\n    move_actions: actions.get(),\n    jump_actions: actions.get(),\n    talk_actions: actions.get(),\n}"
 
 ---
 SnapshotResult {
-    tag: "changes",
+    tag: "updates",
     current_tick: 0,
     move_actions: Some(
         [
             Action {
                 raw: MoveState,
                 entity_id: 1,
-                ty: Start {
+                ty: Update {
                     start: 0,
-                    end: 15,
-                    each: false,
+                    end: 264,
                 },
             },
             Action {
                 raw: MoveState,
                 entity_id: 2,
-                ty: Start {
+                ty: Update {
                     start: 0,
-                    end: 7,
-                    each: false,
+                    end: 132,
                 },
             },
         ],

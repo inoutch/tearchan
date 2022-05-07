@@ -5,31 +5,31 @@ expression: "SnapshotResult {\n    current_tick: manager.current_tick(),\n    ta
 ---
 SnapshotResult {
     tag: "changes",
-    current_tick: 15,
-    move_actions: Some(
-        [
-            Action {
-                raw: MoveState,
-                entity_id: 1,
-                ty: End {
-                    start: 0,
-                    end: 15,
-                },
-            },
-        ],
-    ),
+    current_tick: 3,
+    move_actions: None,
     jump_actions: Some(
         [
             Action {
                 raw: JumpState,
-                entity_id: 1,
+                entity_id: 2,
+                ty: End {
+                    start: 2,
+                    end: 3,
+                },
+            },
+        ],
+    ),
+    talk_actions: Some(
+        [
+            Action {
+                raw: TalkState,
+                entity_id: 2,
                 ty: Start {
-                    start: 15,
-                    end: 45,
+                    start: 3,
+                    end: 7,
                     each: false,
                 },
             },
         ],
     ),
-    talk_actions: None,
 }

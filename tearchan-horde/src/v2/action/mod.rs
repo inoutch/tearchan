@@ -29,12 +29,17 @@ pub enum ActionType {
     Start {
         start: Tick,
         end: Tick,
+        each: bool,
     },
     Update {
         start: TimeMilliseconds,
         end: TimeMilliseconds,
     },
     End {
+        start: Tick,
+        end: Tick,
+    },
+    EachTick {
         start: Tick,
         end: Tick,
     },
@@ -46,12 +51,13 @@ impl ActionType {
             ActionType::Start { start, .. } => Some(*start),
             ActionType::Update { .. } => None,
             ActionType::End { end, .. } => Some(*end),
+            ActionType::EachTick { end, .. } => Some(*end),
         }
     }
 
     pub fn remap(&self, tick: Tick, positive: bool, tick_duration: TimeMilliseconds) -> ActionType {
         match self {
-            ActionType::Start { start, end } => {
+            ActionType::Start { start, end, each } => {
                 let start = if positive {
                     start.wrapping_add(tick)
                 } else {
@@ -62,7 +68,11 @@ impl ActionType {
                 } else {
                     end.wrapping_sub(tick)
                 };
-                ActionType::Start { start, end }
+                ActionType::Start {
+                    start,
+                    end,
+                    each: *each,
+                }
             }
             ActionType::Update { start, end } => {
                 let start = if positive {
@@ -89,6 +99,19 @@ impl ActionType {
                     end.wrapping_sub(tick)
                 };
                 ActionType::End { start, end }
+            }
+            ActionType::EachTick { start, end } => {
+                let start = if positive {
+                    start.wrapping_add(tick)
+                } else {
+                    start.wrapping_sub(tick)
+                };
+                let end = if positive {
+                    end.wrapping_add(tick)
+                } else {
+                    end.wrapping_sub(tick)
+                };
+                ActionType::EachTick { start, end }
             }
         }
     }
