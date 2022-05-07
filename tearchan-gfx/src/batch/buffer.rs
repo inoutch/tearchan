@@ -276,7 +276,7 @@ where
         pointer: BatchBufferPointer,
         data: &[TDataType],
     ) {
-        assert!(pointer.len <= data.len());
+        assert!(data.len() <= pointer.len);
         self.buffer.write(writer, data, pointer.first);
     }
 
