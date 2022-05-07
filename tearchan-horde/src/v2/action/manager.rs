@@ -7,6 +7,7 @@ use crate::v2::action::{Action, ActionSessionId, ActionType, ArcAction, VALID_SE
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::any::{Any, TypeId};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tearchan_ecs::component::EntityId;
@@ -272,23 +273,34 @@ impl ActionManager {
         let validator = ActionSessionValidator {
             contexts: Some(&self.contexts),
         };
-        let mut actions = converter1(&self.update_actions);
-        actions.append(
-            &mut self
-                .each_tick_actions
-                .iter()
-                .flat_map(|(type_id, actions)| converter2(type_id, actions, &validator))
-                .collect::<Vec<_>>(),
-        );
-        actions.append(
-            &mut self
-                .actions
-                .iter()
-                .flat_map(|(_tick, action)| converter0(&action.map, &validator))
-                .collect::<Vec<_>>(),
-        );
+        let mut actions = self
+            .actions
+            .iter()
+            .flat_map(|(_tick, action)| converter0(&action.map, &validator))
+            .collect::<Vec<_>>();
+        let mut each_tick_actions = self
+            .each_tick_actions
+            .iter()
+            .flat_map(|(type_id, actions)| converter2(type_id, actions, &validator))
+            .collect::<Vec<_>>();
+        actions.append(&mut each_tick_actions);
+        actions.sort_by(|a, b| match a.tick().unwrap().cmp(&b.tick().unwrap()) {
+            Ordering::Equal => match a.entity_id.cmp(&b.entity_id) {
+                Ordering::Equal => match a.ty {
+                    ActionType::Start { .. } => Ordering::Greater,
+                    ActionType::End { .. } => Ordering::Less,
+                    _ => unreachable!(),
+                },
+                ordering => ordering,
+            },
+            ordering => ordering,
+        });
+
+        let mut update_actions = converter1(&self.update_actions);
+        update_actions.sort_by(|a, b| a.entity_id.cmp(&b.entity_id));
+        update_actions.append(&mut actions);
         ActionManagerData {
-            actions,
+            actions: update_actions,
             tick_duration: self.tick_duration,
             current_tick: self.current_tick,
             next_time: self.next_time,
@@ -733,7 +745,7 @@ pub enum ActionManagerError {
     InvalidDataNoEndAction,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ActionManagerData<T> {
     actions: Vec<Action<T>>,
     tick_duration: TimeMilliseconds,
@@ -892,11 +904,22 @@ mod test {
         });
     }
 
-    fn assert_actions<T>(actions0: Option<Vec<&ArcAction<T>>>, actions1: Option<Vec<&ArcAction<T>>>)
-    where
+    fn assert_actions<T>(
+        actions0: Option<Vec<&ArcAction<T>>>,
+        actions1: Option<Vec<&ArcAction<T>>>,
+        current_tick0: Tick,
+        current_tick1: Tick,
+    ) where
         T: 'static + Eq + Debug,
     {
-        assert_eq!(actions0.is_none(), actions1.is_none());
+        if actions0.is_none() != actions1.is_none() {
+            println!(
+                "current_tick0: {:?}, current_tick1: {:?}",
+                current_tick0, current_tick1
+            );
+            println!("{:?} = {:?}", actions0, actions1);
+            assert_eq!(actions0.is_none(), actions1.is_none());
+        }
         if let Some(actions0) = actions0 {
             let actions1 = actions1.unwrap();
             assert_eq!(actions0.len(), actions1.len());
@@ -913,12 +936,14 @@ mod test {
         map1: &TypedAnyActionMap,
         manager0: &ActionManager,
         manager1: &ActionManager,
+        current_tick0: Tick,
+        current_tick1: Tick,
     ) where
         T: 'static + Eq + Debug,
     {
         let actions0 = map0.get::<T>(&manager0.validator());
         let actions1 = map1.get::<T>(&manager1.validator());
-        assert_actions(actions0, actions1);
+        assert_actions(actions0, actions1, current_tick0, current_tick1);
     }
 
     fn assert_managers(
@@ -929,6 +954,8 @@ mod test {
         loop {
             let result0 = manager0.pull_actions();
             let result1 = manager1.pull_actions();
+            let current_tick0 = manager0.current_tick();
+            let current_tick1 = manager0.current_tick();
             if result0.is_none() != result1.is_none() {
                 debug_pull_action_result("result0", &result0, &manager0.validator());
                 debug_pull_action_result("result1", &result1, &manager0.validator());
@@ -937,9 +964,30 @@ mod test {
 
             if let Some(result0) = result0 {
                 let result1 = result1.unwrap();
-                assert_action_map::<MoveState>(&result0.map, &result1.map, manager0, manager1);
-                assert_action_map::<JumpState>(&result0.map, &result1.map, manager0, manager1);
-                assert_action_map::<TalkState>(&result0.map, &result1.map, manager0, manager1);
+                assert_action_map::<MoveState>(
+                    &result0.map,
+                    &result1.map,
+                    manager0,
+                    manager1,
+                    current_tick0,
+                    current_tick1,
+                );
+                assert_action_map::<JumpState>(
+                    &result0.map,
+                    &result1.map,
+                    manager0,
+                    manager1,
+                    current_tick0,
+                    current_tick1,
+                );
+                assert_action_map::<TalkState>(
+                    &result0.map,
+                    &result1.map,
+                    manager0,
+                    manager1,
+                    current_tick0,
+                    current_tick1,
+                );
             } else {
                 break;
             }
@@ -957,10 +1005,12 @@ mod test {
 
         let map0 = manager0.pull_updates();
         let map1 = manager1.pull_updates();
+        let current_tick0 = manager0.current_tick();
+        let current_tick1 = manager0.current_tick();
 
-        assert_actions::<MoveState>(map0.get(), map1.get());
-        assert_actions::<JumpState>(map0.get(), map1.get());
-        assert_actions::<TalkState>(map0.get(), map1.get());
+        assert_actions::<MoveState>(map0.get(), map1.get(), current_tick0, current_tick1);
+        assert_actions::<JumpState>(map0.get(), map1.get(), current_tick0, current_tick1);
+        assert_actions::<TalkState>(map0.get(), map1.get(), current_tick0, current_tick1);
 
         (tick_count, None)
     }
@@ -1345,7 +1395,7 @@ mod test {
 
         manager.enqueue(1, Arc::new(MoveState), 3000);
         manager.enqueue(1, Arc::new(JumpState), 500);
-        manager.enqueue(1, Arc::new(TalkState), 1500);
+        manager.enqueue_with_options(1, Arc::new(TalkState), 1500, EnqueueOptions { each: true });
         manager.enqueue(1, Arc::new(JumpState), 2000);
         manager.enqueue(1, Arc::new(MoveState), 3000);
         manager.enqueue(1, Arc::new(TalkState), 1000);
@@ -1354,10 +1404,10 @@ mod test {
         manager.enqueue(2, Arc::new(TalkState), 1000);
         manager.enqueue(2, Arc::new(JumpState), 2000);
         manager.enqueue(2, Arc::new(TalkState), 2500);
-        manager.enqueue(2, Arc::new(MoveState), 4000);
+        manager.enqueue_with_options(2, Arc::new(MoveState), 4000, EnqueueOptions { each: true });
         manager.enqueue(2, Arc::new(JumpState), 2000);
 
-        manager.update(500);
+        manager.update(500); // tick: 7
 
         while manager.pull_actions().is_some() {}
 
@@ -1369,6 +1419,7 @@ mod test {
         let str = serde_json::to_string(&data).unwrap();
 
         let data: ActionManagerData<TestAction> = serde_json::from_str(&str).unwrap();
+        insta::assert_debug_snapshot!(data);
 
         let mut new_manager = ActionManager::from_data(data, convert_from_actions).unwrap();
 

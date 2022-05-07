@@ -1,0 +1,241 @@
+---
+source: tearchan-horde/src/v2/action/manager.rs
+expression: data
+
+---
+ActionManagerData {
+    actions: [
+        Action {
+            raw: Move(
+                MoveState,
+            ),
+            entity_id: 1,
+            ty: Update {
+                start: 0,
+                end: 2970,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 2,
+            ty: Update {
+                start: 462,
+                end: 1452,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 2,
+            ty: End {
+                start: 7,
+                end: 22,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 2,
+            ty: Start {
+                start: 22,
+                end: 52,
+                each: false,
+            },
+        },
+        Action {
+            raw: Move(
+                MoveState,
+            ),
+            entity_id: 1,
+            ty: End {
+                start: 0,
+                end: 45,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 1,
+            ty: Start {
+                start: 45,
+                end: 52,
+                each: false,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 1,
+            ty: End {
+                start: 45,
+                end: 52,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 1,
+            ty: Start {
+                start: 52,
+                end: 74,
+                each: true,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 2,
+            ty: End {
+                start: 22,
+                end: 52,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 2,
+            ty: Start {
+                start: 52,
+                end: 89,
+                each: false,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 1,
+            ty: End {
+                start: 52,
+                end: 74,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 1,
+            ty: Start {
+                start: 74,
+                end: 104,
+                each: false,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 2,
+            ty: End {
+                start: 52,
+                end: 89,
+            },
+        },
+        Action {
+            raw: Move(
+                MoveState,
+            ),
+            entity_id: 2,
+            ty: Start {
+                start: 89,
+                end: 149,
+                each: true,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 1,
+            ty: End {
+                start: 74,
+                end: 104,
+            },
+        },
+        Action {
+            raw: Move(
+                MoveState,
+            ),
+            entity_id: 1,
+            ty: Start {
+                start: 104,
+                end: 149,
+                each: false,
+            },
+        },
+        Action {
+            raw: Move(
+                MoveState,
+            ),
+            entity_id: 1,
+            ty: End {
+                start: 104,
+                end: 149,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 1,
+            ty: Start {
+                start: 149,
+                end: 164,
+                each: false,
+            },
+        },
+        Action {
+            raw: Move(
+                MoveState,
+            ),
+            entity_id: 2,
+            ty: End {
+                start: 89,
+                end: 149,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 2,
+            ty: Start {
+                start: 149,
+                end: 179,
+                each: false,
+            },
+        },
+        Action {
+            raw: Talk(
+                TalkState,
+            ),
+            entity_id: 1,
+            ty: End {
+                start: 149,
+                end: 164,
+            },
+        },
+        Action {
+            raw: Jump(
+                JumpState,
+            ),
+            entity_id: 2,
+            ty: End {
+                start: 149,
+                end: 179,
+            },
+        },
+    ],
+    tick_duration: 66,
+    current_tick: 7,
+    next_time: 500,
+}
