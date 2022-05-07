@@ -250,7 +250,7 @@ impl Game {
                         let position = positions.get_mut(walk_action.entity_id());
                         if let Some(position) = position {
                             match walk_action.ty() {
-                                ActionType::Start { start, end } => {
+                                ActionType::Start { start, end, .. } => {
                                     position.from =
                                         (state.from.clone_owned(), TickData { value: *start });
                                     position.to =
@@ -304,6 +304,7 @@ impl Game {
                                             .unwrap();
                                     }
                                 }
+                                ActionType::EachTick { .. } => {}
                             }
                         }
                     }
@@ -331,6 +332,7 @@ impl Game {
                                 ActionType::End { .. } => {
                                     scaled_position.0 = state.to_scaled.clone_owned();
                                 }
+                                ActionType::EachTick { .. } => {}
                             }
                         }
                     }
@@ -371,6 +373,7 @@ impl Game {
                                     }
                                     ActionType::Update { .. } => {}
                                     ActionType::End { .. } => {}
+                                    ActionType::EachTick { .. } => {}
                                 }
                             }
                         }
@@ -402,6 +405,7 @@ impl Game {
                                     direction.0 = DirectionState::None;
                                 }
                             }
+                            ActionType::EachTick { .. } => {}
                         }
                     }
                 });
@@ -444,6 +448,7 @@ impl Game {
                                     }
                                     ActionType::Update { .. } => {}
                                     ActionType::End { .. } => {}
+                                    ActionType::EachTick { .. } => {}
                                 }
                             }
                         }
@@ -469,6 +474,7 @@ impl Game {
                             }
                             ActionType::Update { .. } => {}
                             ActionType::End { .. } => {}
+                            ActionType::EachTick { .. } => {}
                         }
                     }
                 });
@@ -494,6 +500,7 @@ impl Game {
                         }
                         ActionType::Update { .. } => {}
                         ActionType::End { .. } => {}
+                        ActionType::EachTick { .. } => {}
                     }
                 }
             });
@@ -976,6 +983,7 @@ impl Game {
         let job_manager_data = job_manager.to_data(
             convert_actions_from_typed_action_any_map,
             convert_actions_from_typed_any_action_map,
+            convert_actions_from_any_action_vec,
         );
         let json = serde_json::to_string(&GameSerializableData {
             entity_manager_data: self.entity_manager.to_data(),
