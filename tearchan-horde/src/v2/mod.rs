@@ -69,8 +69,9 @@ macro_rules! define_actions {
             map
         });
 
+        #[allow(dead_code)]
         #[derive(Clone, Debug, $crate::v2::serde::Serialize, $crate::v2::serde::Deserialize)]
-        enum $name {
+        pub enum $name {
             $(
                 $member(std::sync::Arc<$struct>),
             )*
