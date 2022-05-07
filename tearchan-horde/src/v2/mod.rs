@@ -122,10 +122,10 @@ mod test {
     use std::sync::Arc;
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
-    struct MoveState;
+    pub struct MoveState;
 
     #[derive(Clone, Debug, Deserialize, Serialize)]
-    struct JumpState;
+    pub struct JumpState;
 
     define_actions!(TestAction, (Move, MoveState), (Jump, JumpState));
 

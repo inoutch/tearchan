@@ -683,13 +683,13 @@ mod test {
     use tearchan_ecs::component::EntityId;
 
     #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-    struct MoveState;
+    pub struct MoveState;
 
     #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-    struct JumpState;
+    pub struct JumpState;
 
     #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-    struct TalkState;
+    pub struct TalkState;
 
     #[derive(Debug)]
     #[allow(dead_code)]
