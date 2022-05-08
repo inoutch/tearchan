@@ -340,6 +340,7 @@ impl BatchObjectManager {
             .index_allocator
             .reallocate(object.index_pointer(), indices.len());
         object.set_index_pointer(new_pointer);
+        object.set_indices(indices);
         self.object_ids_grouped_by_index_pointer
             .insert(new_pointer, id);
 
@@ -377,6 +378,9 @@ impl BatchObjectManager {
             .vertex_allocator
             .reallocate(object.vertex_pointer(), vertex_len);
         object.set_vertex_pointer(new_pointer);
+        for (attribute, vertices) in vertices.into_iter().enumerate() {
+            object.set_vertices(attribute as u32, vertices);
+        }
         self.object_ids_grouped_by_vertex_pointer
             .insert(new_pointer, id);
 

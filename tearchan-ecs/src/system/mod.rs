@@ -55,8 +55,8 @@ mod test {
         let mut group1 = ComponentGroupSync::default();
         let mut group2 = ComponentGroupSync::default();
         {
-            let mut writer1 = group1.try_write().unwrap();
-            let mut writer2 = group2.try_write().unwrap();
+            let mut writer1 = group1.write();
+            let mut writer2 = group2.write();
             writer1.get_mut().push(0, Component1 { value: 0 });
             writer2.get_mut().push(0, Component2 { value: 2 });
 
@@ -65,21 +65,17 @@ mod test {
         }
 
         {
-            let r = group1.try_read().unwrap();
+            let r = group1.read();
             assert_eq!(r.get().get(0).unwrap().value, 0);
             assert_eq!(r.get().get(1).unwrap().value, 1);
         }
 
-        CustomSystem::run_async(
-            &thread_pool,
-            group1.try_write().unwrap(),
-            group2.try_read().unwrap(),
-        );
+        CustomSystem::run_async(&thread_pool, group1.write(), group2.read());
 
         thread_pool.join();
 
         {
-            let r = group1.try_read().unwrap();
+            let r = group1.read();
             assert_eq!(r.get().get(0).unwrap().value, 2);
             assert_eq!(r.get().get(1).unwrap().value, 4);
         }

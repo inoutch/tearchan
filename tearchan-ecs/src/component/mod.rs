@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod group;
 pub mod group_sync;
+pub mod resource_sync;
 pub mod zip;
 
 pub type EntityId = u64;
@@ -28,5 +29,9 @@ impl<T> Component<T> {
 
     pub fn inner_mut(&mut self) -> &mut T {
         &mut self.inner
+    }
+    
+    pub fn into_inner(self) -> T {
+        self.inner
     }
 }

@@ -1,0 +1,16 @@
+---
+source: tearchan-horde/src/v2/mod.rs
+expression: "collection.get::<MoveState>()"
+
+---
+Some(
+    [
+        Action {
+            raw: MoveState,
+            entity_id: 1,
+            ty: Start {
+                time: 0,
+            },
+        },
+    ],
+)

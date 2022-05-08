@@ -1,0 +1,35 @@
+---
+source: tearchan-horde/src/v2/action/manager.rs
+expression: "SnapshotResult {\n    current_tick: manager.current_tick(),\n    tag: \"changes\",\n    move_actions: actions.map.get(&manager.validator()),\n    jump_actions: actions.map.get(&manager.validator()),\n    talk_actions: actions.map.get(&manager.validator()),\n}"
+
+---
+SnapshotResult {
+    tag: "changes",
+    current_tick: 3,
+    move_actions: None,
+    jump_actions: Some(
+        [
+            Action {
+                raw: JumpState,
+                entity_id: 2,
+                ty: End {
+                    start: 2,
+                    end: 3,
+                },
+            },
+        ],
+    ),
+    talk_actions: Some(
+        [
+            Action {
+                raw: TalkState,
+                entity_id: 2,
+                ty: Start {
+                    start: 3,
+                    end: 7,
+                    each: false,
+                },
+            },
+        ],
+    ),
+}

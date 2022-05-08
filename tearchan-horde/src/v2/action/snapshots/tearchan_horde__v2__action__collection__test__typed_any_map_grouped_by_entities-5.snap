@@ -1,0 +1,6 @@
+---
+source: tearchan-horde/src/v2/action/collection.rs
+expression: "collection.get::<MoveState>()"
+
+---
+None

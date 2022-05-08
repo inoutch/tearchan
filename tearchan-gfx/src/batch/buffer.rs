@@ -276,7 +276,7 @@ where
         pointer: BatchBufferPointer,
         data: &[TDataType],
     ) {
-        assert!(pointer.len <= data.len());
+        assert!(data.len() <= pointer.len);
         self.buffer.write(writer, data, pointer.first);
     }
 
@@ -379,12 +379,7 @@ mod test {
         }
 
         fn copy(&mut self, _copy: &mut ResultContext, from: usize, to: usize, len: usize) {
-            let from = {
-                self.data.as_slice()[from..(from + len)]
-                    .iter()
-                    .copied()
-                    .collect::<Vec<_>>()
-            };
+            let from = { self.data.as_slice()[from..(from + len)].to_vec() };
             self.data.splice(to..(to + len), from);
         }
 
