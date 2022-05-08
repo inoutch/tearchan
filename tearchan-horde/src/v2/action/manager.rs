@@ -289,6 +289,7 @@ impl ActionManager {
                 Ordering::Equal => match a.ty {
                     ActionType::Start { .. } => Ordering::Greater,
                     ActionType::End { .. } => Ordering::Less,
+                    ActionType::EachTick { .. } => Ordering::Equal,
                     _ => unreachable!(),
                 },
                 ordering => ordering,
