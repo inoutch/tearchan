@@ -47,14 +47,12 @@ where
 
     #[inline]
     pub fn attach(&mut self, entity_id: EntityId) {
-        self.action_manager.attach(entity_id);
-        self.jobs.insert(entity_id, Vec::new());
+        self.controller().attach(entity_id);
     }
 
     #[inline]
     pub fn detach(&mut self, entity_id: EntityId) {
-        self.action_manager.detach(entity_id);
-        self.jobs.remove(&entity_id);
+        self.controller().detach(entity_id);
     }
 
     #[inline]
@@ -116,12 +114,25 @@ where
         self.action_manager.current_tick()
     }
 
+    pub fn controller(&mut self) -> JobController<T::Job> {
+        JobController {
+            action_manager: &mut self.action_manager,
+            jobs: &mut self.jobs,
+        }
+    }
+
     fn run_actions(&mut self, provider: &mut T) {
         // Loop for each tick
         loop {
             let result_or_none = self.action_manager.pull_actions();
             if let Some(result) = &result_or_none {
-                provider.on_change_tick(&result.map, &self.action_manager.validator());
+                provider.on_change_tick(
+                    &result.map,
+                    JobController {
+                        action_manager: &mut self.action_manager,
+                        jobs: &mut self.jobs,
+                    },
+                );
 
                 for entity_id in result.cancels.iter() {
                     provider.on_cancel_job(
@@ -169,17 +180,44 @@ where
     }
 }
 
-pub struct JobController<'a> {
+pub struct JobActionController<'a> {
     action_manager: &'a mut ActionManager,
 }
 
-impl<'a> JobController<'a> {
+impl<'a> JobActionController<'a> {
     #[inline]
     pub fn enqueue<T>(&mut self, entity_id: EntityId, raw: Arc<T>, duration: TimeMilliseconds)
     where
         T: 'static,
     {
         self.action_manager.enqueue(entity_id, raw, duration);
+    }
+}
+
+pub struct JobController<'a, T> {
+    action_manager: &'a mut ActionManager,
+    jobs: &'a mut HashMap<EntityId, Vec<T>>,
+}
+
+impl<'a, T> JobController<'a, T> {
+    #[inline]
+    pub fn attach(&mut self, entity_id: EntityId) {
+        self.action_manager.attach(entity_id);
+        self.jobs.insert(entity_id, Vec::new());
+    }
+
+    #[inline]
+    pub fn detach(&mut self, entity_id: EntityId) {
+        self.action_manager.detach(entity_id);
+        self.jobs.remove(&entity_id);
+    }
+
+    pub fn validator(&self) -> ActionSessionValidator {
+        self.action_manager.validator()
+    }
+
+    pub fn current_tick(&self) -> Tick {
+        self.action_manager.current_tick()
     }
 }
 
