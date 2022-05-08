@@ -3,13 +3,21 @@ use crate::utils::{calc_center_from_scaled_position, calc_position_from_ratio, C
 use maze_generator::prelude::Direction;
 use nalgebra_glm::{distance, vec2, vec3, TVec2, Vec2, Vec3};
 use rand::Rng;
+use rapier2d::dynamics::{IntegrationParameters, IslandManager, RigidBodySet};
+use rapier2d::geometry::{
+    ActiveCollisionTypes, BroadPhase, ColliderBuilder, ColliderSet, IntersectionEvent, NarrowPhase,
+};
+use rapier2d::na::Vector2;
+use rapier2d::pipeline::{ActiveEvents, ChannelEventCollector, CollisionPipeline};
+use rapier2d::prelude::ColliderHandle;
 use serde::de::{Error, MapAccess, Visitor};
 use serde::Deserializer;
 use serde_json::value::RawValue;
+use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Sender};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tearchan::fs::{file_util, write_bytes_to_file};
 use tearchan::util::array_2d::Array2D;
 use tearchan::util::thread::ThreadPool;
@@ -22,11 +30,9 @@ use tearchan_horde::action::manager::TimeMilliseconds;
 use tearchan_horde::v2::action::collection::{
     TypedAnyActionMap, TypedAnyActionMapGroupedByEntityId,
 };
-use tearchan_horde::v2::action::manager::{
-    ActionController, ActionSessionValidator, ACTION_REMAPPER,
-};
+use tearchan_horde::v2::action::manager::{ActionController, EnqueueOptions, ACTION_REMAPPER};
 use tearchan_horde::v2::action::{ActionType, ArcAction};
-use tearchan_horde::v2::job::manager::{JobManager, JobManagerData};
+use tearchan_horde::v2::job::manager::{JobController, JobManager, JobManagerData};
 use tearchan_horde::v2::job::HordeInterface;
 use tearchan_horde::v2::serde::{Deserialize, Serialize};
 use tearchan_horde::v2::{calc_ratio_f32_from_ms, calc_ratio_f32_from_tick, define_actions, Tick};
@@ -39,9 +45,10 @@ enum Command {
     UpdateRenderSpritePosition(EntityId, Vec2),
     UpdateRenderSpriteColor(EntityId, Vec3),
     UpdateCameraPosition(Vec3),
+    DestroyEntity(EntityId),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum EntityType {
     Player,
     Enemy,
@@ -117,6 +124,7 @@ pub enum HordeJob {
 
 #[derive(Serialize, Deserialize)]
 struct PositionData {
+    current: Vec2,
     from: (Vec2, TickData),
     to: (Vec2, TickData),
 }
@@ -165,7 +173,7 @@ struct ScaledPositionData(TVec2<i32>);
 #[derive(Serialize, Deserialize)]
 struct ColorData(Vec3);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct PathData {
     from: TVec2<i32>,
     to: TVec2<i32>,
@@ -181,6 +189,14 @@ trait MapperTrait {
 
     fn time(&self) -> TimeMilliseconds {
         0
+    }
+
+    fn tick(&self) -> Tick {
+        0
+    }
+
+    fn controller(&mut self) -> Option<&mut JobController<Arc<HordeJob>>> {
+        None
     }
 }
 
@@ -198,8 +214,413 @@ pub struct Game {
     directions: ComponentGroupSync<DirectionData>,
     // runtime
     passages: Array2D<EntityId>,
+    colliders: Arc<RwLock<ColliderSet>>,
+    collider_handlers: Arc<RwLock<HashMap<EntityId, ColliderHandle>>>,
+    collision_pipeline: CollisionPipeline,
+    broad_phase: BroadPhase,
+    narrow_phase: NarrowPhase,
+    rigid_bodies: RigidBodySet,
     // renderers
     pub renderer: Renderer,
+}
+
+impl HordeInterface for Game {
+    type Job = Arc<HordeJob>;
+
+    fn on_change_tick(
+        &mut self,
+        map: &TypedAnyActionMap,
+        controller: JobController<Arc<HordeJob>>,
+    ) {
+        struct Mapper<'a> {
+            map: &'a TypedAnyActionMap,
+            controller: JobController<'a, Arc<HordeJob>>,
+        }
+        impl<'a> MapperTrait for Mapper<'a> {
+            fn get_cloned<T>(&self) -> Option<Vec<ArcAction<T>>>
+            where
+                T: 'static,
+            {
+                self.map.get_cloned(&self.controller.validator())
+            }
+
+            fn tick(&self) -> Tick {
+                self.controller.current_tick()
+            }
+
+            fn controller(&mut self) -> Option<&'a mut JobController<Arc<HordeJob>>> {
+                Some(&mut self.controller)
+            }
+        }
+        self.run_action(Mapper { map, controller });
+    }
+
+    fn on_change_time(&mut self, map: &TypedAnyActionMapGroupedByEntityId, time: TimeMilliseconds) {
+        struct Mapper<'a> {
+            map: &'a TypedAnyActionMapGroupedByEntityId,
+            time: TimeMilliseconds,
+        }
+        impl<'a> MapperTrait for Mapper<'a> {
+            fn get_cloned<T>(&self) -> Option<Vec<ArcAction<T>>>
+            where
+                T: 'static,
+            {
+                self.map.get_cloned()
+            }
+            fn time(&self) -> TimeMilliseconds {
+                self.time
+            }
+        }
+        self.run_action(Mapper { map, time });
+    }
+
+    fn on_cancel_job(&mut self, _entity_id: EntityId, mut jobs: Vec<Self::Job>) {
+        while let Some(job) = jobs.pop() {
+            match job.as_ref() {
+                HordeJob::Wander => {}
+                HordeJob::Wait(_) => {}
+                HordeJob::GoDestination => {}
+            }
+        }
+    }
+
+    fn on_first(&self, entity_id: EntityId, priority: u32) -> Self::Job {
+        let entity_types = self.entity_types.read();
+        let entity_types = entity_types.get();
+        let entity_type = entity_types.get(entity_id).unwrap();
+        match entity_type {
+            EntityType::Player => match priority {
+                0 => Arc::new(HordeJob::GoDestination),
+                _ => Arc::new(HordeJob::Wait(3000)),
+            },
+            EntityType::Enemy => match priority {
+                0 => Arc::new(HordeJob::Wander),
+                _ => Arc::new(HordeJob::Wait(3000)),
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    fn on_next(
+        &self,
+        entity_id: EntityId,
+        job: Self::Job,
+        controller: &mut ActionController,
+    ) -> Option<Self::Job> {
+        match job.as_ref() {
+            HordeJob::Wander => return run_wander_job(self, entity_id, controller),
+            HordeJob::Wait(duration) => {
+                controller.enqueue(entity_id, Arc::new(WaitState), *duration);
+            }
+            HordeJob::GoDestination => return run_go_destination_job(self, entity_id, controller),
+        }
+        None
+    }
+}
+
+fn run_wander_job(
+    game: &Game,
+    entity_id: EntityId,
+    controller: &mut ActionController,
+) -> Option<Arc<HordeJob>> {
+    let mut rng: rand::rngs::StdRng =
+        rand::SeedableRng::seed_from_u64(entity_id * (controller.current_tick() + 1));
+
+    let scaled_positions = game.scaled_positions.read();
+    let scaled_positions = scaled_positions.get();
+    let scaled_position = scaled_positions.get(entity_id)?;
+
+    let steps: usize = rng.gen_range(5..10);
+    let mut first = scaled_position.0.clone_owned();
+    for _ in 0..steps {
+        let passage_entity_id = *game.passages.get(&first)?;
+        let paths = game.paths.read();
+        let paths = paths.get();
+        let passage_paths = paths.get(passage_entity_id)?;
+
+        if passage_paths.is_empty() {
+            break;
+        }
+        let next = &passage_paths[rng.gen_range(0..passage_paths.len())];
+        controller.enqueue_with_options(
+            entity_id,
+            Arc::new(WalkState {
+                from_scaled: first.clone_owned(),
+                to_scaled: next.to.clone_owned(),
+                from: calc_center_from_scaled_position(&first),
+                to: calc_center_from_scaled_position(&next.to),
+            }),
+            rng.gen_range(1..3) * 500,
+            EnqueueOptions { each: true },
+        );
+        first = next.to.clone_owned();
+    }
+    controller.enqueue(entity_id, Arc::new(WaitState), rng.gen_range(2000..3000));
+    None
+}
+
+fn run_go_destination_job(
+    game: &Game,
+    entity_id: EntityId,
+    controller: &mut ActionController,
+) -> Option<Arc<HordeJob>> {
+    let directions = game.directions.read();
+    let directions = directions.get();
+    let direction = directions.get(entity_id)?;
+
+    if let DirectionState::None = direction.0 {
+        return Some(Arc::new(HordeJob::Wait(TimeMilliseconds::MAX)));
+    }
+
+    let scaled_positions = game.scaled_positions.read();
+    let scaled_positions = scaled_positions.get();
+    let scaled_position = scaled_positions.get(entity_id)?;
+
+    let positions = game.positions.read();
+    let positions = positions.get();
+    let position = positions.get(entity_id)?;
+
+    let position = calc_position_from_ratio(
+        &position.from.0,
+        &position.to.0,
+        calc_ratio_f32_from_tick(
+            position.from.1.value,
+            position.to.1.value,
+            controller.current_tick(),
+        ),
+    );
+
+    let to_scaled_position = scaled_position.0 + direction.0.get_vec2();
+
+    let passage_entity_id = game.passages.get(&scaled_position.0)?;
+    let paths = game.paths.read();
+    let paths = paths.get();
+    let paths = paths.get(*passage_entity_id)?;
+
+    let has_path = paths.iter().any(|path| path.to == to_scaled_position);
+    if !has_path {
+        return Some(Arc::new(HordeJob::Wait(TimeMilliseconds::MAX)));
+    }
+
+    let to_position = calc_center_from_scaled_position(&to_scaled_position);
+    let cell_distance = distance(&to_position, &position) / CELL_SCALE_SIZE;
+
+    controller.enqueue_with_options(
+        entity_id,
+        Arc::new(WalkState {
+            from_scaled: scaled_position.0.clone_owned(),
+            to_scaled: to_scaled_position.clone_owned(),
+            from: position.clone_owned(),
+            to: to_position,
+        }),
+        (cell_distance * PLAYER_SPEED) as TimeMilliseconds,
+        EnqueueOptions { each: true },
+    );
+
+    Some(Arc::new(HordeJob::Wait(TimeMilliseconds::MAX)))
+}
+
+pub struct CreatePlayerParams<'a> {
+    pub job_manager: &'a mut JobManager<Game>,
+    pub initial_position: TVec2<i32>,
+    pub entity_type: EntityType,
+}
+
+fn create_cell(game: &mut Game, params: CreatePlayerParams) -> EntityId {
+    let entity_id = game.entity_manager.gen();
+    let position = calc_center_from_scaled_position(&params.initial_position);
+    game.positions.write().get_mut().push(
+        entity_id,
+        PositionData {
+            current: position.clone_owned(),
+            from: (
+                position.clone_owned(),
+                TickData {
+                    value: params.job_manager.current_tick(),
+                },
+            ),
+            to: (
+                position.clone_owned(),
+                TickData {
+                    value: params.job_manager.current_tick(),
+                },
+            ),
+        },
+    );
+    game.scaled_positions.write().get_mut().push(
+        entity_id,
+        ScaledPositionData(params.initial_position.clone_owned()),
+    );
+    game.colors
+        .write()
+        .get_mut()
+        .push(entity_id, ColorData(vec3(1.0f32, 0.0f32, 0.0f32)));
+    game.entity_types
+        .write()
+        .get_mut()
+        .push(entity_id, params.entity_type);
+    game.directions
+        .write()
+        .get_mut()
+        .push(entity_id, DirectionData(DirectionState::None));
+
+    params.job_manager.attach(entity_id);
+
+    entity_id
+}
+
+pub struct CreatePassageParams {
+    pub initial_position: TVec2<i32>,
+    pub directions: Vec<Direction>,
+}
+
+fn create_passage(game: &mut Game, params: CreatePassageParams) -> EntityId {
+    let entity_id = game.entity_manager.gen();
+    game.scaled_positions.write().get_mut().push(
+        entity_id,
+        ScaledPositionData(params.initial_position.clone_owned()),
+    );
+
+    let mut paths = Vec::new();
+    for direction in params.directions {
+        let scaled_to = match direction {
+            Direction::North => vec2(0, -1),
+            Direction::South => vec2(0, 1),
+            Direction::East => vec2(1, 0),
+            Direction::West => vec2(-1, 0),
+        } + params.initial_position;
+        paths.push(PathData {
+            from: params.initial_position.clone_owned(),
+            to: scaled_to,
+        });
+    }
+
+    game.paths.write().get_mut().push(entity_id, paths);
+
+    game.entity_types
+        .write()
+        .get_mut()
+        .push(entity_id, EntityType::Passage);
+
+    entity_id
+}
+
+pub struct RestoreCellParams {
+    entity_id: EntityId,
+}
+
+fn restore_cell(game: &mut Game, params: RestoreCellParams) -> Option<()> {
+    let positions = game.positions.read();
+    let positions = positions.get();
+    let position = positions.get(params.entity_id)?;
+
+    let colors = game.colors.read();
+    let colors = colors.get();
+    let color = colors.get(params.entity_id)?;
+
+    game.renderer
+        .add_sprite(params.entity_id, &position.current);
+    game.renderer
+        .update_sprite_color(params.entity_id, &color.0);
+
+    let mut p = Vector2::new(0.05f32, 0.05f32);
+    if game.player_id == params.entity_id {
+        game.renderer.update_camera_target_position(&vec3(
+            position.current.x,
+            0.0f32,
+            position.current.y,
+        ));
+        p = Vector2::new(position.current.x, position.current.y);
+    }
+
+    let handler = game.colliders.write().unwrap().insert(
+        ColliderBuilder::ball(CELL_SCALE_SIZE / 2.0f32 * 0.5f32)
+            .translation(p)
+            .active_collision_types(ActiveCollisionTypes::all())
+            .active_events(ActiveEvents::INTERSECTION_EVENTS)
+            .sensor(true)
+            .user_data(params.entity_id as u128)
+            .build(),
+    );
+    game.collider_handlers
+        .write()
+        .unwrap()
+        .insert(params.entity_id, handler);
+
+    Some(())
+}
+
+struct RestorePassageParams {
+    entity_id: EntityId,
+}
+
+fn restore_passage(game: &mut Game, params: RestorePassageParams) -> Option<()> {
+    let scaled_positions = game.scaled_positions.read();
+    let scaled_positions = scaled_positions.get();
+    let scaled_position = scaled_positions.get(params.entity_id)?;
+
+    let paths = game.paths.read();
+    let paths = paths.get();
+    let paths = paths.get(params.entity_id)?;
+
+    game.passages.set(&scaled_position.0, params.entity_id);
+
+    game.renderer.add_line(
+        params.entity_id,
+        &paths
+            .iter()
+            .map(|path| {
+                (
+                    calc_center_from_scaled_position(&path.from),
+                    calc_center_from_scaled_position(&path.to),
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    Some(())
+}
+
+struct RestoreEntityParams<'a> {
+    entity_id: EntityId,
+    game: &'a mut Game,
+    #[allow(dead_code)]
+    current_tick: Tick,
+}
+
+fn restore_entity(params: RestoreEntityParams) {
+    let entity_types = params.game.entity_types.read();
+    let entity_types = entity_types.get();
+    let entity_type = match entity_types.get(params.entity_id) {
+        None => return,
+        Some(entity_type) => entity_type,
+    };
+    match entity_type {
+        EntityType::Player => {
+            restore_cell(
+                params.game,
+                RestoreCellParams {
+                    entity_id: params.entity_id,
+                },
+            );
+        }
+        EntityType::Enemy => {
+            restore_cell(
+                params.game,
+                RestoreCellParams {
+                    entity_id: params.entity_id,
+                },
+            );
+        }
+        EntityType::Passage => {
+            restore_passage(
+                params.game,
+                RestorePassageParams {
+                    entity_id: params.entity_id,
+                },
+            );
+        }
+    }
 }
 
 impl Game {
@@ -216,11 +637,17 @@ impl Game {
             entity_types: Default::default(),
             directions: Default::default(),
             passages: Default::default(),
+            colliders: Arc::new(RwLock::new(ColliderSet::new())),
+            collider_handlers: Default::default(),
+            collision_pipeline: CollisionPipeline::new(),
+            broad_phase: BroadPhase::new(),
+            narrow_phase: NarrowPhase::new(),
+            rigid_bodies: RigidBodySet::new(),
             renderer,
         }
     }
 
-    fn run_action<T>(&mut self, map: T)
+    fn run_action<T>(&mut self, mut map: T)
     where
         T: MapperTrait,
     {
@@ -238,6 +665,7 @@ impl Game {
                 let walk_actions = Arc::clone(&walk_actions);
                 let sender = Sender::clone(&sender);
                 let time = map.time();
+                let tick = map.tick();
                 let player_id = self.player_id;
 
                 self.pool.execute(move || {
@@ -304,7 +732,11 @@ impl Game {
                                             .unwrap();
                                     }
                                 }
-                                ActionType::EachTick { .. } => {}
+                                ActionType::EachTick { start, end } => {
+                                    let ratio = calc_ratio_f32_from_tick(*start, *end, tick);
+                                    let p = calc_position_from_ratio(&state.from, &state.to, ratio);
+                                    position.current = p;
+                                }
                             }
                         }
                     }
@@ -383,6 +815,7 @@ impl Game {
             {
                 let rsync_child = rsync.child();
                 let mut directions = self.directions.write();
+                let walk_actions = Arc::clone(&walk_actions);
 
                 self.pool.execute(move || {
                     rsync_child.begin();
@@ -410,6 +843,47 @@ impl Game {
                     }
                 });
             }
+            /*{
+                let rsync_child = rsync.child();
+                let colliders = Arc::clone(&self.colliders);
+                let collider_handlers = Arc::clone(&self.collider_handlers);
+                let positions = self.positions.read();
+                let player_id = self.player_id;
+
+                self.pool.execute(move || {
+                    rsync_child.begin();
+                    let positions = positions.get();
+                    let collider_handlers = collider_handlers.read().unwrap();
+                    let mut colliders = colliders.write().unwrap();
+                    rsync_child.end();
+
+                    for walk_action in walk_actions.iter() {
+                        if let Some(position) = positions.get(walk_action.entity_id()) {
+                            if let Some(collider_handler) =
+                                collider_handlers.get(&walk_action.entity_id())
+                            {
+                                if let Some(collider) = colliders.get_mut(*collider_handler) {
+                                    match walk_action.ty() {
+                                        ActionType::Start { .. } => {}
+                                        ActionType::Update { .. } => {}
+                                        ActionType::End { .. } => {}
+                                        ActionType::EachTick { .. } => {
+                                            if player_id == walk_action.entity_id() {
+                                                collider.set_translation(Vector2::new(
+                                                    position.current.x,
+                                                    position.current.y,
+                                                ));
+                                            } else {
+                                                println!("{:?}", collider.translation());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }*/
         }
         if let Some(wait_actions) = map.get_cloned::<WaitState>() {
             let wait_actions = Arc::new(wait_actions);
@@ -506,8 +980,80 @@ impl Game {
             });
         }
 
+        if map.controller().is_some() {
+            let rsync_child = rsync.child();
+            let positions = self.positions.read();
+            let colliders = Arc::clone(&self.colliders);
+            let collider_handlers = Arc::clone(&self.collider_handlers);
+            self.pool.execute(move || {
+                rsync_child.begin();
+                let positions = positions.get();
+                let collider_handlers = collider_handlers.read().unwrap();
+                let mut colliders = colliders.write().unwrap();
+                rsync_child.end();
+
+                for (entity_id, position) in positions.iter() {
+                    let handler = match collider_handlers.get(&entity_id) {
+                        None => continue,
+                        Some(handler) => handler,
+                    };
+                    let collider = match colliders.get_mut(*handler) {
+                        None => continue,
+                        Some(handler) => handler,
+                    };
+                    collider.set_translation(Vector2::new(position.current.x, position.current.y));
+                }
+            });
+        }
+
         rsync.join();
         self.pool.join();
+
+        if map.controller().is_some() {
+            let (intersection_send, intersection_recv) = crossbeam::channel::unbounded();
+            let (collision_send, _collision_recv) = crossbeam::channel::unbounded();
+            let event_handler = ChannelEventCollector::new(intersection_send, collision_send);
+            let integration_parameters = IntegrationParameters::default();
+            self.collision_pipeline.step(
+                integration_parameters.prediction_distance,
+                &mut self.broad_phase,
+                &mut self.narrow_phase,
+                &mut self.rigid_bodies,
+                &mut self.colliders.write().unwrap(),
+                &(),
+                &event_handler,
+            );
+            {
+                let colliders = self.colliders.read().unwrap();
+                let entity_types = self.entity_types.read();
+                let entity_types = entity_types.get();
+                while let Ok(event) = intersection_recv.try_recv() {
+                    let IntersectionEvent {
+                        collider1,
+                        collider2,
+                        intersecting,
+                    } = event;
+                    if intersecting {
+                        let a = colliders.get(collider1).unwrap().user_data as EntityId;
+                        let b = colliders.get(collider2).unwrap().user_data as EntityId;
+                        let a_type = match entity_types.get(a) {
+                            None => continue,
+                            Some(ty) => ty,
+                        };
+                        let b_type = match entity_types.get(b) {
+                            None => continue,
+                            Some(ty) => ty,
+                        };
+                        if a_type == &EntityType::Player && b_type == &EntityType::Enemy {
+                            sender.send(Command::DestroyEntity(b)).unwrap();
+                        }
+                        if b_type == &EntityType::Player && a_type == &EntityType::Enemy {
+                            sender.send(Command::DestroyEntity(a)).unwrap();
+                        }
+                    };
+                }
+            }
+        }
 
         while let Ok(command) = receiver.try_recv() {
             match command {
@@ -520,418 +1066,13 @@ impl Game {
                 Command::UpdateCameraPosition(position) => {
                     self.renderer.update_camera_target_position(&position);
                 }
-            }
-        }
-    }
-}
-
-impl HordeInterface for Game {
-    type Job = Arc<HordeJob>;
-
-    fn on_change_tick(&mut self, map: &TypedAnyActionMap, validator: &ActionSessionValidator) {
-        struct Mapper<'a> {
-            map: &'a TypedAnyActionMap,
-            validator: &'a ActionSessionValidator<'a>,
-        }
-        impl<'a> MapperTrait for Mapper<'a> {
-            fn get_cloned<T>(&self) -> Option<Vec<ArcAction<T>>>
-            where
-                T: 'static,
-            {
-                self.map.get_cloned(self.validator)
-            }
-        }
-        self.run_action(Mapper { map, validator });
-    }
-
-    fn on_change_time(&mut self, map: &TypedAnyActionMapGroupedByEntityId, time: TimeMilliseconds) {
-        struct Mapper<'a> {
-            map: &'a TypedAnyActionMapGroupedByEntityId,
-            time: TimeMilliseconds,
-        }
-        impl<'a> MapperTrait for Mapper<'a> {
-            fn get_cloned<T>(&self) -> Option<Vec<ArcAction<T>>>
-            where
-                T: 'static,
-            {
-                self.map.get_cloned()
-            }
-            fn time(&self) -> TimeMilliseconds {
-                self.time
-            }
-        }
-        self.run_action(Mapper { map, time });
-    }
-
-    fn on_cancel_job(&mut self, _entity_id: EntityId, mut jobs: Vec<Self::Job>) {
-        while let Some(job) = jobs.pop() {
-            match job.as_ref() {
-                HordeJob::Wander => {}
-                HordeJob::Wait(_) => {}
-                HordeJob::GoDestination => {}
+                Command::DestroyEntity(entity_id) => {
+                    self.destroy_entity(map.controller().unwrap(), entity_id);
+                }
             }
         }
     }
 
-    fn on_first(&self, entity_id: EntityId, priority: u32) -> Self::Job {
-        let entity_types = self.entity_types.read();
-        let entity_types = entity_types.get();
-        let entity_type = entity_types.get(entity_id).unwrap();
-        match entity_type {
-            EntityType::Player => match priority {
-                0 => Arc::new(HordeJob::GoDestination),
-                _ => Arc::new(HordeJob::Wait(3000)),
-            },
-            EntityType::Enemy => match priority {
-                0 => Arc::new(HordeJob::Wander),
-                _ => Arc::new(HordeJob::Wait(3000)),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    fn on_next(
-        &self,
-        entity_id: EntityId,
-        job: Self::Job,
-        controller: &mut ActionController,
-    ) -> Option<Self::Job> {
-        match job.as_ref() {
-            HordeJob::Wander => return run_wander_job(self, entity_id, controller),
-            HordeJob::Wait(duration) => {
-                controller.enqueue(entity_id, Arc::new(WaitState), *duration);
-            }
-            HordeJob::GoDestination => return run_go_destination_job(self, entity_id, controller),
-        }
-        None
-    }
-}
-
-fn run_wander_job(
-    game: &Game,
-    entity_id: EntityId,
-    controller: &mut ActionController,
-) -> Option<Arc<HordeJob>> {
-    let mut rng: rand::rngs::StdRng =
-        rand::SeedableRng::seed_from_u64(entity_id * (controller.current_tick() + 1));
-
-    let scaled_positions = game.scaled_positions.read();
-    let scaled_positions = scaled_positions.get();
-    let scaled_position = scaled_positions.get(entity_id)?;
-
-    let steps: usize = rng.gen_range(5..10);
-    let mut first = scaled_position.0.clone_owned();
-    for _ in 0..steps {
-        let passage_entity_id = *game.passages.get(&first)?;
-        let paths = game.paths.read();
-        let paths = paths.get();
-        let passage_paths = paths.get(passage_entity_id)?;
-
-        if passage_paths.is_empty() {
-            break;
-        }
-        let next = &passage_paths[rng.gen_range(0..passage_paths.len())];
-        controller.enqueue(
-            entity_id,
-            Arc::new(WalkState {
-                from_scaled: first.clone_owned(),
-                to_scaled: next.to.clone_owned(),
-                from: calc_center_from_scaled_position(&first),
-                to: calc_center_from_scaled_position(&next.to),
-            }),
-            rng.gen_range(1..3) * 500,
-        );
-        first = next.to.clone_owned();
-    }
-    controller.enqueue(entity_id, Arc::new(WaitState), rng.gen_range(2000..3000));
-    None
-}
-
-fn run_go_destination_job(
-    game: &Game,
-    entity_id: EntityId,
-    controller: &mut ActionController,
-) -> Option<Arc<HordeJob>> {
-    let directions = game.directions.read();
-    let directions = directions.get();
-    let direction = directions.get(entity_id)?;
-
-    if let DirectionState::None = direction.0 {
-        return Some(Arc::new(HordeJob::Wait(TimeMilliseconds::MAX)));
-    }
-
-    let scaled_positions = game.scaled_positions.read();
-    let scaled_positions = scaled_positions.get();
-    let scaled_position = scaled_positions.get(entity_id)?;
-
-    let positions = game.positions.read();
-    let positions = positions.get();
-    let position = positions.get(entity_id)?;
-
-    let position = calc_position_from_ratio(
-        &position.from.0,
-        &position.to.0,
-        calc_ratio_f32_from_tick(
-            position.from.1.value,
-            position.to.1.value,
-            controller.current_tick(),
-        ),
-    );
-
-    let center_of_scaled_position = calc_center_from_scaled_position(&scaled_position.0);
-    let to_scaled_position = if position.x != center_of_scaled_position.x {
-        if position.x < center_of_scaled_position.x {
-            match direction.0 {
-                DirectionState::Right => vec2(scaled_position.0.x, scaled_position.0.y),
-                DirectionState::Left => vec2(scaled_position.0.x - 1, scaled_position.0.y),
-                _ => scaled_position.0.clone_owned(),
-            }
-        } else {
-            match direction.0 {
-                DirectionState::Right => vec2(scaled_position.0.x + 1, scaled_position.0.y),
-                DirectionState::Left => vec2(scaled_position.0.x, scaled_position.0.y),
-                _ => scaled_position.0.clone_owned(),
-            }
-        }
-    } else if position.y != center_of_scaled_position.y {
-        if position.y < center_of_scaled_position.y {
-            match direction.0 {
-                DirectionState::Up => vec2(scaled_position.0.x, scaled_position.0.y - 1),
-                DirectionState::Down => vec2(scaled_position.0.x, scaled_position.0.y),
-                _ => scaled_position.0.clone_owned(),
-            }
-        } else {
-            match direction.0 {
-                DirectionState::Up => vec2(scaled_position.0.x, scaled_position.0.y),
-                DirectionState::Down => vec2(scaled_position.0.x, scaled_position.0.y + 1),
-                _ => scaled_position.0.clone_owned(),
-            }
-        }
-    } else {
-        scaled_position.0 + direction.0.get_vec2()
-    };
-
-    let passage_entity_id = game.passages.get(&scaled_position.0)?;
-    let paths = game.paths.read();
-    let paths = paths.get();
-    let paths = paths.get(*passage_entity_id)?;
-
-    let has_path = paths.iter().any(|path| path.to == to_scaled_position);
-    if !has_path {
-        return Some(Arc::new(HordeJob::Wait(TimeMilliseconds::MAX)));
-    }
-
-    let to_position = calc_center_from_scaled_position(&to_scaled_position);
-    let cell_distance = distance(&to_position, &position) / CELL_SCALE_SIZE;
-
-    controller.enqueue(
-        entity_id,
-        Arc::new(WalkState {
-            from_scaled: scaled_position.0.clone_owned(),
-            to_scaled: to_scaled_position.clone_owned(),
-            from: position.clone_owned(),
-            to: to_position,
-        }),
-        (cell_distance * PLAYER_SPEED) as TimeMilliseconds,
-    );
-
-    Some(Arc::new(HordeJob::Wait(TimeMilliseconds::MAX)))
-}
-
-pub struct CreatePlayerParams<'a> {
-    pub job_manager: &'a mut JobManager<Game>,
-    pub initial_position: TVec2<i32>,
-    pub entity_type: EntityType,
-}
-
-fn create_cell(game: &mut Game, params: CreatePlayerParams) -> EntityId {
-    let entity_id = game.entity_manager.gen();
-    let position = calc_center_from_scaled_position(&params.initial_position);
-    game.positions.write().get_mut().push(
-        entity_id,
-        PositionData {
-            from: (
-                position.clone_owned(),
-                TickData {
-                    value: params.job_manager.current_tick(),
-                },
-            ),
-            to: (
-                position.clone_owned(),
-                TickData {
-                    value: params.job_manager.current_tick(),
-                },
-            ),
-        },
-    );
-    game.scaled_positions.write().get_mut().push(
-        entity_id,
-        ScaledPositionData(params.initial_position.clone_owned()),
-    );
-    game.colors
-        .write()
-        .get_mut()
-        .push(entity_id, ColorData(vec3(1.0f32, 0.0f32, 0.0f32)));
-    game.entity_types
-        .write()
-        .get_mut()
-        .push(entity_id, params.entity_type);
-    game.directions
-        .write()
-        .get_mut()
-        .push(entity_id, DirectionData(DirectionState::None));
-
-    params.job_manager.attach(entity_id);
-
-    entity_id
-}
-
-pub struct CreatePassageParams {
-    pub initial_position: TVec2<i32>,
-    pub directions: Vec<Direction>,
-}
-
-fn create_passage(game: &mut Game, params: CreatePassageParams) -> EntityId {
-    let entity_id = game.entity_manager.gen();
-    game.scaled_positions.write().get_mut().push(
-        entity_id,
-        ScaledPositionData(params.initial_position.clone_owned()),
-    );
-
-    let mut paths = Vec::new();
-    for direction in params.directions {
-        let scaled_to = match direction {
-            Direction::North => vec2(0, -1),
-            Direction::South => vec2(0, 1),
-            Direction::East => vec2(1, 0),
-            Direction::West => vec2(-1, 0),
-        } + params.initial_position;
-        paths.push(PathData {
-            from: params.initial_position.clone_owned(),
-            to: scaled_to,
-        });
-    }
-
-    game.paths.write().get_mut().push(entity_id, paths);
-
-    game.entity_types
-        .write()
-        .get_mut()
-        .push(entity_id, EntityType::Passage);
-
-    entity_id
-}
-
-pub struct RestoreCellParams {
-    entity_id: EntityId,
-    current_tick: Tick,
-}
-
-fn restore_cell(game: &mut Game, params: RestoreCellParams) -> Option<()> {
-    let positions = game.positions.read();
-    let positions = positions.get();
-    let position = positions.get(params.entity_id)?;
-
-    let colors = game.colors.read();
-    let colors = colors.get();
-    let color = colors.get(params.entity_id)?;
-
-    let position = calc_position_from_ratio(
-        &position.from.0,
-        &position.to.0,
-        calc_ratio_f32_from_tick(
-            position.from.1.value,
-            position.to.1.value,
-            params.current_tick,
-        ),
-    );
-    game.renderer.add_sprite(params.entity_id, &position);
-    game.renderer
-        .update_sprite_color(params.entity_id, &color.0);
-
-    if game.player_id == params.entity_id {
-        game.renderer
-            .update_camera_target_position(&vec3(position.x, 0.0f32, position.y))
-    }
-
-    Some(())
-}
-
-struct RestorePassageParams {
-    entity_id: EntityId,
-}
-
-fn restore_passage(game: &mut Game, params: RestorePassageParams) -> Option<()> {
-    let scaled_positions = game.scaled_positions.read();
-    let scaled_positions = scaled_positions.get();
-    let scaled_position = scaled_positions.get(params.entity_id)?;
-
-    let paths = game.paths.read();
-    let paths = paths.get();
-    let paths = paths.get(params.entity_id)?;
-
-    game.passages.set(&scaled_position.0, params.entity_id);
-
-    game.renderer.add_line(
-        params.entity_id,
-        &paths
-            .iter()
-            .map(|path| {
-                (
-                    calc_center_from_scaled_position(&path.from),
-                    calc_center_from_scaled_position(&path.to),
-                )
-            })
-            .collect::<Vec<_>>(),
-    );
-
-    Some(())
-}
-
-struct RestoreEntityParams<'a> {
-    entity_id: EntityId,
-    game: &'a mut Game,
-    current_tick: Tick,
-}
-
-fn restore_entity(params: RestoreEntityParams) {
-    let entity_types = params.game.entity_types.read();
-    let entity_types = entity_types.get();
-    let entity_type = match entity_types.get(params.entity_id) {
-        None => return,
-        Some(entity_type) => entity_type,
-    };
-    match entity_type {
-        EntityType::Player => {
-            restore_cell(
-                params.game,
-                RestoreCellParams {
-                    entity_id: params.entity_id,
-                    current_tick: params.current_tick,
-                },
-            );
-        }
-        EntityType::Enemy => {
-            restore_cell(
-                params.game,
-                RestoreCellParams {
-                    entity_id: params.entity_id,
-                    current_tick: params.current_tick,
-                },
-            );
-        }
-        EntityType::Passage => {
-            restore_passage(
-                params.game,
-                RestorePassageParams {
-                    entity_id: params.entity_id,
-                },
-            );
-        }
-    }
-}
-
-impl Game {
     pub fn restore(&mut self, current_tick: Tick) {
         for entity_id in self.entity_manager.pull_vacated_entities() {
             restore_entity(RestoreEntityParams {
@@ -942,7 +1083,11 @@ impl Game {
         }
     }
 
-    pub fn destroy_entity(&mut self, job_manager: &mut JobManager<Game>, entity_id: EntityId) {
+    pub fn destroy_entity(
+        &mut self,
+        job_controller: &mut JobController<Arc<HordeJob>>,
+        entity_id: EntityId,
+    ) {
         self.entity_manager.free(entity_id);
 
         self.positions.write().get_mut().remove(entity_id);
@@ -952,10 +1097,20 @@ impl Game {
         self.entity_types.write().get_mut().remove(entity_id);
         self.directions.write().get_mut().remove(entity_id);
 
+        // TODO: Remove entity from passages
+        if let Some(collider_handler) = self.collider_handlers.write().unwrap().remove(&entity_id) {
+            self.colliders.write().unwrap().remove(
+                collider_handler,
+                &mut IslandManager::new(),
+                &mut self.rigid_bodies,
+                false,
+            );
+        }
+
         self.renderer.remove_sprite(entity_id);
         self.renderer.remove_lines(entity_id);
 
-        job_manager.detach(entity_id);
+        job_controller.detach(entity_id);
     }
 
     pub fn create_cell(&mut self, params: CreatePlayerParams) -> EntityId {
@@ -1020,7 +1175,7 @@ impl Game {
             .cloned()
             .collect::<Vec<_>>();
         for entity_id in entity_ids {
-            self.destroy_entity(job_manager, entity_id);
+            self.destroy_entity(&mut job_manager.controller(), entity_id);
         }
 
         let file = file_util();

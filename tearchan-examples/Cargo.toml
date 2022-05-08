@@ -51,6 +51,8 @@ serde = { version = "1.0.125", features = ["rc"] }
 serde_json = { version = "1.0.79", features = ["raw_value"] }
 wavefront_obj = "9.0.0"
 maze_generator = "2.0.0"
+rapier2d = "0.11.2"
+crossbeam = "0.8.1"
 
 [build-dependencies]
 shaderc = "0.6.2"
