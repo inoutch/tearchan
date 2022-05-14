@@ -219,6 +219,11 @@ impl<'a, T> JobController<'a, T> {
     pub fn current_tick(&self) -> Tick {
         self.action_manager.current_tick()
     }
+
+    #[inline]
+    pub fn cancel(&mut self, entity_id: EntityId, immediate: bool) {
+        self.action_manager.cancel(entity_id, immediate);
+    }
 }
 
 #[derive(Serialize, Deserialize)]
