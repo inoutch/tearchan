@@ -18,7 +18,7 @@ pub trait HordeInterface {
     fn on_first(&self, entity_id: EntityId, priority: u32) -> Self::Job;
 
     fn on_next(
-        &self,
+        &mut self,
         entity_id: EntityId,
         job: Self::Job,
         controller: &mut ActionController,

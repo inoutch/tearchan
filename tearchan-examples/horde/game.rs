@@ -302,7 +302,7 @@ impl HordeInterface for Game {
     }
 
     fn on_next(
-        &self,
+        &mut self,
         entity_id: EntityId,
         job: Self::Job,
         controller: &mut ActionController,
