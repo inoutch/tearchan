@@ -114,8 +114,8 @@ impl<'a> EntityToken<'a> {
         self.entity_id
     }
 
-    pub fn commit(mut self) {
-        self.guard_id_manager.gen();
+    pub fn commit(mut self) -> EntityId {
+        self.guard_id_manager.gen()
     }
 }
 
