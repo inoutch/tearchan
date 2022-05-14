@@ -34,9 +34,9 @@ impl IdManager {
         *self.incremental_id_manager.current()
     }
 
-    pub fn free(&mut self, entity_id: EntityId) {
+    pub fn free(&mut self, entity_id: EntityId) -> bool {
         self.vacated_entities.remove(&entity_id);
-        self.entity_ids.remove(&entity_id);
+        self.entity_ids.remove(&entity_id)
     }
 
     pub fn iter(&self) -> Iter<EntityId> {
@@ -65,8 +65,8 @@ impl EntityManager {
         self.0.write().unwrap().gen()
     }
 
-    pub fn free(&self, entity_id: EntityId) {
-        self.0.write().unwrap().free(entity_id);
+    pub fn free(&self, entity_id: EntityId) -> bool {
+        self.0.write().unwrap().free(entity_id)
     }
 
     pub fn read(&self) -> EntityManagerReader {
