@@ -697,6 +697,11 @@ impl<'a> ActionController<'a> {
     }
 
     #[inline]
+    pub fn tick_duration(&self) -> TimeMilliseconds {
+        self.tick_duration
+    }
+
+    #[inline]
     pub fn attach(&mut self, entity_id: EntityId) {
         debug_assert!(!self.contexts.contains_key(&entity_id));
 
