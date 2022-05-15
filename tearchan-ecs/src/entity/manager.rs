@@ -30,8 +30,12 @@ impl IdManager {
         entity_id
     }
 
-    pub fn next(&self) -> EntityId {
+    pub fn current(&self) -> EntityId {
         *self.incremental_id_manager.current()
+    }
+
+    pub fn next(&self, current: EntityId) -> EntityId {
+        self.incremental_id_manager.next(current)
     }
 
     pub fn free(&mut self, entity_id: EntityId) -> bool {
@@ -94,8 +98,9 @@ impl EntityManager {
     pub fn begin(&self) -> EntityToken {
         let guard = self.0.write().unwrap();
         EntityToken {
-            entity_id: guard.next(),
+            entity_id: guard.current(),
             guard_id_manager: guard,
+            count: 1,
         }
     }
 
@@ -107,15 +112,20 @@ impl EntityManager {
 pub struct EntityToken<'a> {
     entity_id: EntityId,
     guard_id_manager: RwLockWriteGuard<'a, IdManager>,
+    count: usize,
 }
 
 impl<'a> EntityToken<'a> {
-    pub fn entity_id(&self) -> EntityId {
-        self.entity_id
+    pub fn gen(&mut self) -> EntityId {
+        let entity_id = self.entity_id;
+        self.entity_id = self.guard_id_manager.next(entity_id);
+        entity_id
     }
 
-    pub fn commit(mut self) -> EntityId {
-        self.guard_id_manager.gen()
+    pub fn commit(mut self) {
+        for _ in 0..self.count {
+            self.guard_id_manager.gen();
+        }
     }
 }
 
@@ -231,24 +241,24 @@ mod test {
     fn test_commitment() {
         let entity_manager = EntityManager::default();
         let entity_id0 = {
-            let token = entity_manager.begin();
-            let entity_id = token.entity_id();
+            let mut token = entity_manager.begin();
+            let entity_id = token.gen();
             token.commit();
             entity_id
         };
         {
-            let token = entity_manager.begin();
-            let _entity_id = token.entity_id();
+            let mut token = entity_manager.begin();
+            let _entity_id = token.gen();
         };
         let entity_id1 = {
-            let token = entity_manager.begin();
-            let entity_id = token.entity_id();
+            let mut token = entity_manager.begin();
+            let entity_id = token.gen();
             token.commit();
             entity_id
         };
         {
-            let token = entity_manager.begin();
-            let _entity_id = token.entity_id();
+            let mut token = entity_manager.begin();
+            let _entity_id = token.gen();
         };
         assert_eq!(
             entity_manager

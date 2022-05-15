@@ -30,6 +30,11 @@ impl<T> IdManager<T> {
         self.current.lock().unwrap()
     }
 
+    pub fn next(&self, value: T) -> T {
+        let incrementer = &self.incrementer;
+        incrementer(&value)
+    }
+
     pub fn create_generator(&self) -> IdGenerator<T> {
         IdGenerator {
             current: Arc::clone(&self.current),
