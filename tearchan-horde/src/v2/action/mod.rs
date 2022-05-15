@@ -59,14 +59,14 @@ impl ActionType {
         match self {
             ActionType::Start { start, end, each } => {
                 let start = if positive {
-                    start.wrapping_add(tick)
+                    start.saturating_add(tick)
                 } else {
-                    start.wrapping_sub(tick)
+                    start.saturating_sub(tick)
                 };
                 let end = if positive {
-                    end.wrapping_add(tick)
+                    end.saturating_add(tick)
                 } else {
-                    end.wrapping_sub(tick)
+                    end.saturating_sub(tick)
                 };
                 ActionType::Start {
                     start,
@@ -76,40 +76,40 @@ impl ActionType {
             }
             ActionType::Update { start, end } => {
                 let start = if positive {
-                    start.wrapping_add(tick * tick_duration)
+                    start.saturating_add(tick * tick_duration)
                 } else {
-                    start.wrapping_sub(tick * tick_duration)
+                    start.saturating_sub(tick * tick_duration)
                 };
                 let end = if positive {
-                    end.wrapping_add(tick * tick_duration)
+                    end.saturating_add(tick * tick_duration)
                 } else {
-                    end.wrapping_sub(tick * tick_duration)
+                    end.saturating_sub(tick * tick_duration)
                 };
                 ActionType::Update { start, end }
             }
             ActionType::End { start, end } => {
                 let start = if positive {
-                    start.wrapping_add(tick)
+                    start.saturating_add(tick)
                 } else {
-                    start.wrapping_sub(tick)
+                    start.saturating_sub(tick)
                 };
                 let end = if positive {
-                    end.wrapping_add(tick)
+                    end.saturating_add(tick)
                 } else {
-                    end.wrapping_sub(tick)
+                    end.saturating_sub(tick)
                 };
                 ActionType::End { start, end }
             }
             ActionType::EachTick { start, end } => {
                 let start = if positive {
-                    start.wrapping_add(tick)
+                    start.saturating_add(tick)
                 } else {
-                    start.wrapping_sub(tick)
+                    start.saturating_sub(tick)
                 };
                 let end = if positive {
-                    end.wrapping_add(tick)
+                    end.saturating_add(tick)
                 } else {
-                    end.wrapping_sub(tick)
+                    end.saturating_sub(tick)
                 };
                 ActionType::EachTick { start, end }
             }

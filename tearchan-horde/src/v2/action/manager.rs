@@ -488,8 +488,8 @@ impl<'a> ActionManagerConverter<'a> {
             ActionType::Start { start, end, each } => {
                 let tick = remapped_action_type.tick().unwrap();
                 let item = self.actions.entry(tick).or_insert_with(Default::default);
-                let start_time = start.wrapping_mul(self.tick_duration);
-                let end_time = end.wrapping_mul(self.tick_duration);
+                let start_time = start.saturating_mul(self.tick_duration);
+                let end_time = end.saturating_mul(self.tick_duration);
                 item.events.push_back((
                     entity_id,
                     (
@@ -622,7 +622,7 @@ impl<'a> ActionController<'a> {
         let start_tick = context.last_tick;
         let end_tick = start_tick + duration / self.tick_duration;
         let start = start_tick * self.tick_duration;
-        let end = end_tick.wrapping_mul(self.tick_duration);
+        let end = end_tick.saturating_mul(self.tick_duration);
         let each = options.each;
         {
             let item = self
@@ -771,9 +771,9 @@ impl ActionRemapper {
             .unwrap()
             .map(|(value, positive)| {
                 if positive {
-                    tick.wrapping_add(value)
+                    tick.saturating_add(value)
                 } else {
-                    tick.wrapping_sub(value)
+                    tick.saturating_sub(value)
                 }
             })
             .unwrap_or(tick)
