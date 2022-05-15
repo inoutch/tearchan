@@ -121,6 +121,11 @@ where
         }
     }
 
+    pub fn reset(&mut self) {
+        self.jobs.clear();
+        self.action_manager = ActionManager::default();
+    }
+
     fn run_actions(&mut self, provider: &mut T) {
         // Loop for each tick
         loop {
