@@ -160,8 +160,12 @@ where
                 while let Some(job) = job_queue.pop_front() {
                     self.jobs.get_mut(&entity_id).unwrap().push(job.clone());
 
-                    let result =
-                        provider.on_next(entity_id, job, &mut self.action_manager.controller());
+                    if let Some(result) =
+                        provider.on_next(entity_id, job, &mut self.action_manager.controller())
+                    {
+                        job_queue.push_back(result);
+                    }
+
                     if job_queue.is_empty() && !self.action_manager.has_some_actions(entity_id) {
                         // If the jobs and actions cannot be generated from the current job tree,
                         // change the priority and recreate the first job
@@ -169,10 +173,6 @@ where
                         self.jobs.get_mut(&entity_id).unwrap().clear();
                         job_queue.push_front(provider.on_first(entity_id, priority));
                         continue;
-                    }
-
-                    if let Some(result) = result {
-                        job_queue.push_back(result);
                     }
                 }
             }
