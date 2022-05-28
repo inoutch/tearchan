@@ -215,9 +215,44 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
                     &mut colors,
                     &mut texcoords,
                     &mut normals,
-                    &object,
+                    object,
                     shade,
                 );
+            }
+        }
+
+        MeshBuilder {
+            indices,
+            positions,
+            colors,
+            texcoords,
+            normals,
+        }
+    }
+
+    pub fn with_objects(
+        self,
+        objects: Vec<&wavefront_obj::obj::Object>,
+    ) -> MeshBuilder<Vec<IndexType>, Vec<Vec3>, Vec<Vec4>, Vec<Vec2>> {
+        let mut indices: Vec<IndexType> = vec![];
+        let mut positions: Vec<Vec3> = vec![];
+        let mut colors: Vec<Vec4> = vec![];
+        let mut texcoords: Vec<Vec2> = vec![];
+        let mut normals: Vec<Vec3> = vec![];
+
+        for object in objects {
+            for geometry in &object.geometry {
+                for shade in &geometry.shapes {
+                    create_elements_from_shade(
+                        &mut indices,
+                        &mut positions,
+                        &mut colors,
+                        &mut texcoords,
+                        &mut normals,
+                        object,
+                        shade,
+                    );
+                }
             }
         }
 
@@ -255,7 +290,7 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
                     &mut colors,
                     &mut texcoords,
                     &mut normals,
-                    &object,
+                    object,
                     shade,
                     &rect2(fx, fy, fw, fh),
                 );
@@ -333,7 +368,7 @@ impl<TIndicesType, TPositionsType, TColorsType, TTexcoordsType>
                         &mut colors,
                         &mut texcoords,
                         &mut normals,
-                        &object,
+                        object,
                         shade,
                         &rect2(fx, fy, fw, fh),
                     );
