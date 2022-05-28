@@ -134,27 +134,31 @@ impl<TProvider> Batch<TProvider> {
                 }
                 BatchObjectEvent::WriteToIndexBuffer { id } => {
                     if let Some(object) = manager.get(id) {
-                        provider.run(
-                            &mut context,
-                            BatchEvent::WriteToIndexBuffer {
-                                id,
-                                pointer: object.index_pointer(),
-                                object,
-                            },
-                        );
+                        if !object.index_pointer().is_empty() {
+                            provider.run(
+                                &mut context,
+                                BatchEvent::WriteToIndexBuffer {
+                                    id,
+                                    pointer: object.index_pointer(),
+                                    object,
+                                },
+                            );
+                        }
                     }
                 }
                 BatchObjectEvent::WriteToVertexBuffer { id, attribute } => {
                     if let Some(object) = manager.get(id) {
-                        provider.run(
-                            &mut context,
-                            BatchEvent::WriteToVertexBuffer {
-                                id,
-                                pointer: object.vertex_pointer(),
-                                attribute,
-                                object,
-                            },
-                        );
+                        if !object.vertex_pointer().is_empty() {
+                            provider.run(
+                                &mut context,
+                                BatchEvent::WriteToVertexBuffer {
+                                    id,
+                                    pointer: object.vertex_pointer(),
+                                    attribute,
+                                    object,
+                                },
+                            );
+                        }
                     }
                 }
                 BatchObjectEvent::ClearToIndexBuffer { pointer } => {
