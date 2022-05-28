@@ -281,6 +281,9 @@ impl BatchObjectManager {
         };
         object.set_transform(attribute, transform);
 
+        if object.vertex_pointer().is_empty() {
+            return;
+        }
         let key = BatchObjectKey::Vertex((id, attribute));
         if self.objects_will_be_rewritten.get(&key).is_none() {
             self.events
@@ -313,6 +316,9 @@ impl BatchObjectManager {
             None => return,
         };
         assert_eq!(vertices.len(), prev_data.len());
+        if vertices.is_empty() {
+            return;
+        }
 
         object.set_vertices(attribute, vertices);
         let key = BatchObjectKey::Vertex((id, attribute));

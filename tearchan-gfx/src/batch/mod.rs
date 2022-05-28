@@ -171,6 +171,7 @@ impl<TProvider> Batch<TProvider> {
                 }
             }
         }
+        self.manager.clear_events();
     }
 }
 

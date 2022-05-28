@@ -43,6 +43,10 @@ pub struct BatchBufferAllocator {
 
 impl BatchBufferAllocator {
     pub fn allocate(&mut self, len: usize) -> BatchBufferPointer {
+        if len == 0 {
+            // "first" is held as a pointer key, so it does not create a pointer with no size
+            return BatchBufferPointer::new(usize::MAX, 0);
+        }
         if let Some(pointer) = self.allocate_from_pending_pointers(len) {
             self.events.push_back(Event::Write {
                 first: pointer.first,
@@ -67,6 +71,11 @@ impl BatchBufferAllocator {
     }
 
     pub fn free(&mut self, pointer: BatchBufferPointer) {
+        if pointer.len == 0 {
+            // Pointers with size zero are not registered
+            return;
+        }
+
         let first = pointer.first;
         let last = pointer.first + pointer.len;
         self.pointers.remove(&pointer.first);
@@ -251,6 +260,14 @@ impl BatchBufferPointer {
 
     pub fn last(&self) -> usize {
         self.first + self.len
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 
@@ -754,5 +771,20 @@ mod test {
         pending_pointers.remove(BatchBufferPointer { first: 3, len: 3 });
         assert_eq!(pending_pointers.pending_pointers.len(), 0);
         assert_eq!(pending_pointers.pending_pointers_grouped_by_last.len(), 0);
+    }
+
+    #[test]
+    fn test_zero_pointers() {
+        let mut allocator = BatchBufferAllocator::default();
+
+        let p1 = allocator.allocate(0);
+        let p2 = allocator.allocate(0);
+        let _p3 = allocator.allocate(5);
+
+        allocator.free(p1);
+        allocator.free(p2);
+
+        assert_eq!(allocator.len(), 5);
+        assert_eq!(allocator.pointers.len(), 1);
     }
 }
