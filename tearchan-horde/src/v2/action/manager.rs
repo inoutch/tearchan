@@ -56,6 +56,7 @@ struct ActionContext {
     running_end_tick: Tick,      // The end time of running action
     session_id: ActionSessionId, // Use for validation action
     session_expired_at: Tick,    // Invalid session is expired at this
+    last_tick_of_zero_tick_action: Option<Tick>,
 }
 
 #[derive(Default)]
@@ -209,6 +210,14 @@ impl ActionManager {
                     }
                     self.each_tick_actions.remove(entity_id);
                     self.update_actions.remove(entity_id);
+
+                    if context
+                        .last_tick_of_zero_tick_action
+                        .map(|last| last == tick)
+                        .unwrap_or(false)
+                    {
+                        context.last_tick_of_zero_tick_action = None;
+                    }
                 }
                 Event::Canceled => {
                     self.vacated_entities.insert(entity_id);
@@ -328,6 +337,7 @@ impl ActionManager {
                     running_end_tick: Tick::MAX,
                     session_id: manager.session_id_manager.gen(),
                     session_expired_at: manager.current_tick,
+                    last_tick_of_zero_tick_action: None,
                 });
             }
             match action.ty {
@@ -399,6 +409,7 @@ impl ActionManager {
                     running_end_tick: Tick::MAX,
                     session_id: self.session_id_manager.gen(),
                     session_expired_at: self.current_tick,
+                    last_tick_of_zero_tick_action: None,
                 });
             }
         }
@@ -449,6 +460,10 @@ impl ActionManager {
             Some(context) => context,
         };
         context.last_tick != self.current_tick
+            || context
+                .last_tick_of_zero_tick_action
+                .map(|tick| tick == self.current_tick)
+                .unwrap_or(false)
     }
 }
 
@@ -689,6 +704,7 @@ impl<'a> ActionController<'a> {
                 .push_back((entity_id, (context.session_id, Event::Ended)));
         }
         context.last_tick = end_tick;
+        context.last_tick_of_zero_tick_action = Some(end_tick);
     }
 
     #[inline]
@@ -712,6 +728,7 @@ impl<'a> ActionController<'a> {
                 running_end_tick: self.current_tick,
                 session_id: self.session_id_manager.gen(),
                 session_expired_at: self.current_tick,
+                last_tick_of_zero_tick_action: None,
             },
         );
         self.vacated_entities.insert(entity_id);
@@ -1455,5 +1472,44 @@ mod test {
         manager.update(462);
 
         assert_snapshot(&mut manager);
+    }
+
+    #[test]
+    fn test_zero_tick_action() {
+        let mut manager = ActionManager::default();
+        manager.attach(1);
+
+        manager.enqueue(1, Arc::new(MoveState), 0);
+
+        assert!(manager.has_some_actions(1));
+
+        while manager.pull_actions().is_some() {}
+
+        assert!(!manager.has_some_actions(1));
+
+        manager.enqueue(1, Arc::new(MoveState), 660);
+        manager.enqueue(1, Arc::new(MoveState), 0);
+
+        manager.update(660);
+
+        let actions = manager.pull_actions().unwrap();
+        insta::assert_debug_snapshot!(SnapshotResult {
+            current_tick: manager.current_tick(),
+            tag: "test1",
+            move_actions: actions.map.get(&manager.validator()),
+            jump_actions: actions.map.get(&manager.validator()),
+            talk_actions: actions.map.get(&manager.validator())
+        });
+        let actions = manager.pull_actions().unwrap();
+        insta::assert_debug_snapshot!(SnapshotResult {
+            current_tick: manager.current_tick(),
+            tag: "test2",
+            move_actions: actions.map.get(&manager.validator()),
+            jump_actions: actions.map.get(&manager.validator()),
+            talk_actions: actions.map.get(&manager.validator())
+        });
+
+        assert_eq!(manager.current_tick, 10);
+        assert!(!manager.has_some_actions(1));
     }
 }
